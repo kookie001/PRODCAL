@@ -1,0 +1,6 @@
+{
+  "name": "Google Calendar Tasks",
+  "description": "A high-fidelity Google Calendar-style Task Manager with Month, Week, Day, and Schedule views, task CRUD, collapsible subtasks, category filtering, and Material 3 design.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
