@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+    <!-- Card Shadow -->
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#0f172a" flood-opacity="0.15" />
+    </filter>
+  </defs>
+
+  <!-- Solid white circle for standard maskable background -->
+  <rect width="512" height="512" rx="112" fill="#ffffff" />
+
+  <!-- App Logo Container -->
+  <g filter="url(#dropShadow)">
+    <!-- Calendar Card Base -->
+    <rect x="96" y="96" width="320" height="320" rx="48" fill="#ffffff" stroke="#e2e8f0" stroke-width="8" />
+    
+    <!-- Calendar Card Header (Blue) -->
+    <path d="M96 144 C96 117.49 117.49 96 144 96 H368 C394.51 96 416 117.49 416 144 V176 H96 Z" fill="url(#bgGrad)" />
+    
+    <!-- Calendar Binder Rings/Dots -->
+    <circle cx="160" cy="136" r="12" fill="#ffffff" opacity="0.9" />
+    <circle cx="256" cy="136" r="12" fill="#ffffff" opacity="0.9" />
+    <circle cx="352" cy="136" r="12" fill="#ffffff" opacity="0.9" />
+
+    <!-- Google-style Task Checkbox (Circular) -->
+    <circle cx="256" cy="288" r="64" fill="none" stroke="#2563eb" stroke-width="16" />
+    
+    <!-- Inner Checkmark -->
+    <path d="M224 288 L248 312 L296 264" fill="none" stroke="#2563eb" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+</svg>

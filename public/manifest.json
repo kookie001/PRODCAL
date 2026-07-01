@@ -1,0 +1,24 @@
+{
+  "name": "Google Calendar Tasks",
+  "short_name": "Tasks",
+  "description": "A high-fidelity Google Calendar-style Task Manager with Month, Week, Day, and Schedule views, task CRUD, collapsible subtasks, category filtering, and Material 3 design.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/app_icon.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any"
+    }
+  ]
+}
