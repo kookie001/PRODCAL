@@ -4,7 +4,9 @@ const ASSETS_TO_CACHE = [
   '/index.html',
   '/manifest.json',
   '/icon.svg',
-  '/app_icon.jpg'
+  '/icon-192.png',
+  '/icon-512.png',
+  '/apple-touch-icon.png'
 ];
 
 // Install Service Worker and precache basic shells
