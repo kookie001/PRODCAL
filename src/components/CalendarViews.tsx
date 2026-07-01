@@ -25,11 +25,18 @@ import {
   Check,
   AlertCircle,
   Sparkles,
-  ListTodo
+  ListTodo,
+  ArrowLeft,
+  Search,
+  Plus,
+  X,
+  MoreVertical
 } from 'lucide-react';
 import { useTaskStore } from '../store';
 import { Task, CATEGORIES, Subtask, CategoryType } from '../types';
 import { QuickCreatePopover } from './QuickCreatePopover';
+import { motion, AnimatePresence } from 'motion/react';
+import { Ripple } from './Ripple';
 
 interface CalendarViewsProps {
   searchQuery: string;
@@ -848,21 +855,21 @@ const WeekView: React.FC<WeekViewProps> = ({
 
                 {/* Render hourly timed tasks floating absolute on top of grid */}
                 {dayTasks.map((task) => {
-                  if (!task.time) return null;
+                  if (!task.time && draggedTaskId !== task.id) return null;
 
-                  const [taskHour, taskMin] = task.time.split(':').map(Number);
+                  const [taskHour, taskMin] = (task.time || "00:00").split(':').map(Number);
                   const startOffsetMins = (taskHour * 60) + (taskMin || 0);
                   const topPos = startOffsetMins * (1536 / 1440);
 
                   const cat = CATEGORIES.find((c) => c.id === task.category) || CATEGORIES[0];
                   
-                  const isCollapsed = collapsedTasks[task.id] ?? false; 
+                  const isCollapsed = collapsedTasks[task.id] ?? true; 
                   const hasSubtasks = task.subtasks && task.subtasks.length > 0;
-                  const isExpanded = expandedTaskId === task.id;
+                  const isExpanded = !isCollapsed;
 
                   const isDraggingThis = draggedTaskId === task.id;
                   const currentTop = isDraggingThis ? Math.max(0, dragStartTop + dragCurrentOffset) : topPos;
-                  const displayTime = isDraggingThis && tempTimeStr ? tempTimeStr : task.time;
+                  const displayTime = isDraggingThis && tempTimeStr ? tempTimeStr : (task.time || "All-Day");
 
                   const deleteTask = useTaskStore.getState().deleteTask;
                   const setEditingTask = useTaskStore.getState().setEditingTask;
@@ -870,246 +877,275 @@ const WeekView: React.FC<WeekViewProps> = ({
                   return (
                     <div
                       key={task.id}
-                      onPointerDown={(e) => {
-                        e.stopPropagation();
-                        if (e.button !== 0) return;
-                        const target = e.currentTarget as HTMLElement;
-                        target.setPointerCapture(e.pointerId);
-                        onTaskDragStart(task.id, topPos, e.clientY);
-                      }}
-                      onPointerMove={(e) => {
-                        e.stopPropagation();
-                        if (draggedTaskId === task.id) {
-                          onTaskDragMove(e.clientY);
-                        }
-                      }}
-                      onPointerUp={(e) => {
-                        e.stopPropagation();
-                        if (draggedTaskId === task.id) {
-                          const target = e.currentTarget as HTMLElement;
-                          target.releasePointerCapture(e.pointerId);
-                          onTaskDragEnd();
-                          const diffY = Math.abs(e.clientY - pointerStartY);
-                          if (diffY < 5) {
-                            if (isExpanded) {
-                              setExpandedTaskId(null);
-                            } else {
-                              setExpandedTaskId(task.id);
-                            }
-                          }
-                        }
-                      }}
-                      className={`absolute left-1 right-1 p-2.5 rounded-lg border text-xs shadow-xs transition-all duration-200 flex flex-col select-none pl-3.5
-                        ${isDraggingThis 
-                          ? 'scale-[1.02] shadow-lg opacity-95 border-blue-500 ring-2 ring-blue-500/30 z-50 cursor-grabbing' 
-                          : isExpanded 
-                            ? 'z-40 ring-1 ring-blue-400/40 border-blue-400 shadow-md scale-[1.01]' 
-                            : 'hover:scale-[1.01] hover:shadow-xs cursor-grab z-5'
-                        }
-                        ${task.completed
-                          ? 'bg-gray-50 text-gray-400 border-gray-200'
-                          : `${cat.color.bgLight} ${cat.color.light} ${cat.color.borderLight}`
-                        }
-                      `}
+                      className="absolute left-1 right-1 overflow-hidden rounded-xl"
                       style={{ 
                         top: `${currentTop}px`,
-                        height: (isExpanded || !isCollapsed) ? 'auto' : '52px',
+                        height: isExpanded ? 'auto' : '52px',
                         minHeight: '52px',
-                        overflow: 'visible',
-                        touchAction: 'none'
+                        zIndex: isDraggingThis ? 100 : isExpanded ? 40 : 5,
                       }}
                     >
-                      {/* Left accent stripe */}
-                      <div 
-                        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-lg transition-colors" 
-                        style={{ backgroundColor: task.completed ? '#cbd5e1' : cat.color.solid }}
-                      />
+                      {/* Swipe Background (Delete Trash indicators) */}
+                      <div className="absolute inset-0 bg-rose-600 rounded-xl flex items-center justify-between px-4 text-white z-0 pointer-events-none">
+                        <Trash2 size={16} className="animate-pulse" />
+                        <Trash2 size={16} className="animate-pulse" />
+                      </div>
 
-                      {/* Header row with custom checkbox */}
-                      <div className="flex items-start justify-between min-w-0">
-                        <div className="flex items-center min-w-0 flex-1">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              updateTask(task.id, { completed: !task.completed });
-                            }}
-                            className="p-0.5 rounded-full text-gray-500 hover:text-gray-800 transition-colors flex-shrink-0 mr-1.5 cursor-pointer"
-                          >
-                            <span 
-                              className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center transition-all
-                                ${task.completed 
-                                  ? 'bg-blue-600 border-blue-600 text-white' 
-                                  : 'bg-transparent border-gray-400 hover:border-gray-600'
-                                }
-                              `}
-                              style={task.completed ? { backgroundColor: cat.color.solid, borderColor: cat.color.solid } : { borderColor: cat.color.solid }}
+                      {/* Draggable Task Card */}
+                      <motion.div
+                        drag="x"
+                        dragDirectionLock
+                        dragConstraints={{ left: 0, right: 0 }}
+                        dragElastic={{ left: 0.95, right: 0.95 }}
+                        onDragEnd={(event, info) => {
+                          const threshold = 100;
+                          if (Math.abs(info.offset.x) > threshold) {
+                            deleteTask(task.id);
+                          }
+                        }}
+                        onPointerDown={(e) => {
+                          e.stopPropagation();
+                          if (e.button !== 0) return;
+                          const target = e.currentTarget as HTMLElement;
+                          target.setPointerCapture(e.pointerId);
+                          onTaskDragStart(task.id, topPos, e.clientY);
+                        }}
+                        onPointerMove={(e) => {
+                          e.stopPropagation();
+                          if (draggedTaskId === task.id) {
+                            onTaskDragMove(e.clientY);
+                          }
+                        }}
+                        onPointerUp={(e) => {
+                          e.stopPropagation();
+                          if (draggedTaskId === task.id) {
+                            const target = e.currentTarget as HTMLElement;
+                            target.releasePointerCapture(e.pointerId);
+                            onTaskDragEnd();
+                            const diffY = Math.abs(e.clientY - pointerStartY);
+                            if (diffY < 5) {
+                              toggleTaskCollapse(task.id);
+                            }
+                          }
+                        }}
+                        className={`w-full p-2.5 rounded-xl border text-xs shadow-xs transition-all duration-150 flex flex-col select-none pl-3.5 z-10 relative
+                          ${isDraggingThis 
+                            ? 'scale-[1.02] shadow-sm opacity-95 border-blue-500 ring-2 ring-blue-500/30 cursor-grabbing' 
+                            : isExpanded 
+                              ? 'ring-1.5 ring-blue-400/50 border-blue-400 shadow-xs scale-[1.005]' 
+                              : 'hover:scale-[1.005] hover:shadow-xs cursor-grab'
+                          }
+                          ${task.completed
+                            ? 'bg-gray-50 text-gray-400 border-gray-200'
+                            : `${cat.color.bgLight} ${cat.color.light} ${cat.color.borderLight}`
+                          }
+                        `}
+                        style={{ 
+                          overflow: 'visible',
+                          touchAction: 'none'
+                        }}
+                      >
+                        {/* Ripple Effect */}
+                        <Ripple color={task.completed ? 'rgba(0, 0, 0, 0.04)' : 'rgba(0, 0, 0, 0.07)'} />
+
+                        {/* Left accent stripe */}
+                        <div 
+                          className="absolute left-0 top-0 bottom-0 w-1 rounded-l-lg transition-colors" 
+                          style={{ backgroundColor: task.completed ? '#cbd5e1' : cat.color.solid }}
+                        />
+
+                        {/* Header row with custom checkbox */}
+                        <div className="flex items-start justify-between min-w-0 relative z-10">
+                          <div className="flex items-center min-w-0 flex-1">
+                            <button
+                              type="button"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateTask(task.id, { completed: !task.completed });
+                              }}
+                              className="p-0.5 rounded-full text-gray-500 hover:text-gray-800 transition-colors flex-shrink-0 mr-1.5 cursor-pointer"
                             >
-                              {task.completed && <Check size={8} className="stroke-[3px] text-white" />}
+                              <span 
+                                className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center transition-all
+                                  ${task.completed 
+                                    ? 'bg-blue-600 border-blue-600 text-white' 
+                                    : 'bg-transparent border-gray-400 hover:border-gray-600'
+                                  }
+                                `}
+                                style={task.completed ? { backgroundColor: cat.color.solid, borderColor: cat.color.solid } : { borderColor: cat.color.solid }}
+                              >
+                                {task.completed && <Check size={8} className="stroke-[3px] text-white" />}
+                              </span>
+                            </button>
+                            
+                            <div className={`font-semibold truncate leading-tight flex-1 ${task.completed ? 'line-through text-gray-400 font-normal' : ''}`}>
+                              {task.title}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-1 pl-1 flex-shrink-0">
+                            {hasSubtasks && (
+                              <button
+                                type="button"
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleTaskCollapse(task.id);
+                                }}
+                                className="p-0.5 hover:bg-black/5 rounded transition-transform duration-150 cursor-pointer"
+                                style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}
+                              >
+                                <ChevronRight size={11} />
+                              </button>
+                            )}
+                            <span className="text-[9px] opacity-75 font-bold flex items-center space-x-0.5 whitespace-nowrap">
+                              <Clock size={9} />
+                              <span>{displayTime}</span>
                             </span>
-                          </button>
-                          
-                          <div className={`font-semibold truncate leading-tight flex-1 ${task.completed ? 'line-through text-gray-400 font-normal' : ''}`}>
-                            {task.title}
                           </div>
                         </div>
 
-                        <div className="flex items-center space-x-1 pl-1 flex-shrink-0">
-                          {hasSubtasks && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleTaskCollapse(task.id);
-                              }}
-                              className="p-0.5 hover:bg-black/5 rounded transition-transform duration-150 cursor-pointer"
-                              style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}
-                            >
-                              <ChevronRight size={11} />
-                            </button>
+                        {/* Sub-header details */}
+                        <div className="text-[9px] opacity-80 mt-0.5 flex items-center justify-between relative z-10">
+                          <div className="flex items-center min-w-0">
+                            <span 
+                              className="w-1 h-1 rounded-full mr-1 flex-shrink-0"
+                              style={!task.completed ? { backgroundColor: cat.color.solid } : undefined}
+                            />
+                            <span className="font-semibold truncate">{cat.name}</span>
+                          </div>
+
+                          {/* Subtasks Progress Status Dots when Collapsed */}
+                          {hasSubtasks && isCollapsed && (
+                            <div className="flex items-center space-x-0.5 bg-black/5 px-1.5 py-0.2 rounded-full scale-90 border border-black/5 flex-shrink-0">
+                              <span className="text-[8px] font-bold font-mono mr-0.5">
+                                {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
+                              </span>
+                              <div className="flex items-center space-x-0.5">
+                                {task.subtasks.slice(0, 4).map((s) => (
+                                  <span 
+                                    key={s.id} 
+                                    className={`w-1 h-1 rounded-full border
+                                      ${s.completed 
+                                        ? 'bg-blue-600 border-blue-600' 
+                                        : 'bg-transparent border-gray-400'
+                                      }
+                                    `} 
+                                  />
+                                ))}
+                                {task.subtasks.length > 4 && <span className="text-[6px] font-bold">+</span>}
+                              </div>
+                            </div>
                           )}
-                          <span className="text-[9px] opacity-75 font-bold flex items-center space-x-0.5 whitespace-nowrap">
-                            <Clock size={9} />
-                            <span>{displayTime}</span>
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Sub-header details */}
-                      <div className="text-[9px] opacity-80 mt-0.5 flex items-center justify-between">
-                        <div className="flex items-center min-w-0">
-                          <span 
-                            className="w-1 h-1 rounded-full mr-1 flex-shrink-0"
-                            style={!task.completed ? { backgroundColor: cat.color.solid } : undefined}
-                          />
-                          <span className="font-semibold truncate">{cat.name}</span>
                         </div>
 
-                        {/* Subtasks Progress Status Dots when Collapsed */}
-                        {hasSubtasks && isCollapsed && (
-                          <div className="flex items-center space-x-0.5 bg-black/5 px-1.5 py-0.2 rounded-full scale-90 border border-black/5 flex-shrink-0">
-                            <span className="text-[8px] font-bold font-mono mr-0.5">
-                              {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
-                            </span>
-                            <div className="flex items-center space-x-0.5">
-                              {task.subtasks.slice(0, 4).map((s) => (
-                                <span 
-                                  key={s.id} 
-                                  className={`w-1 h-1 rounded-full border
-                                    ${s.completed 
-                                      ? 'bg-blue-600 border-blue-600' 
-                                      : 'bg-transparent border-gray-400'
-                                    }
-                                  `} 
-                                />
-                              ))}
-                              {task.subtasks.length > 4 && <span className="text-[6px] font-bold">+</span>}
+                        {/* Inline expanded details */}
+                        {isExpanded && (
+                          <div className="mt-2 pt-2 border-t border-black/5 flex flex-col space-y-1.5 animate-fadeIn relative z-10">
+                            <div className="flex items-center space-x-1 text-[9px] text-gray-500 font-medium">
+                              <CalendarDays size={10} />
+                              <span>{task.date} {task.time ? `at ${task.time}` : '(All Day)'}</span>
+                            </div>
+
+                            <div className="flex items-center space-x-1.5 pt-0.5">
+                              <button
+                                type="button"
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingTask(task);
+                                  setFABOpen(true);
+                                }}
+                                className="flex items-center space-x-0.5 px-2 py-0.5 rounded bg-black/5 hover:bg-black/10 text-gray-700 font-semibold text-[9px] select-none cursor-pointer transition-colors"
+                                title="Edit task"
+                              >
+                                <Edit3 size={10} />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                type="button"
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteTask(task.id);
+                                }}
+                                className="flex items-center space-x-0.5 px-2 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-[9px] select-none cursor-pointer transition-colors"
+                                title="Delete task"
+                              >
+                                <Trash2 size={10} />
+                                <span>Delete</span>
+                              </button>
                             </div>
                           </div>
                         )}
-                      </div>
 
-                      {/* Inline expanded details */}
-                      {isExpanded && (
-                        <div className="mt-2 pt-2 border-t border-black/5 flex flex-col space-y-1.5 animate-fadeIn">
-                          <div className="flex items-center space-x-1 text-[9px] text-gray-500 font-medium">
-                            <CalendarDays size={10} />
-                            <span>{task.date} at {task.time}</span>
-                          </div>
+                        {/* Display subtasks below parent block if expanded */}
+                        {!isCollapsed && hasSubtasks && (
+                          <div className="mt-1.5 space-y-0.5 border-t border-black/5 pt-1.5 flex-1 overflow-visible relative z-10">
+                            {task.subtasks.map((sub, sIdx) => {
+                              const isDraggingSub = draggedSubTaskId === task.id && draggedSubIndex === sIdx;
+                              const subTopOffset = isDraggingSub ? subDraggedOffset : 0;
 
-                          <div className="flex items-center space-x-1.5 pt-0.5">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingTask(task);
-                                setFABOpen(true);
-                              }}
-                              className="flex items-center space-x-0.5 px-2 py-0.5 rounded bg-black/5 hover:bg-black/10 text-gray-700 font-semibold text-[9px] select-none cursor-pointer transition-colors"
-                              title="Edit task"
-                            >
-                              <Edit3 size={10} />
-                              <span>Edit</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteTask(task.id);
-                              }}
-                              className="flex items-center space-x-0.5 px-2 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-[9px] select-none cursor-pointer transition-colors"
-                              title="Delete task"
-                            >
-                              <Trash2 size={10} />
-                              <span>Delete</span>
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Display subtasks below parent block if expanded */}
-                      {!isCollapsed && hasSubtasks && (
-                        <div className="mt-1.5 space-y-0.5 border-t border-black/5 pt-1.5 flex-1 overflow-visible">
-                          {task.subtasks.map((sub, sIdx) => {
-                            const isDraggingSub = draggedSubTaskId === task.id && draggedSubIndex === sIdx;
-                            const subTopOffset = isDraggingSub ? subDraggedOffset : 0;
-
-                            return (
-                              <div 
-                                key={sub.id} 
-                                className={`group flex items-center space-x-1 py-0.5 px-1 rounded hover:bg-black/5 relative select-none transition-all duration-150
-                                  ${isDraggingSub ? 'bg-black/10 shadow-sm z-50 scale-[1.02] ring-1 ring-blue-500/20' : ''}
-                                  ${sub.completed ? 'opacity-60' : 'hover:translate-x-0.5'}
-                                `}
-                                style={{
-                                  transform: isDraggingSub ? `translate(${subDraggedOffsetX}px, ${subTopOffset}px)` : 'none',
-                                  touchAction: 'none'
-                                }}
-                              >
-                                {/* Small drag handle (≡) */}
-                                <button
-                                  type="button"
-                                  onPointerDown={(e) => handleSubPointerDown(task.id, sIdx, e)}
-                                  onPointerMove={(e) => handleSubPointerMove(task.id, sIdx, e)}
-                                  onPointerUp={(e) => handleSubPointerUp(task.id, sIdx, e)}
-                                  className="p-0.5 text-gray-400 hover:text-gray-700 rounded cursor-grab active:cursor-grabbing flex-shrink-0 opacity-30 group-hover:opacity-100 transition-opacity"
-                                  title="Drag subtask to prioritize"
-                                >
-                                  <GripVertical size={10} />
-                                </button>
-
-                                {/* Completion dot/checkbox */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleSubtask(task.id, sub.id);
+                              return (
+                                <div 
+                                  key={sub.id} 
+                                  className={`group flex items-center space-x-1 py-0.5 px-1 rounded hover:bg-black/5 relative select-none transition-all duration-150
+                                    ${isDraggingSub ? 'bg-black/10 shadow-sm z-50 scale-[1.02] ring-1 ring-blue-500/20' : ''}
+                                    ${sub.completed ? 'opacity-60' : 'hover:translate-x-0.5'}
+                                  `}
+                                  style={{
+                                    transform: isDraggingSub ? `translate(${subDraggedOffsetX}px, ${subTopOffset}px)` : 'none',
+                                    touchAction: 'none'
                                   }}
-                                  className="p-0.5 text-gray-500 hover:text-gray-800 rounded flex-shrink-0 cursor-pointer"
-                                  title={sub.completed ? "Mark incomplete" : "Mark complete"}
                                 >
-                                  <span 
-                                    className={`w-2 h-2 rounded-full flex items-center justify-center border border-current flex-shrink-0 transition-all
-                                      ${sub.completed ? 'bg-blue-600 border-blue-600 text-white' : 'bg-transparent border-gray-400'}
-                                    `}
-                                    style={!sub.completed ? { color: cat.color.solid, borderColor: cat.color.solid } : undefined}
+                                  {/* Small drag handle (≡) */}
+                                  <button
+                                    type="button"
+                                    onPointerDown={(e) => handleSubPointerDown(task.id, sIdx, e)}
+                                    onPointerMove={(e) => handleSubPointerMove(task.id, sIdx, e)}
+                                    onPointerUp={(e) => handleSubPointerUp(task.id, sIdx, e)}
+                                    className="p-0.5 text-gray-400 hover:text-gray-700 rounded cursor-grab active:cursor-grabbing flex-shrink-0 opacity-30 group-hover:opacity-100 transition-opacity"
+                                    title="Drag subtask to prioritize"
                                   >
-                                    {sub.completed && <Check size={5} className="stroke-[3.5px] text-white" />}
-                                  </span>
-                                </button>
+                                    <GripVertical size={10} />
+                                  </button>
 
-                                {/* Title */}
-                                <span className={`truncate text-[9px] flex-1 ${sub.completed ? 'line-through opacity-50 text-gray-400 font-normal' : 'font-medium text-gray-700 group-hover:text-gray-900'}`}>
-                                  {sub.title}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
+                                  {/* Completion dot/checkbox */}
+                                  <button
+                                    type="button"
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleSubtask(task.id, sub.id);
+                                    }}
+                                    className="p-0.5 text-gray-500 hover:text-gray-800 rounded flex-shrink-0 cursor-pointer relative overflow-hidden"
+                                    title={sub.completed ? "Mark incomplete" : "Mark complete"}
+                                  >
+                                    <span 
+                                      className={`w-2 h-2 rounded-full flex items-center justify-center border border-current flex-shrink-0 transition-all
+                                        ${sub.completed ? 'bg-blue-600 border-blue-600 text-white' : 'bg-transparent border-gray-400'}
+                                      `}
+                                      style={!sub.completed ? { color: cat.color.solid, borderColor: cat.color.solid } : undefined}
+                                    >
+                                      {sub.completed && <Check size={5} className="stroke-[3.5px] text-white" />}
+                                    </span>
+                                  </button>
+
+                                  {/* Title */}
+                                  <span className={`truncate text-[9px] flex-1 ${sub.completed ? 'line-through opacity-50 text-gray-400 font-normal' : 'font-medium text-gray-700 group-hover:text-gray-900'}`}>
+                                    {sub.title}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </motion.div>
                     </div>
                   );
-                })}                {/* Non-timed tasks section at the very top */}
+                })}
+                {/* Non-timed tasks section at the very top */}
                 <div className="absolute top-1 left-1 right-1 flex flex-col space-y-1">
                   {dayTasks.filter(t => !t.time).map((task) => {
                     const cat = CATEGORIES.find((c) => c.id === task.category) || CATEGORIES[0];
@@ -1122,120 +1158,150 @@ const WeekView: React.FC<WeekViewProps> = ({
                     return (
                       <div
                         key={task.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isExpanded) {
-                            setExpandedTaskId(null);
-                          } else {
-                            setExpandedTaskId(task.id);
-                          }
-                        }}
-                        className={`p-1.5 rounded-md border text-[10px] cursor-pointer shadow-2xs transition-all duration-200 flex flex-col pl-3 relative
-                          ${isExpanded ? 'z-50 ring-1 ring-blue-400 border-blue-400' : 'hover:scale-101'}
-                          ${task.completed
-                            ? 'bg-gray-50 text-gray-400 border-gray-100'
-                            : `${cat.color.bgLight} ${cat.color.light} ${cat.color.borderLight}`
-                          }
-                        `}
+                        className="relative overflow-hidden rounded-md"
+                        style={{ minHeight: '28px' }}
                       >
-                        {/* Accent left stripe */}
-                        <div 
-                          className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-md" 
-                          style={{ backgroundColor: task.completed ? '#cbd5e1' : cat.color.solid }}
-                        />
-
-                        {/* Title and Checkbox row */}
-                        <div className="flex items-center justify-between min-w-0">
-                          <div className="flex items-center min-w-0 flex-1">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                updateTask(task.id, { completed: !task.completed });
-                              }}
-                              className="p-0.5 rounded-full text-gray-500 hover:text-gray-800 transition-colors flex-shrink-0 mr-1.5 cursor-pointer"
-                            >
-                              <span 
-                                className={`w-3 h-3 rounded-full border flex items-center justify-center transition-all
-                                  ${task.completed 
-                                    ? 'bg-blue-600 border-blue-600 text-white' 
-                                    : 'bg-transparent border-gray-400 hover:border-gray-600'
-                                  }
-                                `}
-                                style={task.completed ? { backgroundColor: cat.color.solid, borderColor: cat.color.solid } : { borderColor: cat.color.solid }}
-                              >
-                                {task.completed && <Check size={6} className="stroke-[3.5px] text-white" />}
-                              </span>
-                            </button>
-                            <span className={`font-semibold truncate flex-1 ${task.completed ? 'line-through text-gray-400 font-normal' : ''}`}>
-                              All-Day: {task.title}
-                            </span>
-                          </div>
+                        {/* Swipe background */}
+                        <div className="absolute inset-0 bg-rose-600 rounded-md flex items-center justify-between px-3 text-white z-0 pointer-events-none">
+                          <Trash2 size={12} className="animate-pulse" />
+                          <Trash2 size={12} className="animate-pulse" />
                         </div>
 
-                        {/* Expanded state details */}
-                        {isExpanded && (
-                          <div className="mt-1.5 pt-1.5 border-t border-black/5 flex flex-col space-y-1.5 text-[9px]">
-                            <div className="flex items-center space-x-1 text-gray-500 font-medium">
-                              <CalendarDays size={8} />
-                              <span>{task.date} (All Day)</span>
-                            </div>
+                        {/* Draggable container */}
+                        <motion.div
+                          drag="x"
+                          dragDirectionLock
+                          dragConstraints={{ left: 0, right: 0 }}
+                          dragElastic={{ left: 0.95, right: 0.95 }}
+                          onDragEnd={(event, info) => {
+                            const threshold = 100;
+                            if (Math.abs(info.offset.x) > threshold) {
+                              deleteTask(task.id);
+                            }
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (isExpanded) {
+                              setExpandedTaskId(null);
+                            } else {
+                              setExpandedTaskId(task.id);
+                            }
+                          }}
+                          className={`p-1.5 rounded-md border text-[10px] cursor-pointer shadow-2xs transition-all duration-200 flex flex-col pl-3 relative z-10
+                            ${isExpanded ? 'ring-1 ring-blue-400 border-blue-400' : 'hover:scale-101'}
+                            ${task.completed
+                              ? 'bg-gray-50 text-gray-400 border-gray-100'
+                              : `${cat.color.bgLight} ${cat.color.light} ${cat.color.borderLight}`
+                            }
+                          `}
+                          style={{ touchAction: 'pan-y' }}
+                        >
+                          {/* Ripple Effect */}
+                          <Ripple color="rgba(0, 0, 0, 0.05)" />
 
-                            <div className="flex items-center space-x-1.5 pt-0.5">
+                          {/* Accent left stripe */}
+                          <div 
+                            className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-md" 
+                            style={{ backgroundColor: task.completed ? '#cbd5e1' : cat.color.solid }}
+                          />
+
+                          {/* Title and Checkbox row */}
+                          <div className="flex items-center justify-between min-w-0 relative z-10">
+                            <div className="flex items-center min-w-0 flex-1">
                               <button
                                 type="button"
+                                onPointerDown={(e) => e.stopPropagation()}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setEditingTask(task);
-                                  setFABOpen(true);
+                                  updateTask(task.id, { completed: !task.completed });
                                 }}
-                                className="flex items-center space-x-0.5 px-1.5 py-0.5 rounded bg-black/5 hover:bg-black/10 text-gray-700 font-semibold select-none cursor-pointer transition-colors"
+                                className="p-0.5 rounded-full text-gray-500 hover:text-gray-800 transition-colors flex-shrink-0 mr-1.5 cursor-pointer"
                               >
-                                <Edit3 size={8} />
-                                <span>Edit</span>
+                                <span 
+                                  className={`w-3 h-3 rounded-full border flex items-center justify-center transition-all
+                                    ${task.completed 
+                                      ? 'bg-blue-600 border-blue-600 text-white' 
+                                      : 'bg-transparent border-gray-400 hover:border-gray-600'
+                                    }
+                                  `}
+                                  style={task.completed ? { backgroundColor: cat.color.solid, borderColor: cat.color.solid } : { borderColor: cat.color.solid }}
+                                >
+                                  {task.completed && <Check size={6} className="stroke-[3.5px] text-white" />}
+                                </span>
                               </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  deleteTask(task.id);
-                                }}
-                                className="flex items-center space-x-0.5 px-1.5 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold select-none cursor-pointer transition-colors"
-                              >
-                                <Trash2 size={8} />
-                                <span>Delete</span>
-                              </button>
+                              <span className={`font-semibold truncate flex-1 ${task.completed ? 'line-through text-gray-400 font-normal' : ''}`}>
+                                All-Day: {task.title}
+                              </span>
                             </div>
-
-                            {/* Subtasks inside expanded all-day task */}
-                            {hasSubtasks && (
-                              <div className="mt-1 space-y-0.5 pt-1 border-t border-black/5">
-                                {task.subtasks.map((sub) => (
-                                  <div key={sub.id} className="flex items-center space-x-1 py-0.5">
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        toggleSubtask(task.id, sub.id);
-                                      }}
-                                      className="p-0.5 text-gray-500 hover:text-gray-800 rounded flex-shrink-0 cursor-pointer"
-                                    >
-                                      <span 
-                                        className={`w-1.5 h-1.5 rounded-full flex items-center justify-center border border-current flex-shrink-0 transition-all
-                                          ${sub.completed ? 'bg-blue-600 border-blue-600' : 'bg-transparent border-gray-400'}
-                                        `}
-                                        style={!sub.completed ? { color: cat.color.solid, borderColor: cat.color.solid } : undefined}
-                                      />
-                                    </button>
-                                    <span className={`truncate text-[8px] flex-1 ${sub.completed ? 'line-through opacity-50' : 'font-medium text-gray-700'}`}>
-                                      {sub.title}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
                           </div>
-                        )}
+
+                          {/* Expanded state details */}
+                          {isExpanded && (
+                            <div className="mt-1.5 pt-1.5 border-t border-black/5 flex flex-col space-y-1.5 text-[9px] relative z-10">
+                              <div className="flex items-center space-x-1 text-gray-500 font-medium">
+                                <CalendarDays size={8} />
+                                <span>{task.date} (All Day)</span>
+                              </div>
+
+                              <div className="flex items-center space-x-1.5 pt-0.5">
+                                <button
+                                  type="button"
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingTask(task);
+                                    setFABOpen(true);
+                                  }}
+                                  className="flex items-center space-x-0.5 px-1.5 py-0.5 rounded bg-black/5 hover:bg-black/10 text-gray-700 font-semibold select-none cursor-pointer transition-colors"
+                                >
+                                  <Edit3 size={8} />
+                                  <span>Edit</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deleteTask(task.id);
+                                  }}
+                                  className="flex items-center space-x-0.5 px-1.5 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold select-none cursor-pointer transition-colors"
+                                >
+                                  <Trash2 size={8} />
+                                  <span>Delete</span>
+                                </button>
+                              </div>
+
+                              {/* Subtasks inside expanded all-day task */}
+                              {hasSubtasks && (
+                                <div className="mt-1 space-y-0.5 pt-1 border-t border-black/5">
+                                  {task.subtasks.map((sub) => (
+                                    <div key={sub.id} className="flex items-center space-x-1 py-0.5">
+                                      <button
+                                        type="button"
+                                        onPointerDown={(e) => e.stopPropagation()}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          toggleSubtask(task.id, sub.id);
+                                        }}
+                                        className="p-0.5 text-gray-500 hover:text-gray-800 rounded flex-shrink-0 cursor-pointer"
+                                      >
+                                        <span 
+                                          className={`w-1.5 h-1.5 rounded-full flex items-center justify-center border border-current flex-shrink-0 transition-all
+                                            ${sub.completed ? 'bg-blue-600 border-blue-600' : 'bg-transparent border-gray-400'}
+                                          `}
+                                          style={!sub.completed ? { color: cat.color.solid, borderColor: cat.color.solid } : undefined}
+                                        />
+                                      </button>
+                                      <span className={`truncate text-[8px] flex-1 ${sub.completed ? 'line-through opacity-50' : 'font-medium text-gray-700'}`}>
+                                        {sub.title}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </motion.div>
                       </div>
                     );
                   })}
@@ -1294,7 +1360,7 @@ const DayView: React.FC<DayViewProps> = ({
 }) => {
   const hours = Array.from({ length: 24 }, (_, i) => i);
   const isTodayDay = isToday(activeDate);
-  const [isDashboardExpanded, setIsDashboardExpanded] = useState(false);
+  const setTasksOverlayOpen = useTaskStore((state) => state.setTasksOverlayOpen);
 
   const reorderSubtasks = useTaskStore((state) => state.reorderSubtasks);
   const toggleSubtask = useTaskStore((state) => state.toggleSubtask);
@@ -1497,184 +1563,28 @@ const DayView: React.FC<DayViewProps> = ({
     >
       {/* Pending Task Viewer (GCAL Style) */}
       {(() => {
-        const pendingToday = dayTasks.filter((task) => !task.completed);
-        const pendingOverdue = tasks.filter((task) => {
-          const taskDate = new Date(task.date + 'T00:00:00');
-          return taskDate < activeDate && !task.completed;
-        });
-        const completedToday = dayTasks.filter((task) => task.completed);
-        const totalToday = dayTasks.length;
-        const completionPercentage = totalToday > 0 ? Math.round((completedToday.length / totalToday) * 100) : 0;
-
+        const allPendingTasks = tasks.filter((task) => !task.completed);
         return (
-          <div className="bg-neutral-50/85 border-b border-gray-150 flex flex-col flex-shrink-0 select-none overflow-hidden transition-all duration-300">
-            {/* Collapsed Header Bar */}
+          <div className="bg-white border-b border-gray-150 flex flex-col flex-shrink-0 select-none">
             <div 
-              onClick={() => setIsDashboardExpanded(!isDashboardExpanded)}
-              className="flex items-center h-12 px-4 justify-between cursor-pointer hover:bg-gray-100/50 transition-colors select-none"
+              onClick={() => setTasksOverlayOpen(true)}
+              className="flex items-center h-10 px-3 justify-between cursor-pointer hover:bg-gray-50/70 transition-colors"
             >
-              <div className="flex items-center space-x-2.5 min-w-0">
-                <div className="w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0 border border-blue-100/30 shadow-2xs">
-                  <ListTodo size={14} className="stroke-[2.5px]" />
-                </div>
-                
-                <div className="flex flex-col text-left">
-                  <span className="text-[11px] font-bold text-gray-800 tracking-tight flex items-center space-x-1.5">
-                    <span>Pending Tasks Overview</span>
-                    {(pendingToday.length + pendingOverdue.length) > 0 && (
-                      <span className="px-1.5 py-0.2 bg-blue-100 text-blue-700 rounded-full font-mono text-[9px] font-extrabold scale-90">
-                        {pendingToday.length + pendingOverdue.length}
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-[9px] text-gray-500 font-medium">
-                    {pendingOverdue.length > 0 
-                      ? `${pendingOverdue.length} overdue • ${pendingToday.length} today` 
-                      : `${pendingToday.length} pending today`
-                    }
-                  </span>
-                </div>
-              </div>
-
-              {/* Stats & Toggle */}
               <div className="flex items-center space-x-2">
-                {totalToday > 0 && (
-                  <div className="flex items-center space-x-1 text-[9px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200/50">
-                    <span>{completionPercentage}% Done</span>
-                  </div>
+                <span className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                  Pending Tasks
+                </span>
+                {allPendingTasks.length > 0 && (
+                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded-full font-mono text-[9px] font-extrabold">
+                    {allPendingTasks.length}
+                  </span>
                 )}
-                
-                <button 
-                  type="button"
-                  className="p-1 hover:bg-gray-200 rounded-full text-gray-500 transition-transform duration-200"
-                  style={{ transform: isDashboardExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
-                >
-                  <ChevronDown size={14} />
-                </button>
+              </div>
+              <div className="flex items-center space-x-1 text-xs text-blue-600 font-bold">
+                <span>Open Tasks List</span>
+                <ChevronRight size={13} className="stroke-[2.5px]" />
               </div>
             </div>
-
-            {/* Expanded Dashboard Panel */}
-            {isDashboardExpanded && (
-              <div className="px-4 pb-4 pt-1 border-t border-gray-100 bg-white grid grid-cols-1 md:grid-cols-3 gap-3 animate-in slide-in-from-top-4 duration-200">
-                
-                {/* Column 1: Overdue Card */}
-                <div className="bg-rose-50/40 border border-rose-100/70 p-3 rounded-2xl flex flex-col space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-extrabold text-rose-700 uppercase tracking-wider flex items-center space-x-1">
-                      <AlertCircle size={12} className="text-rose-500 flex-shrink-0" />
-                      <span>Overdue ({pendingOverdue.length})</span>
-                    </span>
-                  </div>
-                  
-                  <div className="space-y-1.5 max-h-[140px] overflow-y-auto scrollbar-none pr-1">
-                    {pendingOverdue.length === 0 ? (
-                      <span className="text-[10px] text-gray-400 font-medium italic block py-1">No overdue tasks! Good job 👏</span>
-                    ) : (
-                      pendingOverdue.map((task) => {
-                        return (
-                          <div 
-                            key={task.id}
-                            onClick={() => setSelectedTaskForDetails(task)}
-                            className="flex items-center space-x-2 bg-white/95 p-2 border border-rose-200/40 rounded-xl cursor-pointer hover:border-rose-300 hover:shadow-2xs transition-all duration-150 group"
-                          >
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                updateTask(task.id, { completed: true });
-                              }}
-                              className="w-3.5 h-3.5 rounded-full border border-rose-300 flex items-center justify-center flex-shrink-0 hover:bg-rose-600 hover:border-rose-600 bg-white transition-colors cursor-pointer"
-                            >
-                              <Check size={8} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </button>
-                            <div className="flex-1 min-w-0 text-left">
-                              <p className="text-xs font-semibold text-rose-950 truncate">{task.title}</p>
-                              <p className="text-[8px] font-mono text-rose-500">{task.date}</p>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-
-                {/* Column 2: Upcoming Card */}
-                <div className="bg-blue-50/30 border border-blue-100/70 p-3 rounded-2xl flex flex-col space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-extrabold text-blue-700 uppercase tracking-wider flex items-center space-x-1">
-                      <Clock size={12} className="text-blue-500 flex-shrink-0" />
-                      <span>Upcoming Today ({pendingToday.length})</span>
-                    </span>
-                  </div>
-                  
-                  <div className="space-y-1.5 max-h-[140px] overflow-y-auto scrollbar-none pr-1">
-                    {pendingToday.length === 0 ? (
-                      <span className="text-[10px] text-gray-400 font-medium italic block py-1">All clear for today! 🥳</span>
-                    ) : (
-                      pendingToday.map((task) => {
-                        const cat = CATEGORIES.find((c) => c.id === task.category) || CATEGORIES[0];
-                        return (
-                          <div 
-                            key={task.id}
-                            onClick={() => setSelectedTaskForDetails(task)}
-                            className="flex items-center space-x-2 bg-white/95 p-2 border border-blue-100/50 rounded-xl cursor-pointer hover:border-blue-300 hover:shadow-2xs transition-all duration-150 group"
-                          >
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                updateTask(task.id, { completed: true });
-                              }}
-                              className="w-3.5 h-3.5 rounded-full border border-blue-300 flex items-center justify-center flex-shrink-0 hover:bg-blue-600 hover:border-blue-600 bg-white transition-colors cursor-pointer"
-                            >
-                              <Check size={8} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </button>
-                            <div className="flex-1 min-w-0 text-left">
-                              <p className="text-xs font-semibold text-gray-800 truncate">{task.title}</p>
-                              <p className="text-[8px] font-mono text-blue-500">{task.time || "All Day"}</p>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-
-                {/* Column 3: Pulse & Progress */}
-                <div className="bg-neutral-50 border border-gray-200/50 p-3 rounded-2xl flex flex-col justify-between space-y-2">
-                  <div className="flex flex-col space-y-1 text-left">
-                    <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider flex items-center space-x-1">
-                      <Sparkles size={11} className="text-amber-500 flex-shrink-0" />
-                      <span>Today's Pulse</span>
-                    </span>
-                    
-                    <div className="pt-1.5">
-                      <div className="flex items-baseline justify-between mb-1">
-                        <span className="text-2xl font-black text-gray-800 font-mono">{completionPercentage}%</span>
-                        <span className="text-[10px] text-gray-400 font-bold">{completedToday.length} of {totalToday} tasks done</span>
-                      </div>
-                      
-                      {/* Progress bar */}
-                      <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden border border-gray-200/30">
-                        <div 
-                          className="h-full bg-blue-600 rounded-full transition-all duration-500"
-                          style={{ width: `${completionPercentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="text-[10px] text-gray-500 font-medium text-left leading-relaxed">
-                    {totalToday === 0 
-                      ? "No tasks scheduled for today. Double tap any cell on the calendar grid to create one!" 
-                      : completionPercentage === 100 
-                        ? "Incredible work! You completed everything today. Relax or plan ahead! 🌟" 
-                        : `You have ${pendingToday.length} upcoming items today. Tap on any card or drag them to change their slot.`
-                    }
-                  </p>
-                </div>
-
-              </div>
-            )}
           </div>
         );
       })()}
@@ -1755,21 +1665,21 @@ const DayView: React.FC<DayViewProps> = ({
 
           {/* Timed Tasks placement */}
           {dayTasks.map((task) => {
-            if (!task.time) return null;
+            if (!task.time && draggedTaskId !== task.id) return null;
 
-            const [taskHour, taskMin] = task.time.split(':').map(Number);
+            const [taskHour, taskMin] = (task.time || "00:00").split(':').map(Number);
             const startOffsetMins = (taskHour * 60) + (taskMin || 0);
             const topPos = startOffsetMins * (1536 / 1440);
 
             const cat = CATEGORIES.find((c) => c.id === task.category) || CATEGORIES[0];
 
-            const isCollapsed = collapsedTasks[task.id] ?? false; 
+            const isCollapsed = collapsedTasks[task.id] ?? true; 
             const hasSubtasks = task.subtasks && task.subtasks.length > 0;
-            const isExpanded = expandedTaskId === task.id;
+            const isExpanded = !isCollapsed;
 
             const isDraggingThis = draggedTaskId === task.id;
             const currentTop = isDraggingThis ? Math.max(0, dragStartTop + dragCurrentOffset) : topPos;
-            const displayTime = isDraggingThis && tempTimeStr ? tempTimeStr : task.time;
+            const displayTime = isDraggingThis && tempTimeStr ? tempTimeStr : (task.time || "All-Day");
 
             const deleteTask = useTaskStore.getState().deleteTask;
             const setEditingTask = useTaskStore.getState().setEditingTask;
@@ -1777,287 +1687,89 @@ const DayView: React.FC<DayViewProps> = ({
             return (
               <div
                 key={task.id}
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  if (e.button !== 0) return;
-                  const target = e.currentTarget as HTMLElement;
-                  target.setPointerCapture(e.pointerId);
-                  onTaskDragStart(task.id, topPos, e.clientY);
-                }}
-                onPointerMove={(e) => {
-                  e.stopPropagation();
-                  if (draggedTaskId === task.id) {
-                    onTaskDragMove(e.clientY);
-                  }
-                }}
-                onPointerUp={(e) => {
-                  e.stopPropagation();
-                  if (draggedTaskId === task.id) {
-                    const target = e.currentTarget as HTMLElement;
-                    target.releasePointerCapture(e.pointerId);
-                    onTaskDragEnd();
-                    const diffY = Math.abs(e.clientY - pointerStartY);
-                    if (diffY < 5) {
-                      if (isExpanded) {
-                        setExpandedTaskId(null);
-                      } else {
-                        setExpandedTaskId(task.id);
-                      }
-                    }
-                  }
-                }}
-                className={`absolute left-4 right-4 p-3.5 rounded-xl border text-sm shadow-xs transition-all duration-200 flex flex-col select-none pl-5
-                  ${isDraggingThis 
-                    ? 'scale-[1.02] shadow-lg opacity-95 border-blue-500 ring-2 ring-blue-500/30 z-50 cursor-grabbing' 
-                    : isExpanded 
-                      ? 'z-40 ring-1 ring-blue-400/40 border-blue-400 shadow-md scale-[1.01]'
-                      : 'hover:scale-[1.01] hover:shadow-xs cursor-grab z-5'
-                  }
-                  ${task.completed
-                    ? 'bg-gray-50 text-gray-400 border-gray-200'
-                    : `${cat.color.bgLight} ${cat.color.light} ${cat.color.borderLight}`
-                  }
-                `}
+                className="absolute left-4 right-4 overflow-hidden rounded-2xl"
                 style={{ 
                   top: `${currentTop}px`,
-                  height: (isExpanded || !isCollapsed) ? 'auto' : '64px',
+                  height: isExpanded ? 'auto' : '64px',
                   minHeight: '64px',
-                  overflow: 'visible',
-                  touchAction: 'none'
+                  zIndex: isDraggingThis ? 100 : isExpanded ? 40 : 5,
                 }}
               >
-                {/* Left accent stripe */}
-                <div 
-                  className="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-xl transition-colors" 
-                  style={{ backgroundColor: task.completed ? '#cbd5e1' : cat.color.solid }}
-                />
-
-                {/* Header row with custom checkbox */}
-                <div className="flex items-start justify-between min-w-0">
-                  <div className="flex items-center min-w-0 flex-1">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        updateTask(task.id, { completed: !task.completed });
-                      }}
-                      className="p-0.5 rounded-full text-gray-500 hover:text-gray-800 transition-colors flex-shrink-0 mr-2 cursor-pointer"
-                    >
-                      <span 
-                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all
-                          ${task.completed 
-                            ? 'bg-blue-600 border-blue-600 text-white' 
-                            : 'bg-transparent border-gray-400 hover:border-gray-600'
-                          }
-                        `}
-                        style={task.completed ? { backgroundColor: cat.color.solid, borderColor: cat.color.solid } : { borderColor: cat.color.solid }}
-                      >
-                        {task.completed && <Check size={10} className="stroke-[3px] text-white" />}
-                      </span>
-                    </button>
-
-                    <div className={`font-bold truncate leading-tight flex-1 ${task.completed ? 'line-through text-gray-400 font-normal' : ''}`}>
-                      {task.title}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-1.5 pl-2 flex-shrink-0">
-                    {hasSubtasks && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleTaskCollapse(task.id);
-                        }}
-                        className="p-1 hover:bg-black/5 rounded transition-transform duration-150 cursor-pointer"
-                        style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}
-                      >
-                        <ChevronRight size={14} />
-                      </button>
-                    )}
-                    <span className="text-xs opacity-75 font-bold flex items-center space-x-1 whitespace-nowrap">
-                      <Clock size={12} />
-                      <span>{displayTime}</span>
-                    </span>
-                  </div>
+                {/* Swipe background */}
+                <div className="absolute inset-0 bg-rose-600 rounded-2xl flex items-center justify-between px-4 text-white z-0 pointer-events-none">
+                  <Trash2 size={18} className="animate-pulse" />
+                  <Trash2 size={18} className="animate-pulse" />
                 </div>
 
-                 {/* Sub-header details */}
-                <div className="text-xs opacity-80 mt-1 flex items-center justify-between">
-                  <div className="flex items-center min-w-0">
-                    <span 
-                      className="w-2.5 h-2.5 rounded-full mr-2"
-                      style={!task.completed ? { backgroundColor: cat.color.solid } : undefined}
-                    />
-                    <span className="font-semibold truncate">{cat.name}</span>
-                  </div>
-
-                  {/* Subtasks Progress Status Dots when Collapsed */}
-                  {hasSubtasks && isCollapsed && (
-                    <div className="flex items-center space-x-1 bg-black/5 px-2 py-0.5 rounded-full scale-95 border border-black/5 flex-shrink-0">
-                      <span className="text-[10px] font-bold font-mono mr-1">
-                        {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
-                      </span>
-                      <div className="flex items-center space-x-0.5">
-                        {task.subtasks.slice(0, 5).map((s) => (
-                          <span 
-                            key={s.id} 
-                            className={`w-1.5 h-1.5 rounded-full border
-                              ${s.completed 
-                                ? 'bg-blue-600 border-blue-600' 
-                                : 'bg-transparent border-gray-400'
-                              }
-                            `} 
-                          />
-                        ))}
-                        {task.subtasks.length > 5 && <span className="text-[8px] font-bold">+</span>}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Inline expanded details */}
-                {isExpanded && (
-                  <div className="mt-2.5 pt-2.5 border-t border-black/5 flex flex-col space-y-2 animate-fadeIn">
-                    <div className="flex items-center space-x-1.5 text-xs text-gray-500 font-medium">
-                      <CalendarDays size={13} />
-                      <span>{task.date} at {task.time}</span>
-                    </div>
-
-                    <div className="flex items-center space-x-2 pt-0.5">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingTask(task);
-                          setFABOpen(true);
-                        }}
-                        className="flex items-center space-x-1 px-3 py-1 rounded bg-black/5 hover:bg-black/10 text-gray-700 font-semibold text-xs select-none cursor-pointer transition-colors"
-                        title="Edit task"
-                      >
-                        <Edit3 size={12} />
-                        <span>Edit</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteTask(task.id);
-                        }}
-                        className="flex items-center space-x-1 px-3 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs select-none cursor-pointer transition-colors"
-                        title="Delete task"
-                      >
-                        <Trash2 size={12} />
-                        <span>Delete</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Display subtasks below parent block if expanded */}
-                {!isCollapsed && hasSubtasks && (
-                  <div className="mt-2 space-y-1 border-t border-black/5 pt-2 flex-1 overflow-visible">
-                    {task.subtasks.map((sub, sIdx) => {
-                      const isDraggingSub = draggedSubTaskId === task.id && draggedSubIndex === sIdx;
-                      const subTopOffset = isDraggingSub ? subDraggedOffset : 0;
-
-                      return (
-                        <div 
-                          key={sub.id} 
-                          className={`group flex items-center space-x-2 py-0.5 px-1.5 rounded hover:bg-black/5 relative select-none transition-all duration-150
-                            ${isDraggingSub ? 'bg-black/10 shadow-sm z-50 scale-[1.01] ring-1 ring-blue-500/20' : ''}
-                            ${sub.completed ? 'opacity-60' : 'hover:translate-x-0.5'}
-                          `}
-                          style={{
-                            transform: isDraggingSub ? `translate(${subDraggedOffsetX}px, ${subTopOffset}px)` : 'none',
-                            touchAction: 'none'
-                          }}
-                        >
-                          {/* Drag handle (≡) */}
-                          <button
-                            type="button"
-                            onPointerDown={(e) => handleSubPointerDown(task.id, sIdx, e)}
-                            onPointerMove={(e) => handleSubPointerMove(task.id, sIdx, e)}
-                            onPointerUp={(e) => handleSubPointerUp(task.id, sIdx, e)}
-                            className="p-1 text-gray-400 hover:text-gray-700 rounded cursor-grab active:cursor-grabbing flex-shrink-0 opacity-30 group-hover:opacity-100 transition-opacity"
-                            title="Drag subtask to prioritize"
-                          >
-                            <GripVertical size={13} />
-                          </button>
-
-                          {/* Completion checkbox/dot */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleSubtask(task.id, sub.id);
-                            }}
-                            className="p-1 text-gray-500 hover:text-gray-800 rounded flex-shrink-0 cursor-pointer"
-                            title={sub.completed ? "Mark incomplete" : "Mark complete"}
-                          >
-                            <span 
-                              className={`w-2.5 h-2.5 rounded-full flex items-center justify-center border border-current flex-shrink-0 transition-all
-                                ${sub.completed ? 'bg-blue-600 border-blue-600 text-white' : 'bg-transparent border-gray-400'}
-                              `}
-                              style={!sub.completed ? { color: cat.color.solid, borderColor: cat.color.solid } : undefined}
-                            >
-                              {sub.completed && <Check size={6} className="stroke-[3.5px] text-white" />}
-                            </span>
-                          </button>
-
-                          {/* Title */}
-                          <span className={`truncate text-xs flex-1 ${sub.completed ? 'line-through opacity-50 text-gray-400 font-normal' : 'font-medium text-gray-700 group-hover:text-gray-900'}`}>
-                            {sub.title}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          {/* Non-timed tasks list */}
-          <div className="absolute top-2 left-4 right-4 flex flex-col space-y-1.5">
-            {dayTasks.filter(t => !t.time).map((task) => {
-              const cat = CATEGORIES.find((c) => c.id === task.category) || CATEGORIES[0];
-              const isExpanded = expandedTaskId === task.id;
-              const hasSubtasks = task.subtasks && task.subtasks.length > 0;
-
-              const deleteTask = useTaskStore.getState().deleteTask;
-              const setEditingTask = useTaskStore.getState().setEditingTask;
-
-              return (
-                <div
-                  key={task.id}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (isExpanded) {
-                      setExpandedTaskId(null);
-                    } else {
-                      setExpandedTaskId(task.id);
+                {/* Draggable Task Card */}
+                <motion.div
+                  drag="x"
+                  dragDirectionLock
+                  dragConstraints={{ left: 0, right: 0 }}
+                  dragElastic={{ left: 0.95, right: 0.95 }}
+                  onDragEnd={(event, info) => {
+                    const threshold = 100;
+                    if (Math.abs(info.offset.x) > threshold) {
+                      deleteTask(task.id);
                     }
                   }}
-                  className={`p-3 rounded-xl border text-sm cursor-pointer shadow-xs transition-all duration-200 flex flex-col pl-5 relative
-                    ${isExpanded ? 'z-50 ring-1 ring-blue-400 border-blue-400 shadow-sm' : 'hover:scale-[1.01] hover:shadow-xs'}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    if (e.button !== 0) return;
+                    const target = e.currentTarget as HTMLElement;
+                    target.setPointerCapture(e.pointerId);
+                    onTaskDragStart(task.id, topPos, e.clientY);
+                  }}
+                  onPointerMove={(e) => {
+                    e.stopPropagation();
+                    if (draggedTaskId === task.id) {
+                      onTaskDragMove(e.clientY);
+                    }
+                  }}
+                  onPointerUp={(e) => {
+                    e.stopPropagation();
+                    if (draggedTaskId === task.id) {
+                      const target = e.currentTarget as HTMLElement;
+                      target.releasePointerCapture(e.pointerId);
+                      onTaskDragEnd();
+                      const diffY = Math.abs(e.clientY - pointerStartY);
+                      if (diffY < 5) {
+                        toggleTaskCollapse(task.id);
+                      }
+                    }
+                  }}
+                  className={`w-full p-3.5 rounded-2xl border text-sm shadow-xs transition-all duration-150 flex flex-col select-none pl-5 z-10 relative
+                    ${isDraggingThis 
+                      ? 'scale-[1.02] shadow-sm opacity-95 border-blue-500 ring-2 ring-blue-500/30 cursor-grabbing' 
+                      : isExpanded 
+                        ? 'ring-1.5 ring-blue-400/50 border-blue-400 shadow-sm scale-[1.005]'
+                        : 'hover:scale-[1.005] hover:shadow-xs cursor-grab'
+                    }
                     ${task.completed
-                      ? 'bg-gray-50 text-gray-400 border-gray-200'
+                      ? 'bg-gray-50 text-gray-400 border-gray-200 shadow-xs'
                       : `${cat.color.bgLight} ${cat.color.light} ${cat.color.borderLight}`
                     }
                   `}
+                  style={{ 
+                    overflow: 'visible',
+                    touchAction: 'none'
+                  }}
                 >
-                  {/* Accent left stripe */}
+                  {/* Ripple effect */}
+                  <Ripple color={task.completed ? 'rgba(0, 0, 0, 0.04)' : 'rgba(0, 0, 0, 0.07)'} />
+
+                  {/* Left accent stripe */}
                   <div 
-                    className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl transition-colors" 
+                    className="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-xl transition-colors" 
                     style={{ backgroundColor: task.completed ? '#cbd5e1' : cat.color.solid }}
                   />
 
-                  {/* Title and Checkbox row */}
-                  <div className="flex items-center justify-between min-w-0">
+                  {/* Header row with custom checkbox */}
+                  <div className="flex items-start justify-between min-w-0 relative z-10">
                     <div className="flex items-center min-w-0 flex-1">
                       <button
                         type="button"
+                        onPointerDown={(e) => e.stopPropagation()}
                         onClick={(e) => {
                           e.stopPropagation();
                           updateTask(task.id, { completed: !task.completed });
@@ -2076,75 +1788,331 @@ const DayView: React.FC<DayViewProps> = ({
                           {task.completed && <Check size={10} className="stroke-[3px] text-white" />}
                         </span>
                       </button>
-                      <span className={`font-bold truncate flex-1 ${task.completed ? 'line-through text-gray-400 font-normal' : ''}`}>
-                        All-Day Task: {task.title}
+
+                      <div className={`font-bold truncate leading-tight flex-1 ${task.completed ? 'line-through text-gray-400 font-normal' : ''}`}>
+                        {task.title}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-1.5 pl-2 flex-shrink-0">
+                      {hasSubtasks && (
+                        <button
+                          type="button"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleTaskCollapse(task.id);
+                          }}
+                          className="p-1 hover:bg-black/5 rounded transition-transform duration-150 cursor-pointer"
+                          style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}
+                        >
+                          <ChevronRight size={14} />
+                        </button>
+                      )}
+                      <span className="text-xs opacity-75 font-bold flex items-center space-x-1 whitespace-nowrap">
+                        <Clock size={12} />
+                        <span>{displayTime}</span>
                       </span>
                     </div>
                   </div>
 
-                  {/* Expanded state details */}
+                   {/* Sub-header details */}
+                  <div className="text-xs opacity-80 mt-1 flex items-center justify-between relative z-10">
+                    <div className="flex items-center min-w-0">
+                      <span 
+                        className="w-2.5 h-2.5 rounded-full mr-2"
+                        style={!task.completed ? { backgroundColor: cat.color.solid } : undefined}
+                      />
+                      <span className="font-semibold truncate">{cat.name}</span>
+                    </div>
+
+                    {/* Subtasks Progress Status Dots when Collapsed */}
+                    {hasSubtasks && isCollapsed && (
+                      <div className="flex items-center space-x-1 bg-black/5 px-2 py-0.5 rounded-full scale-95 border border-black/5 flex-shrink-0">
+                        <span className="text-[10px] font-bold font-mono mr-1">
+                          {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
+                        </span>
+                        <div className="flex items-center space-x-0.5">
+                          {task.subtasks.slice(0, 5).map((s) => (
+                            <span 
+                              key={s.id} 
+                              className={`w-1.5 h-1.5 rounded-full border
+                                ${s.completed 
+                                  ? 'bg-blue-600 border-blue-600' 
+                                  : 'bg-transparent border-gray-400'
+                                }
+                              `} 
+                            />
+                          ))}
+                          {task.subtasks.length > 5 && <span className="text-[8px] font-bold">+</span>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Inline expanded details */}
                   {isExpanded && (
-                    <div className="mt-2 pt-2 border-t border-black/5 flex flex-col space-y-2 text-xs">
-                      <div className="flex items-center space-x-1.5 text-gray-500 font-medium">
+                    <div className="mt-2.5 pt-2.5 border-t border-black/5 flex flex-col space-y-2 animate-fadeIn relative z-10">
+                      <div className="flex items-center space-x-1.5 text-xs text-gray-500 font-medium">
                         <CalendarDays size={13} />
-                        <span>{task.date} (All Day)</span>
+                        <span>{task.date} {task.time ? `at ${task.time}` : '(All Day)'}</span>
                       </div>
 
                       <div className="flex items-center space-x-2 pt-0.5">
                         <button
                           type="button"
+                          onPointerDown={(e) => e.stopPropagation()}
                           onClick={(e) => {
                             e.stopPropagation();
                             setEditingTask(task);
                             setFABOpen(true);
                           }}
-                          className="flex items-center space-x-1 px-3 py-1 rounded bg-black/5 hover:bg-black/10 text-gray-700 font-semibold select-none cursor-pointer transition-colors"
+                          className="flex items-center space-x-1 px-3 py-1 rounded bg-black/5 hover:bg-black/10 text-gray-700 font-semibold text-xs select-none cursor-pointer transition-colors"
+                          title="Edit task"
                         >
                           <Edit3 size={12} />
                           <span>Edit</span>
                         </button>
                         <button
                           type="button"
+                          onPointerDown={(e) => e.stopPropagation()}
                           onClick={(e) => {
                             e.stopPropagation();
                             deleteTask(task.id);
                           }}
-                          className="flex items-center space-x-1 px-3 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold select-none cursor-pointer transition-colors"
+                          className="flex items-center space-x-1 px-3 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs select-none cursor-pointer transition-colors"
+                          title="Delete task"
                         >
                           <Trash2 size={12} />
                           <span>Delete</span>
                         </button>
                       </div>
-
-                      {/* Subtasks inside expanded all-day task */}
-                      {hasSubtasks && (
-                        <div className="mt-2 space-y-1 pt-2 border-t border-black/5">
-                          {task.subtasks.map((sub) => (
-                            <div key={sub.id} className="flex items-center space-x-2 py-0.5">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleSubtask(task.id, sub.id);
-                                }}
-                                className="p-0.5 text-gray-500 hover:text-gray-800 rounded flex-shrink-0 cursor-pointer"
-                              >
-                                <span 
-                                  className={`w-2 h-2 rounded-full flex items-center justify-center border border-current flex-shrink-0 transition-all
-                                    ${sub.completed ? 'bg-blue-600 border-blue-600' : 'bg-transparent border-gray-400'}
-                                  `}
-                                  style={!sub.completed ? { color: cat.color.solid, borderColor: cat.color.solid } : undefined}
-                                />
-                              </button>
-                              <span className={`truncate text-xs flex-1 ${sub.completed ? 'line-through opacity-50' : 'font-medium text-gray-700'}`}>
-                                {sub.title}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   )}
+
+                  {/* Display subtasks below parent block if expanded */}
+                  {!isCollapsed && hasSubtasks && (
+                    <div className="mt-2 space-y-1 border-t border-black/5 pt-2 flex-1 overflow-visible relative z-10">
+                      {task.subtasks.map((sub, sIdx) => {
+                        const isDraggingSub = draggedSubTaskId === task.id && draggedSubIndex === sIdx;
+                        const subTopOffset = isDraggingSub ? subDraggedOffset : 0;
+
+                        return (
+                          <div 
+                            key={sub.id} 
+                            className={`group flex items-center space-x-2 py-0.5 px-1.5 rounded hover:bg-black/5 relative select-none transition-all duration-150
+                              ${isDraggingSub ? 'bg-black/10 shadow-sm z-50 scale-[1.01] ring-1 ring-blue-500/20' : ''}
+                              ${sub.completed ? 'opacity-60' : 'hover:translate-x-0.5'}
+                            `}
+                            style={{
+                              transform: isDraggingSub ? `translate(${subDraggedOffsetX}px, ${subTopOffset}px)` : 'none',
+                              touchAction: 'none'
+                            }}
+                          >
+                            {/* Drag handle (≡) */}
+                            <button
+                              type="button"
+                              onPointerDown={(e) => handleSubPointerDown(task.id, sIdx, e)}
+                              onPointerMove={(e) => handleSubPointerMove(task.id, sIdx, e)}
+                              onPointerUp={(e) => handleSubPointerUp(task.id, sIdx, e)}
+                              className="p-1 text-gray-400 hover:text-gray-700 rounded cursor-grab active:cursor-grabbing flex-shrink-0 opacity-30 group-hover:opacity-100 transition-opacity"
+                              title="Drag subtask to prioritize"
+                            >
+                              <GripVertical size={13} />
+                            </button>
+
+                            {/* Completion checkbox/dot */}
+                            <button
+                              type="button"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleSubtask(task.id, sub.id);
+                              }}
+                              className="p-1 text-gray-500 hover:text-gray-800 rounded flex-shrink-0 cursor-pointer relative overflow-hidden"
+                              title={sub.completed ? "Mark incomplete" : "Mark complete"}
+                            >
+                              <span 
+                                className={`w-2.5 h-2.5 rounded-full flex items-center justify-center border border-current flex-shrink-0 transition-all
+                                  ${sub.completed ? 'bg-blue-600 border-blue-600 text-white' : 'bg-transparent border-gray-400'}
+                                `}
+                                style={!sub.completed ? { color: cat.color.solid, borderColor: cat.color.solid } : undefined}
+                              >
+                                {sub.completed && <Check size={6} className="stroke-[3.5px] text-white" />}
+                              </span>
+                            </button>
+
+                            {/* Title */}
+                            <span className={`truncate text-xs flex-1 ${sub.completed ? 'line-through opacity-50 text-gray-400 font-normal' : 'font-medium text-gray-700 group-hover:text-gray-900'}`}>
+                              {sub.title}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </motion.div>
+              </div>
+            );
+          })}
+
+          {/* Non-timed tasks list */}
+          <div className="absolute top-2 left-4 right-4 flex flex-col space-y-1.5">
+            {dayTasks.filter(t => !t.time).map((task) => {
+              const cat = CATEGORIES.find((c) => c.id === task.category) || CATEGORIES[0];
+              const isExpanded = expandedTaskId === task.id;
+              const hasSubtasks = task.subtasks && task.subtasks.length > 0;
+
+              const deleteTask = useTaskStore.getState().deleteTask;
+              const setEditingTask = useTaskStore.getState().setEditingTask;
+
+              return (
+                <div
+                  key={task.id}
+                  className="relative overflow-hidden rounded-xl"
+                  style={{ minHeight: '44px' }}
+                >
+                  {/* Swipe background */}
+                  <div className="absolute inset-0 bg-rose-600 rounded-xl flex items-center justify-between px-4 text-white z-0 pointer-events-none">
+                    <Trash2 size={16} className="animate-pulse" />
+                    <Trash2 size={16} className="animate-pulse" />
+                  </div>
+
+                  {/* Draggable container */}
+                  <motion.div
+                    drag="x"
+                    dragDirectionLock
+                    dragConstraints={{ left: 0, right: 0 }}
+                    dragElastic={{ left: 0.95, right: 0.95 }}
+                    onDragEnd={(event, info) => {
+                      const threshold = 100;
+                      if (Math.abs(info.offset.x) > threshold) {
+                        deleteTask(task.id);
+                      }
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isExpanded) {
+                        setExpandedTaskId(null);
+                      } else {
+                        setExpandedTaskId(task.id);
+                      }
+                    }}
+                    className={`p-3 rounded-xl border text-sm cursor-pointer shadow-xs transition-all duration-200 flex flex-col pl-5 relative z-10
+                      ${isExpanded ? 'z-50 ring-1 ring-blue-400 border-blue-400 shadow-sm' : 'hover:scale-[1.01] hover:shadow-xs'}
+                      ${task.completed
+                        ? 'bg-gray-50 text-gray-400 border-gray-200'
+                        : `${cat.color.bgLight} ${cat.color.light} ${cat.color.borderLight}`
+                      }
+                    `}
+                    style={{ touchAction: 'pan-y' }}
+                  >
+                    {/* Ripple effect */}
+                    <Ripple color="rgba(0, 0, 0, 0.05)" />
+
+                    {/* Accent left stripe */}
+                    <div 
+                      className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl transition-colors" 
+                      style={{ backgroundColor: task.completed ? '#cbd5e1' : cat.color.solid }}
+                    />
+
+                    {/* Title and Checkbox row */}
+                    <div className="flex items-center justify-between min-w-0 relative z-10">
+                      <div className="flex items-center min-w-0 flex-1">
+                        <button
+                          type="button"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateTask(task.id, { completed: !task.completed });
+                          }}
+                          className="p-0.5 rounded-full text-gray-500 hover:text-gray-800 transition-colors flex-shrink-0 mr-2 cursor-pointer"
+                        >
+                          <span 
+                            className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all
+                              ${task.completed 
+                                ? 'bg-blue-600 border-blue-600 text-white' 
+                                : 'bg-transparent border-gray-400 hover:border-gray-600'
+                              }
+                            `}
+                            style={task.completed ? { backgroundColor: cat.color.solid, borderColor: cat.color.solid } : { borderColor: cat.color.solid }}
+                          >
+                            {task.completed && <Check size={10} className="stroke-[3px] text-white" />}
+                          </span>
+                        </button>
+                        <span className={`font-bold truncate flex-1 ${task.completed ? 'line-through text-gray-400 font-normal' : ''}`}>
+                          All-Day Task: {task.title}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Expanded state details */}
+                    {isExpanded && (
+                      <div className="mt-2 pt-2 border-t border-black/5 flex flex-col space-y-2 text-xs relative z-10">
+                        <div className="flex items-center space-x-1.5 text-gray-500 font-medium">
+                          <CalendarDays size={13} />
+                          <span>{task.date} (All Day)</span>
+                        </div>
+
+                        <div className="flex items-center space-x-2 pt-0.5">
+                          <button
+                            type="button"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingTask(task);
+                              setFABOpen(true);
+                            }}
+                            className="flex items-center space-x-1 px-3 py-1 rounded bg-black/5 hover:bg-black/10 text-gray-700 font-semibold select-none cursor-pointer transition-colors"
+                          >
+                            <Edit3 size={12} />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteTask(task.id);
+                            }}
+                            className="flex items-center space-x-1 px-3 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold select-none cursor-pointer transition-colors"
+                          >
+                            <Trash2 size={12} />
+                            <span>Delete</span>
+                          </button>
+                        </div>
+
+                        {/* Subtasks inside expanded all-day task */}
+                        {hasSubtasks && (
+                          <div className="mt-2 space-y-1 pt-2 border-t border-black/5">
+                            {task.subtasks.map((sub) => (
+                              <div key={sub.id} className="flex items-center space-x-2 py-0.5">
+                                <button
+                                  type="button"
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleSubtask(task.id, sub.id);
+                                  }}
+                                  className="p-0.5 text-gray-500 hover:text-gray-800 rounded flex-shrink-0 cursor-pointer"
+                                >
+                                  <span 
+                                    className={`w-2 h-2 rounded-full flex items-center justify-center border border-current flex-shrink-0 transition-all
+                                      ${sub.completed ? 'bg-blue-600 border-blue-600' : 'bg-transparent border-gray-400'}
+                                    `}
+                                    style={!sub.completed ? { color: cat.color.solid, borderColor: cat.color.solid } : undefined}
+                                  />
+                                </button>
+                                <span className={`truncate text-xs flex-1 ${sub.completed ? 'line-through opacity-50' : 'font-medium text-gray-700'}`}>
+                                  {sub.title}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </motion.div>
                 </div>
               );
             })}
@@ -2294,7 +2262,7 @@ const ScheduleTaskCard: React.FC<ScheduleTaskCardProps> = ({ task, onViewDetails
   return (
     <div
       onClick={onViewDetails}
-      className={`bg-white border border-gray-100 rounded-xl hover:shadow-md transition-material duration-200 p-4 cursor-pointer relative group flex flex-col space-y-3
+      className={`bg-white border border-gray-150/60 rounded-xl shadow-2xs hover:shadow-xs hover:bg-gray-50/10 transition-material duration-200 p-4 cursor-pointer relative group flex flex-col space-y-3
         ${task.completed ? 'opacity-80' : ''}
       `}
     >

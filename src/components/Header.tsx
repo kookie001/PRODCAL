@@ -15,6 +15,7 @@ import {
   ChevronDown,
   Search,
   Calendar,
+  ListTodo,
 } from 'lucide-react';
 import { useTaskStore } from '../store';
 import { MiniCalendar } from './MiniCalendar';
@@ -38,13 +39,17 @@ export const Header: React.FC<HeaderProps> = ({
   const setCurrentDate = useTaskStore((state) => state.setCurrentDate);
   const selectedView = useTaskStore((state) => state.selectedView);
   const setSelectedView = useTaskStore((state) => state.setSelectedView);
+  const tasks = useTaskStore((state) => state.tasks);
+  const setTasksOverlayOpen = useTaskStore((state) => state.setTasksOverlayOpen);
 
   const activeDate = new Date(currentDateStr);
   const [isMiniCalendarOpen, setIsMiniCalendarOpen] = useState(false);
-  const [isViewDropdownOpen, setIsViewDropdownOpen] = useState(false);
+
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const pendingToday = tasks.filter((task) => task.date === todayStr && !task.completed);
+  const pendingOverdue = tasks.filter((task) => task.date < todayStr && !task.completed);
 
   const calendarDropdownRef = useRef<HTMLDivElement>(null);
-  const viewDropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns on day change
   useEffect(() => {
@@ -56,9 +61,6 @@ export const Header: React.FC<HeaderProps> = ({
     const handleClickOutside = (event: MouseEvent) => {
       if (calendarDropdownRef.current && !calendarDropdownRef.current.contains(event.target as Node)) {
         setIsMiniCalendarOpen(false);
-      }
-      if (viewDropdownRef.current && !viewDropdownRef.current.contains(event.target as Node)) {
-        setIsViewDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -111,37 +113,33 @@ export const Header: React.FC<HeaderProps> = ({
 
   const todayDay = new Date().getDate();
 
-  const viewLabels: Record<string, string> = {
-    schedule: 'Schedule',
-    day: 'Day',
-    week: 'Week',
-    month: 'Month',
-  };
-
   return (
     <div className="relative flex flex-col bg-white border-b border-gray-150 select-none z-30">
       <div className="flex items-center justify-between px-3 h-14">
         
-        {/* Left Side: Hamburger Menu & Date Toggler */}
-        <div className="flex items-center space-x-1.5 min-w-0 flex-1">
+        {/* Left Side: Hamburger Menu & Date Toggler with interactive Pending Tasks trigger */}
+        <div className="flex items-center space-x-1 min-w-0 flex-1">
           <button
             onClick={onToggleSidebar}
-            className="p-2 hover:bg-gray-100 rounded-full text-gray-600 transition-colors cursor-pointer flex-shrink-0"
+            className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition-colors cursor-pointer flex-shrink-0"
             title="Main menu"
           >
             <Menu size={20} />
           </button>
 
-          {/* Month/Year selector toggle dropdown */}
-          <button
-            onClick={() => setIsMiniCalendarOpen(!isMiniCalendarOpen)}
-            className="flex items-center space-x-1.5 px-2.5 py-1.5 hover:bg-gray-100 rounded-lg text-gray-800 transition-colors cursor-pointer min-w-0 max-w-[190px] md:max-w-xs"
-          >
-            <span className="text-sm font-bold truncate">
-              {getHeaderDateLabel()}
-            </span>
-            <ChevronDown size={14} className={`text-gray-500 transition-transform flex-shrink-0 ${isMiniCalendarOpen ? 'rotate-180' : ''}`} />
-          </button>
+          {/* Month/Year selector */}
+          <div className="flex items-center min-w-0">
+            <button
+              onClick={() => setIsMiniCalendarOpen(!isMiniCalendarOpen)}
+              className="flex items-center px-2 py-1.5 hover:bg-gray-100/70 rounded-xl transition-all cursor-pointer min-w-0"
+              title="Toggle mini calendar"
+            >
+              <span className="text-base font-bold text-gray-900 truncate tracking-tight leading-none">
+                {getHeaderDateLabel()}
+              </span>
+              <ChevronDown size={14} className={`text-gray-500 ml-1 transition-transform flex-shrink-0 ${isMiniCalendarOpen ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
         </div>
 
         {/* Right Side: Quick navigation actions */}
@@ -184,38 +182,6 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Search size={18} />
           </button>
-
-          {/* 4. Active View Dropdown Selector */}
-          <div className="relative" ref={viewDropdownRef}>
-            <button
-              onClick={() => setIsViewDropdownOpen(!isViewDropdownOpen)}
-              className="flex items-center space-x-1 px-2.5 py-1.5 hover:bg-gray-100 rounded-lg text-xs font-bold text-gray-700 cursor-pointer transition-colors"
-            >
-              <span>{viewLabels[selectedView]}</span>
-              <ChevronDown size={12} className="text-gray-500" />
-            </button>
-
-            {/* View switcher dropdown menu */}
-            {isViewDropdownOpen && (
-              <div className="absolute right-0 mt-1 w-28 bg-white border border-gray-100 rounded-xl shadow-lg py-1 z-50 text-xs">
-                {Object.entries(viewLabels).map(([key, label]) => (
-                  <button
-                    key={key}
-                    onClick={() => {
-                      setSelectedView(key as any);
-                      setIsViewDropdownOpen(false);
-                    }}
-                    className={`w-full text-left px-3.5 py-2 font-semibold hover:bg-gray-50 cursor-pointer transition-colors
-                      ${selectedView === key ? 'text-blue-600 bg-blue-50/40' : 'text-gray-700'}
-                    `}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
         </div>
       </div>
 

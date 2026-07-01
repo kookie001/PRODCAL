@@ -25,7 +25,10 @@ interface TaskState {
   editingTask: Task | null; // For editing existing tasks in the task sheet
   selectedTaskForDetails: Task | null; // For showing task detail modal
   prefilledTime: string; // Pre-filled HH:MM for new tasks
+  prefilledTitle: string; // Pre-filled title for new tasks
   isHeaderCollapsed: boolean; // For Material 3 scroll-to-collapse header
+  lastDeletedTask: Task | null; // For Undo snackbar
+  isTasksOverlayOpen: boolean; // Global state for full-screen GCAL Tasks view
 }
 
 interface TaskActions {
@@ -42,7 +45,11 @@ interface TaskActions {
   setEditingTask: (task: Task | null) => void;
   setSelectedTaskForDetails: (task: Task | null) => void;
   setPrefilledTime: (time: string) => void;
+  setPrefilledTitle: (title: string) => void;
   setHeaderCollapsed: (collapsed: boolean) => void;
+  setLastDeletedTask: (task: Task | null) => void;
+  undoDeleteTask: () => void;
+  setTasksOverlayOpen: (open: boolean) => void;
   
   // Subtask helpers
   toggleSubtask: (taskId: string, subtaskId: string) => void;
@@ -104,7 +111,10 @@ export const useTaskStore = create<TaskState & TaskActions>()(
       editingTask: null,
       selectedTaskForDetails: null,
       prefilledTime: '',
+      prefilledTitle: '',
       isHeaderCollapsed: false,
+      lastDeletedTask: null,
+      isTasksOverlayOpen: false,
 
       // Actions
       addTask: (taskData) => set((state) => {
@@ -138,11 +148,15 @@ export const useTaskStore = create<TaskState & TaskActions>()(
         };
       }),
 
-      deleteTask: (id) => set((state) => ({
-        tasks: state.tasks.filter((task) => task.id !== id),
-        selectedTaskForDetails: state.selectedTaskForDetails?.id === id ? null : state.selectedTaskForDetails,
-        editingTask: state.editingTask?.id === id ? null : state.editingTask
-      })),
+      deleteTask: (id) => set((state) => {
+        const taskToDelete = state.tasks.find((task) => task.id === id);
+        return {
+          tasks: state.tasks.filter((task) => task.id !== id),
+          lastDeletedTask: taskToDelete || null,
+          selectedTaskForDetails: state.selectedTaskForDetails?.id === id ? null : state.selectedTaskForDetails,
+          editingTask: state.editingTask?.id === id ? null : state.editingTask
+        };
+      }),
 
       setCurrentDate: (date) => set({ currentDate: date.toISOString() }),
       
@@ -175,7 +189,23 @@ export const useTaskStore = create<TaskState & TaskActions>()(
 
       setPrefilledTime: (time) => set({ prefilledTime: time }),
 
+      setPrefilledTitle: (title) => set({ prefilledTitle: title }),
+
       setHeaderCollapsed: (collapsed) => set({ isHeaderCollapsed: collapsed }),
+
+      setLastDeletedTask: (task) => set({ lastDeletedTask: task }),
+
+      undoDeleteTask: () => set((state) => {
+        if (!state.lastDeletedTask) return {};
+        const alreadyExists = state.tasks.some((t) => t.id === state.lastDeletedTask?.id);
+        const updatedTasks = alreadyExists ? state.tasks : [...state.tasks, state.lastDeletedTask];
+        return {
+          tasks: updatedTasks,
+          lastDeletedTask: null
+        };
+      }),
+
+      setTasksOverlayOpen: (open) => set({ isTasksOverlayOpen: open }),
 
       // Subtask specific methods
       toggleSubtask: (taskId, subtaskId) => set((state) => {

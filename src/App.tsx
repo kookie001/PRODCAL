@@ -9,6 +9,8 @@ import { CategoryTabBar } from './components/CategoryTabBar';
 import { CalendarViews } from './components/CalendarViews';
 import { TaskSheet } from './components/TaskSheet';
 import { TaskDetailsModal } from './components/TaskDetailsModal';
+import { Ripple } from './components/Ripple';
+import { TasksOverlay } from './components/TasksOverlay';
 
 export default function App() {
   const theme = useTaskStore((state) => state.theme);
@@ -16,11 +18,25 @@ export default function App() {
   const selectedView = useTaskStore((state) => state.selectedView);
   const setSelectedView = useTaskStore((state) => state.setSelectedView);
   
+  const lastDeletedTask = useTaskStore((state) => state.lastDeletedTask);
+  const setLastDeletedTask = useTaskStore((state) => state.setLastDeletedTask);
+  const undoDeleteTask = useTaskStore((state) => state.undoDeleteTask);
+  
   // Local states
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [previousView, setPreviousView] = useState(selectedView);
+
+  // Auto-dismiss the last deleted task notification after 5 seconds
+  useEffect(() => {
+    if (lastDeletedTask) {
+      const timer = setTimeout(() => {
+        setLastDeletedTask(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [lastDeletedTask, setLastDeletedTask]);
 
   // Force light mode on mount and prevent any dark mode classing
   useEffect(() => {
@@ -129,19 +145,59 @@ export default function App() {
               whileHover={{ scale: 1.08 }}
               whileTap={{ scale: 0.94 }}
               onClick={() => setFABOpen(true)}
-              className="w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl shadow-xl hover:shadow-2xl flex items-center justify-center transition-material cursor-pointer group"
+              className="w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl shadow-xl hover:shadow-2xl flex items-center justify-center transition-material cursor-pointer group relative overflow-hidden"
               title="Create Task"
             >
-              <Plus size={26} className="group-hover:rotate-90 transition-transform duration-300" />
+              <Ripple color="rgba(255, 255, 255, 0.2)" />
+              <Plus size={26} className="group-hover:rotate-90 transition-transform duration-300 relative z-10" />
             </motion.button>
           </div>
         </div>
+
+        {/* Material 3 Undo Snackbar */}
+        <AnimatePresence>
+          {lastDeletedTask && (
+            <motion.div
+              initial={{ opacity: 0, y: 50, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+              className="absolute bottom-20 left-4 right-4 bg-neutral-900 text-white rounded-xl shadow-xl px-4 py-3 flex items-center justify-between z-50 border border-neutral-800"
+            >
+              <div className="flex flex-col text-left min-w-0 flex-1 mr-3">
+                <span className="text-[10px] uppercase font-bold text-neutral-400 tracking-wider">
+                  Task Deleted
+                </span>
+                <span className="text-xs font-semibold text-neutral-100 truncate">
+                  {lastDeletedTask.title}
+                </span>
+              </div>
+              <div className="flex items-center space-x-3 flex-shrink-0">
+                <button
+                  onClick={() => undoDeleteTask()}
+                  className="text-xs font-bold text-blue-400 uppercase tracking-wider hover:text-blue-300 active:scale-95 transition-all cursor-pointer bg-transparent border-none outline-none px-1 py-0.5"
+                >
+                  Undo
+                </button>
+                <button
+                  onClick={() => setLastDeletedTask(null)}
+                  className="text-neutral-400 hover:text-neutral-200 p-0.5 rounded-full transition-colors cursor-pointer"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Bottom Sheet Creator & Editor */}
         <TaskSheet />
 
         {/* Task detail card modal picker */}
         <TaskDetailsModal />
+
+        {/* Global Google Calendar style Tasks list overlay */}
+        <TasksOverlay />
       </div>
     </div>
   );

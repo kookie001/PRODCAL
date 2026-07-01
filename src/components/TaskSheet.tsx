@@ -21,6 +21,8 @@ export const TaskSheet: React.FC = () => {
   const updateTask = useTaskStore((state) => state.updateTask);
   const prefilledTime = useTaskStore((state) => state.prefilledTime);
   const setPrefilledTime = useTaskStore((state) => state.setPrefilledTime);
+  const prefilledTitle = useTaskStore((state) => state.prefilledTitle);
+  const setPrefilledTitle = useTaskStore((state) => state.setPrefilledTitle);
   const currentDateStr = useTaskStore((state) => state.currentDate);
   const categories = useTaskStore((state) => state.categories);
 
@@ -51,7 +53,7 @@ export const TaskSheet: React.FC = () => {
         setSubtasks(editingTask.subtasks.map(({ id, title }) => ({ id, title })));
       } else {
         // Create mode
-        setTitle('');
+        setTitle(prefilledTitle || '');
         setCategory('Work');
         
         // Match currently selected date from store
@@ -67,15 +69,21 @@ export const TaskSheet: React.FC = () => {
 
       // Auto-focus input
       setTimeout(() => {
-        inputRef.current?.focus();
+        if (inputRef.current) {
+          inputRef.current.focus();
+          // Put cursor at the end of pre-populated text if present
+          const len = inputRef.current.value.length;
+          inputRef.current.setSelectionRange(len, len);
+        }
       }, 150);
     }
-  }, [isFABOpen, editingTask, currentDateStr, prefilledTime]);
+  }, [isFABOpen, editingTask, currentDateStr, prefilledTime, prefilledTitle]);
 
   const handleClose = () => {
     setFABOpen(false);
     setEditingTask(null);
     setPrefilledTime('');
+    setPrefilledTitle('');
   };
 
   const handleAddSubtask = () => {
