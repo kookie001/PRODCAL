@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, ListTodo, Clock, CalendarDays, Grid, Search, ArrowLeft, X } from 'lucide-react';
+import { Plus, ListTodo, Clock, CalendarDays, Grid, Search, ArrowLeft, X, Menu, Calendar, Settings } from 'lucide-react';
 
 import { useTaskStore } from './store';
 import { Header } from './components/Header';
@@ -14,9 +14,14 @@ import { TasksOverlay } from './components/TasksOverlay';
 
 export default function App() {
   const theme = useTaskStore((state) => state.theme);
+  const isFABOpen = useTaskStore((state) => state.isFABOpen);
   const setFABOpen = useTaskStore((state) => state.setFABOpen);
   const selectedView = useTaskStore((state) => state.selectedView);
   const setSelectedView = useTaskStore((state) => state.setSelectedView);
+  const setCurrentDate = useTaskStore((state) => state.setCurrentDate);
+  const selectedTaskForDetails = useTaskStore((state) => state.selectedTaskForDetails);
+  const isTasksOverlayOpen = useTaskStore((state) => state.isTasksOverlayOpen);
+  const isBottomBarVisible = useTaskStore((state) => state.isBottomBarVisible);
   
   const lastDeletedTask = useTaskStore((state) => state.lastDeletedTask);
   const setLastDeletedTask = useTaskStore((state) => state.setLastDeletedTask);
@@ -117,52 +122,54 @@ export default function App() {
         {/* Main Body Layout */}
         <div className="flex-1 flex overflow-hidden relative">
           
-          {/* Mobile Sidebar backdrop */}
+          {/* Collapsible Left Sidebar */}
           <AnimatePresence>
             {isSidebarOpen && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 0.4 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setIsSidebarOpen(false)}
-                className="absolute inset-0 bg-black z-40"
-              />
+              <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
             )}
           </AnimatePresence>
 
-          {/* Collapsible Left Sidebar */}
-          <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-
           {/* Dynamic Calendar Views container */}
-          <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-white">
+          <motion.main
+            animate={{
+              scale: isSidebarOpen ? 0.97 : 1,
+              x: isSidebarOpen ? 16 : 0,
+              opacity: isSidebarOpen ? 0.7 : 1,
+            }}
+            transition={{ type: 'spring', damping: 32, stiffness: 300 }}
+            className="flex-1 flex flex-col min-w-0 overflow-hidden bg-white origin-left"
+          >
             <CategoryTabBar />
             <CalendarViews searchQuery={searchQuery} />
-          </main>
+          </motion.main>
 
-          {/* Floating "+" FAB (positioned beautifully at bottom-right corner) */}
-          <div className="absolute bottom-6 right-6 z-30">
+          {/* Floating "+" FAB */}
+          <div className="absolute bottom-20 right-4 z-30">
             <motion.button
               whileHover={{ scale: 1.08 }}
               whileTap={{ scale: 0.94 }}
               onClick={() => setFABOpen(true)}
-              className="w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl shadow-xl hover:shadow-2xl flex items-center justify-center transition-material cursor-pointer group relative overflow-hidden"
+              className="w-14 h-14 bg-[#E8F0FE] hover:opacity-90 rounded-[16px] shadow-lg hover:shadow-xl flex items-center justify-center transition-all cursor-pointer group relative overflow-hidden"
               title="Create Task"
             >
-              <Ripple color="rgba(255, 255, 255, 0.2)" />
-              <Plus size={26} className="group-hover:rotate-90 transition-transform duration-300 relative z-10" />
+              <Ripple color="rgba(0, 0, 0, 0.08)" />
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="relative z-10 scale-125 transition-transform duration-300 group-hover:rotate-90">
+                <path d="M5 12h14" stroke="#1A73E8" strokeWidth="4" strokeLinecap="round" />
+                <path d="M12 5v14" stroke="#1A73E8" strokeWidth="4" strokeLinecap="round" />
+              </svg>
             </motion.button>
           </div>
         </div>
 
-        {/* Material 3 Undo Snackbar */}
+         {/* Material 3 Undo Snackbar */}
         <AnimatePresence>
           {lastDeletedTask && (
             <motion.div
               initial={{ opacity: 0, y: 50, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
+              animate={{ opacity: 1, y: 0, scale: 1, bottom: 16 }}
               exit={{ opacity: 0, y: 20, scale: 0.95 }}
               transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-              className="absolute bottom-20 left-4 right-4 bg-neutral-900 text-white rounded-xl shadow-xl px-4 py-3 flex items-center justify-between z-50 border border-neutral-800"
+              className="absolute left-4 right-4 bg-neutral-900 text-white rounded-xl shadow-xl px-4 py-3 flex items-center justify-between z-50 border border-neutral-800"
             >
               <div className="flex flex-col text-left min-w-0 flex-1 mr-3">
                 <span className="text-[10px] uppercase font-bold text-neutral-400 tracking-wider">
@@ -191,13 +198,19 @@ export default function App() {
         </AnimatePresence>
 
         {/* Bottom Sheet Creator & Editor */}
-        <TaskSheet />
+        <AnimatePresence>
+          {isFABOpen && <TaskSheet />}
+        </AnimatePresence>
 
         {/* Task detail card modal picker */}
-        <TaskDetailsModal />
+        <AnimatePresence>
+          {selectedTaskForDetails && <TaskDetailsModal />}
+        </AnimatePresence>
 
         {/* Global Google Calendar style Tasks list overlay */}
-        <TasksOverlay />
+        <AnimatePresence>
+          {isTasksOverlayOpen && <TasksOverlay />}
+        </AnimatePresence>
       </div>
     </div>
   );

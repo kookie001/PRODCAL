@@ -36,15 +36,18 @@ export const CategoryTabBar: React.FC = () => {
   };
 
   return (
-    <div className="w-full bg-white border-b border-gray-100 px-4 py-2 flex items-center overflow-x-auto scrollbar-none flex-shrink-0">
+    <div 
+      className="w-full bg-white border-b border-gray-150 px-4 py-2 flex items-center overflow-x-auto scrollbar-none flex-shrink-0 h-12"
+      style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' }}
+    >
       <div className="flex items-center space-x-2 whitespace-nowrap pr-4">
         {/* All filter pill */}
         <button
           onClick={() => setSelectedCategory('All')}
-          className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide transition-all duration-150 cursor-pointer select-none border
+          className={`h-8 px-4 rounded-full text-xs font-medium transition-all duration-150 cursor-pointer select-none border flex items-center justify-center
             ${selectedCategory === 'All'
-              ? 'bg-[#1A73E8] border-[#1A73E8] text-white shadow-sm font-bold scale-103'
-              : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+              ? 'bg-[#1A73E8] border-transparent text-white'
+              : 'bg-transparent border-[#DADCE0] text-[#5F6368] hover:bg-gray-50'
             }
           `}
         >
@@ -58,10 +61,10 @@ export const CategoryTabBar: React.FC = () => {
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`flex items-center space-x-1.5 px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide transition-all duration-150 cursor-pointer select-none border
+              className={`flex items-center space-x-1.5 h-8 px-4 rounded-full text-xs font-medium transition-all duration-150 cursor-pointer select-none border
                 ${isActive
-                  ? 'bg-[#1A73E8] border-[#1A73E8] text-white shadow-sm font-bold scale-103'
-                  : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+                  ? 'bg-[#1A73E8] border-transparent text-white'
+                  : 'bg-transparent border-[#DADCE0] text-[#5F6368] hover:bg-gray-50'
                 }
               `}
             >
@@ -76,15 +79,15 @@ export const CategoryTabBar: React.FC = () => {
 
         {/* Dynamic Inline "Add Category" Form or Button */}
         {isAdding ? (
-          <form onSubmit={handleAddSubmit} className="flex items-center space-x-1 bg-gray-50 rounded-full border border-blue-300 pl-3 pr-1 py-0.5 shadow-inner transition-all duration-150">
+          <form onSubmit={handleAddSubmit} className="flex items-center space-x-2 bg-white rounded-full border border-[#1A73E8] h-8 pl-3 pr-1 py-0.5 shadow-inner transition-all duration-150">
             <input
               ref={inputRef}
               type="text"
               maxLength={20}
-              placeholder="New Category..."
+              placeholder="New..."
               value={newCategoryName}
               onChange={(e) => setNewCategoryName(e.target.value)}
-              className="bg-transparent text-xs text-gray-800 font-medium focus:outline-none w-28 placeholder-gray-400"
+              className="bg-transparent text-xs text-gray-800 font-medium focus:outline-none w-20 placeholder-gray-400"
             />
             <button
               type="submit"
@@ -97,7 +100,7 @@ export const CategoryTabBar: React.FC = () => {
             <button
               type="button"
               onClick={handleCancel}
-              className="p-1 text-gray-400 hover:bg-gray-150 rounded-full cursor-pointer transition-colors"
+              className="p-1 text-gray-400 hover:bg-gray-50 rounded-full cursor-pointer transition-colors"
               title="Cancel"
             >
               <X size={14} />
@@ -106,11 +109,11 @@ export const CategoryTabBar: React.FC = () => {
         ) : (
           <button
             onClick={() => setIsAdding(true)}
-            className="flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-100 hover:border-blue-200 transition-all duration-150 cursor-pointer select-none"
+            className="flex items-center space-x-1 h-8 px-3.5 rounded-full text-xs font-semibold text-[#1A73E8] border border-dashed border-[#1A73E8]/50 bg-blue-50/20 hover:bg-blue-50/50 transition-all duration-150 cursor-pointer select-none"
             title="Create new category"
           >
             <Plus size={14} />
-            <span>Add</span>
+            <span>Category</span>
           </button>
         )}
       </div>

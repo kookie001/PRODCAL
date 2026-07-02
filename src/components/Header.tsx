@@ -74,6 +74,8 @@ export const Header: React.FC<HeaderProps> = ({
       setCurrentDate(subWeeks(activeDate, 1));
     } else if (selectedView === 'day') {
       setCurrentDate(subDays(activeDate, 1));
+    } else if (selectedView === '3day') {
+      setCurrentDate(subDays(activeDate, 3));
     }
   };
 
@@ -84,6 +86,8 @@ export const Header: React.FC<HeaderProps> = ({
       setCurrentDate(addWeeks(activeDate, 1));
     } else if (selectedView === 'day') {
       setCurrentDate(addDays(activeDate, 1));
+    } else if (selectedView === '3day') {
+      setCurrentDate(addDays(activeDate, 3));
     }
   };
 
@@ -104,6 +108,16 @@ export const Header: React.FC<HeaderProps> = ({
       } else {
         return `${format(start, 'MMM yyyy')} - ${format(end, 'MMM yyyy')}`;
       }
+    } else if (selectedView === '3day') {
+      const start = activeDate;
+      const end = addDays(activeDate, 2);
+      if (start.getMonth() === end.getMonth()) {
+        return format(activeDate, 'MMMM yyyy');
+      } else if (start.getFullYear() === end.getFullYear()) {
+        return `${format(start, 'MMM d')} - ${format(end, 'MMM d, yyyy')}`;
+      } else {
+        return `${format(start, 'MMM d, yyyy')} - ${format(end, 'MMM d, yyyy')}`;
+      }
     } else if (selectedView === 'day') {
       return format(activeDate, 'MMMM d, yyyy');
     } else {
@@ -117,7 +131,7 @@ export const Header: React.FC<HeaderProps> = ({
     <div className="relative flex flex-col bg-white border-b border-gray-150 select-none z-30">
       <div className="flex items-center justify-between px-3 h-14">
         
-        {/* Left Side: Hamburger Menu & Date Toggler with interactive Pending Tasks trigger */}
+        {/* Left Side: Hamburger Menu & Date Toggler with Search icon next to it */}
         <div className="flex items-center space-x-1 min-w-0 flex-1">
           <button
             onClick={onToggleSidebar}
@@ -134,15 +148,24 @@ export const Header: React.FC<HeaderProps> = ({
               className="flex items-center px-2 py-1.5 hover:bg-gray-100/70 rounded-xl transition-all cursor-pointer min-w-0"
               title="Toggle mini calendar"
             >
-              <span className="text-base font-bold text-gray-900 truncate tracking-tight leading-none">
+              <span className="text-xl font-medium text-gray-900 truncate tracking-normal leading-none">
                 {getHeaderDateLabel()}
               </span>
               <ChevronDown size={14} className={`text-gray-500 ml-1 transition-transform flex-shrink-0 ${isMiniCalendarOpen ? 'rotate-180' : ''}`} />
             </button>
           </div>
+
+          {/* Search Toggle (immediately after month title) */}
+          <button
+            onClick={onSearchClick}
+            className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 cursor-pointer transition-colors flex-shrink-0 ml-1"
+            title="Search tasks"
+          >
+            <Search size={18} />
+          </button>
         </div>
 
-        {/* Right Side: Quick navigation actions */}
+        {/* Right Side: Quick navigation actions, utility count and user avatar */}
         <div className="flex items-center space-x-0.5 flex-shrink-0">
           
           {/* 1. Prev & Next buttons */}
@@ -165,22 +188,27 @@ export const Header: React.FC<HeaderProps> = ({
           {/* 2. Today Dynamic Calendar Icon */}
           <button
             onClick={handleToday}
-            className="p-1.5 hover:bg-gray-100 rounded-full text-gray-700 relative flex items-center justify-center transition-colors cursor-pointer"
+            className="p-1.5 hover:bg-[#E8F0FE] rounded-full text-gray-700 relative flex items-center justify-center transition-colors cursor-pointer"
             title="Today"
           >
             <div className="relative w-5.5 h-5.5 border-2 border-gray-700 rounded-md flex flex-col overflow-hidden items-center">
-              <div className="bg-blue-600 w-full h-1.5 flex-shrink-0" />
+              <div className="bg-[#1A73E8] w-full h-1.5 flex-shrink-0" />
               <span className="text-[9px] font-extrabold text-gray-800 leading-none mt-0.5 select-none">{todayDay}</span>
             </div>
           </button>
 
-          {/* 3. Search Toggle */}
+          {/* 3. Task Count Check Utility button */}
           <button
-            onClick={onSearchClick}
-            className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 cursor-pointer transition-colors"
-            title="Search tasks"
+            onClick={() => setTasksOverlayOpen(true)}
+            className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 cursor-pointer transition-colors relative"
+            title="View pending tasks"
           >
-            <Search size={18} />
+            <ListTodo size={18} />
+            {(pendingToday.length + pendingOverdue.length) > 0 && (
+              <span className="absolute top-1 right-1 bg-red-500 text-white rounded-full text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center scale-90">
+                {pendingToday.length + pendingOverdue.length}
+              </span>
+            )}
           </button>
         </div>
       </div>

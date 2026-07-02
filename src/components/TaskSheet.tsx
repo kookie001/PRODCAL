@@ -141,6 +141,9 @@ export const TaskSheet: React.FC = () => {
     setDraggedIndex(index);
     setPointerStartY(e.clientY);
     setDraggedOffset(0);
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(10);
+    }
   };
 
   const handlePointerMove = (index: number, e: React.PointerEvent) => {
@@ -184,20 +187,24 @@ export const TaskSheet: React.FC = () => {
     }
   };
 
-  if (!isFABOpen) return null;
-
   return (
-    <AnimatePresence>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-3xs z-40 flex items-end justify-center select-none">
-        {/* Scrim handle click out */}
-        <div className="absolute inset-0 cursor-default" onClick={handleClose} />
+    <div className="fixed inset-0 z-40 flex items-end justify-center select-none">
+      {/* Premium Glass-blur Backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.25, ease: 'easeOut' }}
+        className="absolute inset-0 bg-black/40 cursor-default"
+        onClick={handleClose}
+      />
 
-        {/* Modal Core Sheet */}
-        <motion.div
+      {/* Modal Core Sheet */}
+      <motion.div
           initial={{ y: '100%' }}
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 26, stiffness: 280 }}
+          transition={{ type: 'spring', damping: 32, stiffness: 300, mass: 0.8 }}
           className="relative bg-white w-full rounded-t-2xl shadow-2xl flex flex-col max-h-[90%] overflow-hidden border border-gray-100 z-10"
         >
           {/* Header row */}
@@ -226,22 +233,105 @@ export const TaskSheet: React.FC = () => {
                   placeholder="Task Title (e.g. Weekly Sync)"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement;
+                      dateInput?.focus();
+                    }
+                  }}
                   className="w-full bg-transparent text-xl font-medium text-gray-900 border-b border-gray-200 focus:border-blue-600 focus:outline-none py-1 transition-all placeholder-gray-400"
                 />
               </div>
 
-              {/* 2. "+ Add Subtask" Button */}
+              {/* 2. Category Selector */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center space-x-1.5">
+                  <Bookmark size={13} className="text-blue-500" />
+                  <span>Category</span>
+                </label>
+                <div className="w-full overflow-x-auto scrollbar-none py-1">
+                  <div className="flex items-center space-x-2 whitespace-nowrap">
+                    {categories.map((cat) => {
+                      const isSelected = category === cat.id;
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setCategory(cat.id)}
+                          className="flex items-center px-4 py-1.5 rounded-full text-xs font-semibold border transition-all hover:scale-105 cursor-pointer"
+                          style={
+                            isSelected 
+                              ? { backgroundColor: cat.color.solid, borderColor: cat.color.solid, color: '#ffffff' }
+                              : { backgroundColor: 'transparent', borderColor: cat.color.solid, color: cat.color.solid }
+                          }
+                        >
+                          <span>{cat.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Date & Time Picker */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center space-x-1.5">
+                    <Calendar size={13} className="text-blue-500" />
+                    <span>Date</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const timeInput = document.querySelector('input[type="time"]') as HTMLInputElement;
+                        timeInput?.focus();
+                      }
+                    }}
+                    className="w-full bg-gray-55 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center space-x-1.5">
+                    <Clock size={13} className="text-blue-500" />
+                    <span>Time (Optional)</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const subInput = document.querySelector('input[placeholder="Subtask description..."]') as HTMLInputElement;
+                        if (subInput) {
+                          subInput.focus();
+                        } else {
+                          e.currentTarget.blur();
+                        }
+                      }
+                    }}
+                    className="w-full bg-gray-55 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </div>
+              </div>
+
+              {/* 4. "+ Add Subtask" Button */}
               <div className="space-y-3 pt-2">
-                {subtasks.length < 5 && (
-                  <button
-                    type="button"
-                    onClick={handleAddSubtask}
-                    className="flex items-center space-x-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
-                  >
-                    <Plus size={14} />
-                    <span>Add Subtask</span>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={handleAddSubtask}
+                  disabled={subtasks.length >= 5}
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 text-blue-700 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                >
+                  <Plus size={14} />
+                  <span>Add Subtask</span>
+                </button>
 
                 {/* Subtasks Indented checklist */}
                 {subtasks.length > 0 && (
@@ -252,7 +342,7 @@ export const TaskSheet: React.FC = () => {
                         <div
                           key={sub.id}
                           className={`flex items-center space-x-2 py-1.5 px-2 rounded bg-white relative transition-all duration-150
-                            ${isDragging ? 'shadow-lg scale-[1.03] bg-blue-50/50 z-50 border border-blue-200' : 'border border-transparent'}
+                            ${isDragging ? 'shadow-lg scale-[1.02] bg-blue-50/50 z-50 border border-blue-200' : 'border border-transparent'}
                           `}
                           style={isDragging ? { transform: `translateY(${draggedOffset}px)`, touchAction: 'none' } : { touchAction: 'none' }}
                         >
@@ -277,6 +367,26 @@ export const TaskSheet: React.FC = () => {
                               updated[index].title = e.target.value;
                               setSubtasks(updated);
                             }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const allSubInputs = Array.from(document.querySelectorAll('input[placeholder="Subtask description..."]')) as HTMLInputElement[];
+                                const currIndex = allSubInputs.indexOf(e.currentTarget);
+                                if (currIndex < allSubInputs.length - 1) {
+                                  allSubInputs[currIndex + 1].focus();
+                                } else {
+                                  if (sub.title.trim() && subtasks.length < 5) {
+                                    handleAddSubtask();
+                                    setTimeout(() => {
+                                      const updatedSubInputs = Array.from(document.querySelectorAll('input[placeholder="Subtask description..."]')) as HTMLInputElement[];
+                                      updatedSubInputs[updatedSubInputs.length - 1]?.focus();
+                                    }, 50);
+                                  } else {
+                                    e.currentTarget.blur();
+                                  }
+                                }
+                              }
+                            }}
                             placeholder="Subtask description..."
                             className="flex-1 bg-transparent border-b border-gray-100 focus:border-blue-600 focus:outline-none text-sm text-gray-800 py-1"
                           />
@@ -297,74 +407,14 @@ export const TaskSheet: React.FC = () => {
                 )}
               </div>
 
-              {/* 3. Category Selector */}
-              <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center space-x-1.5">
-                  <Bookmark size={13} className="text-blue-500" />
-                  <span>Category</span>
-                </label>
-                <div className="w-full overflow-x-auto scrollbar-none py-1">
-                  <div className="flex items-center space-x-2 whitespace-nowrap">
-                    {categories.map((cat) => {
-                      const isSelected = category === cat.id;
-                      return (
-                        <button
-                          key={cat.id}
-                          type="button"
-                          onClick={() => setCategory(cat.id)}
-                          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border cursor-pointer transition-all hover:scale-103
-                            ${isSelected 
-                              ? `${cat.color.bgLight} ${cat.color.light} ${cat.color.borderLight} ring-1 ring-blue-500/15`
-                              : 'bg-gray-55 text-gray-600 border-gray-200 hover:border-gray-300'
-                            }
-                          `}
-                        >
-                          <span 
-                            className="w-2 h-2 rounded-full" 
-                            style={{ backgroundColor: cat.color.solid }} 
-                          />
-                          <span>{cat.name}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* 4. Date & Time Picker */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center space-x-1.5">
-                    <Calendar size={13} className="text-blue-500" />
-                    <span>Date</span>
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full bg-gray-55 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center space-x-1.5">
-                    <Clock size={13} className="text-blue-500" />
-                    <span>Time (Optional)</span>
-                  </label>
-                  <input
-                    type="time"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                    className="w-full bg-gray-55 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                </div>
-              </div>
-
             </form>
           </div>
 
           {/* Footer Save actions */}
-          <div className="flex items-center justify-end space-x-2 p-6 border-t border-gray-100 flex-shrink-0">
+          <div 
+            className="flex items-center justify-end space-x-2 p-6 border-t border-gray-100 flex-shrink-0"
+            style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 16px))' }}
+          >
             <button
               type="button"
               onClick={handleClose}
@@ -382,7 +432,6 @@ export const TaskSheet: React.FC = () => {
             </button>
           </div>
         </motion.div>
-      </div>
-    </AnimatePresence>
+    </div>
   );
 };

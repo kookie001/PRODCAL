@@ -1,9 +1,32 @@
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Roboto", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Google Sans", "Google Sans Text", Roboto, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-md3-primary: #0b57d0;
+  --color-md3-on-primary: #ffffff;
+  --color-md3-primary-container: #d3e3fd;
+  --color-md3-on-primary-container: #041e49;
+  --color-md3-surface: #f8fafd;
+  --color-md3-surface-container: #f1f5f9;
+  --color-md3-outline: #74777f;
+  --color-md3-outline-variant: #c4c6cf;
+
+  --color-bg-page: #F8F9FA;
+  --color-bg-surface: #FFFFFF;
+  --color-bg-drawer: #FFFFFF;
+  --color-text-primary: #202124;
+  --color-text-secondary: #5F6368;
+  --color-text-disabled: #BDC1C6;
+  --color-blue-primary: #1A73E8;
+  --color-blue-container: #E8F0FE;
+  --color-blue-dark: #0B57D0;
+  --color-red-current-time: #EA4335;
+  --color-green-holiday: #137333;
+  --color-divider-gcal: #E0E0E0;
+  --color-scrim-gcal: rgba(0,0,0,0.4);
 }
 
 /* Custom Design Tokens from Professional Polish */
@@ -43,6 +66,10 @@
   transition-property: all;
   transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   transition-duration: 220ms;
+}
+
+body, button, input, select, textarea, label, span, div, p, h1, h2, h3, h4, h5, h6, li, a {
+  font-family: "Google Sans", "Google Sans Text", Roboto, system-ui, sans-serif;
 }
 
 body {

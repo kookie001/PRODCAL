@@ -122,7 +122,14 @@ const TaskItemRow: React.FC<TaskItemRowProps> = ({
   const isSwipingLeft = dragX < -15;
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-gray-150/70 bg-white shadow-3xs select-none">
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 12, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95, y: -8 }}
+      transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+      className="relative overflow-hidden rounded-2xl border border-gray-150/70 bg-white shadow-3xs select-none"
+    >
       {/* Swipe action background indicators */}
       <div 
         className={`absolute inset-0 flex items-center justify-between px-5 text-white z-0 transition-all duration-150
@@ -226,10 +233,17 @@ const TaskItemRow: React.FC<TaskItemRowProps> = ({
                     e.stopPropagation(); // prevent opening details
                     updateTask(task.id, { completed: true });
                   }}
-                  className="w-5.5 h-5.5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all hover:bg-blue-50 cursor-pointer mr-3 active:scale-90 touch-manipulation"
-                  style={{ borderColor: catColor.solid }}
+                  className="w-5.5 h-5.5 rounded-full border-2 border-[#c4c6cf] flex items-center justify-center flex-shrink-0 transition-all hover:bg-blue-50 hover:border-gray-600 cursor-pointer mr-3 active:scale-90 touch-manipulation relative overflow-hidden"
                 >
-                  <span className="w-2.5 h-2.5 rounded-full bg-transparent" />
+                  <motion.span
+                    initial={false}
+                    animate={{ scale: task.completed ? 1 : 0 }}
+                    whileTap={{ scale: 1 }}
+                    transition={{ duration: 0.15, ease: 'easeOut' }}
+                    className="absolute inset-0 bg-[#0b57d0] rounded-full flex items-center justify-center"
+                  >
+                    <Check size={11} className="stroke-[3.5px] text-white" />
+                  </motion.span>
                 </button>
               )}
 
@@ -308,18 +322,29 @@ const TaskItemRow: React.FC<TaskItemRowProps> = ({
                       className="p-0.5 rounded text-gray-500 hover:text-gray-800 cursor-pointer flex items-center justify-center active:scale-90"
                     >
                       <span 
-                        className={`w-4 h-4 rounded-md flex items-center justify-center border-2 transition-all
-                          ${sub.completed 
-                            ? 'bg-blue-600 border-blue-600 text-white' 
-                            : 'bg-transparent border-gray-400 hover:border-gray-600'
-                          }
+                        className={`w-4 h-4 rounded flex items-center justify-center border-2 relative overflow-hidden transition-colors duration-150
+                          ${sub.completed ? 'border-[#0b57d0]' : 'border-[#c4c6cf] hover:border-gray-600'}
                         `}
                       >
-                        {sub.completed && <Check size={11} className="stroke-[3px] text-white" />}
+                        <motion.span
+                          initial={false}
+                          animate={{ scale: sub.completed ? 1 : 0 }}
+                          transition={{ duration: 0.15, ease: 'easeOut' }}
+                          className="absolute inset-0 bg-[#0b57d0] flex items-center justify-center"
+                        >
+                          <Check size={11} className="stroke-[3px] text-white" />
+                        </motion.span>
                       </span>
                     </button>
-                    <span className={`text-xs font-semibold truncate flex-1 ${sub.completed ? 'line-through text-gray-400' : 'text-gray-700'}`}>
-                      {sub.title}
+                    <span className={`text-xs font-semibold truncate flex-1 relative inline-block ${sub.completed ? 'text-gray-400' : 'text-gray-700'}`}>
+                      <span>{sub.title}</span>
+                      <motion.span
+                        initial={{ width: 0 }}
+                        animate={{ width: sub.completed ? '100%' : 0 }}
+                        transition={{ duration: 0.25, ease: 'easeOut' }}
+                        className="absolute left-0 top-1/2 h-[1.5px] bg-gray-400"
+                        style={{ transform: 'translateY(-50%)' }}
+                      />
                     </span>
                   </div>
 
@@ -354,7 +379,7 @@ const TaskItemRow: React.FC<TaskItemRowProps> = ({
           )}
         </div>
       </motion.div>
-    </div>
+    </motion.div>
   );
 };
 
@@ -379,8 +404,6 @@ export const TasksOverlay: React.FC = () => {
   // Multi-Selection States
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
-
-  if (!isTasksOverlayOpen) return null;
 
   const allPendingTasks = tasks.filter((task) => !task.completed);
   const completedTasks = tasks.filter((task) => task.completed);
@@ -514,20 +537,18 @@ export const TasksOverlay: React.FC = () => {
   };
 
   return (
-    <AnimatePresence>
-      {isTasksOverlayOpen && (
-        <motion.div
-          initial={{ y: '100%', opacity: 0.95 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: '100%', opacity: 0.95 }}
-          transition={{ type: 'spring', damping: 28, stiffness: 240 }}
-          className={`fixed inset-0 bg-white z-[100] flex flex-col overflow-hidden text-gray-800 transition-all duration-300
-            ${isFullScreen 
-              ? 'w-full h-full max-w-none rounded-none inset-0' 
-              : 'md:max-w-[430px] md:mx-auto md:shadow-2xl md:border-x md:border-gray-200/50 md:rounded-t-3xl md:inset-y-4 md:h-[calc(100vh-32px)]'
-            }
-          `}
-        >
+    <motion.div
+      initial={{ y: '100%', opacity: 0.95 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: '100%', opacity: 0.95 }}
+      transition={{ type: 'spring', damping: 28, stiffness: 240 }}
+      className={`fixed inset-0 bg-white z-[100] flex flex-col overflow-hidden text-gray-800 transition-all duration-300
+        ${isFullScreen 
+          ? 'w-full h-full max-w-none rounded-none inset-0' 
+          : 'md:max-w-[430px] md:mx-auto md:shadow-2xl md:border-x md:border-gray-200/50 md:rounded-t-3xl md:inset-y-4 md:h-[calc(100vh-32px)]'
+        }
+      `}
+    >
           {/* Header Area (Swaps with multi-selection actions when active) */}
           <div className="flex items-center justify-between h-14 px-4 border-b border-gray-100 flex-shrink-0 bg-white select-none">
             {isMultiSelectMode ? (
@@ -635,41 +656,43 @@ export const TasksOverlay: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-3 animate-fadeIn">
-                <div className="space-y-2.5">
-                  {searchFiltered.map((task) => {
-                    const catColor = CATEGORIES.find((c) => c.id === task.category)?.color || CATEGORIES[0].color;
-                    const isSubExpanded = gcalExpandedTaskIds.includes(task.id);
-                    const isSelected = selectedTaskIds.includes(task.id);
+                <motion.div layout className="space-y-2.5">
+                  <AnimatePresence mode="popLayout">
+                    {searchFiltered.map((task) => {
+                      const catColor = CATEGORIES.find((c) => c.id === task.category)?.color || CATEGORIES[0].color;
+                      const isSubExpanded = gcalExpandedTaskIds.includes(task.id);
+                      const isSelected = selectedTaskIds.includes(task.id);
 
-                    return (
-                      <TaskItemRow
-                        key={task.id}
-                        task={task}
-                        isMultiSelectMode={isMultiSelectMode}
-                        isSelected={isSelected}
-                        onToggleSelect={handleToggleSelect}
-                        onStartMultiSelect={handleStartMultiSelect}
-                        getTaskDateLabel={getTaskDateLabel}
-                        getLeftDateData={getLeftDateData}
-                        updateTask={updateTask}
-                        deleteTask={deleteTask}
-                        addSubtask={addSubtask}
-                        toggleSubtask={toggleSubtask}
-                        deleteSubtask={deleteSubtask}
-                        setEditingTask={setEditingTask}
-                        catColor={catColor}
-                        isSubExpanded={isSubExpanded}
-                        onToggleSubExpanded={() => {
-                          if (isSubExpanded) {
-                            setGcalExpandedTaskIds(gcalExpandedTaskIds.filter(id => id !== task.id));
-                          } else {
-                            setGcalExpandedTaskIds([...gcalExpandedTaskIds, task.id]);
-                          }
-                        }}
-                      />
-                    );
-                  })}
-                </div>
+                      return (
+                        <TaskItemRow
+                          key={task.id}
+                          task={task}
+                          isMultiSelectMode={isMultiSelectMode}
+                          isSelected={isSelected}
+                          onToggleSelect={handleToggleSelect}
+                          onStartMultiSelect={handleStartMultiSelect}
+                          getTaskDateLabel={getTaskDateLabel}
+                          getLeftDateData={getLeftDateData}
+                          updateTask={updateTask}
+                          deleteTask={deleteTask}
+                          addSubtask={addSubtask}
+                          toggleSubtask={toggleSubtask}
+                          deleteSubtask={deleteSubtask}
+                          setEditingTask={setEditingTask}
+                          catColor={catColor}
+                          isSubExpanded={isSubExpanded}
+                          onToggleSubExpanded={() => {
+                            if (isSubExpanded) {
+                              setGcalExpandedTaskIds(gcalExpandedTaskIds.filter(id => id !== task.id));
+                            } else {
+                              setGcalExpandedTaskIds([...gcalExpandedTaskIds, task.id]);
+                            }
+                          }}
+                        />
+                      );
+                    })}
+                  </AnimatePresence>
+                </motion.div>
               </div>
             )}
 
@@ -704,8 +727,15 @@ export const TasksOverlay: React.FC = () => {
                             >
                               <Check size={11} className="stroke-[3.5px]" />
                             </button>
-                            <span className="text-xs text-gray-400 line-through font-bold truncate flex-1">
-                              {task.title}
+                            <span className="text-xs text-gray-400 font-bold truncate flex-1 relative inline-block">
+                              <span>{task.title}</span>
+                              <motion.span
+                                initial={{ width: 0 }}
+                                animate={{ width: '100%' }}
+                                transition={{ duration: 0.25, ease: 'easeOut' }}
+                                className="absolute left-0 top-1/2 h-[1.5px] bg-gray-400"
+                                style={{ transform: 'translateY(-50%)' }}
+                              />
                             </span>
                           </div>
                           <button
@@ -728,6 +758,7 @@ export const TasksOverlay: React.FC = () => {
           <div 
             onClick={handleOpenCreator}
             className="absolute bottom-0 left-0 right-0 border-t border-gray-150 bg-white p-3.5 z-50 shadow-lg cursor-pointer active:scale-[0.99] transition-all"
+            style={{ paddingBottom: 'calc(0.875rem + env(safe-area-inset-bottom, 16px))' }}
           >
             <div className="relative flex items-center w-full bg-gray-50 hover:bg-gray-100/70 border border-gray-200 rounded-2xl pl-11 pr-4 py-3 select-none touch-manipulation">
               <Plus size={18} className="absolute left-3.5 text-blue-600 stroke-[2.5px]" />
@@ -737,7 +768,5 @@ export const TasksOverlay: React.FC = () => {
             </div>
           </div>
         </motion.div>
-      )}
-    </AnimatePresence>
   );
 };

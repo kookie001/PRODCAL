@@ -52,7 +52,7 @@ export const QuickCreatePopover: React.FC<QuickCreatePopoverProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-3xs z-40 flex items-end justify-center select-none">
+      <div className="absolute inset-0 bg-black/45 z-40 flex items-end justify-center select-none">
         {/* Scrim tap to close */}
         <div className="absolute inset-0" onClick={onClose} />
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, 
@@ -13,10 +13,10 @@ import {
   ListTodo
 } from 'lucide-react';
 import { useTaskStore } from '../store';
-import { CATEGORIES } from '../types';
+import { CATEGORIES, Task } from '../types';
 
 export const TaskDetailsModal: React.FC = () => {
-  const selectedTask = useTaskStore((state) => state.selectedTaskForDetails);
+  const selectedTaskFromStore = useTaskStore((state) => state.selectedTaskForDetails);
   const setSelectedTaskForDetails = useTaskStore((state) => state.setSelectedTaskForDetails);
   const deleteTask = useTaskStore((state) => state.deleteTask);
   const setEditingTask = useTaskStore((state) => state.setEditingTask);
@@ -24,27 +24,38 @@ export const TaskDetailsModal: React.FC = () => {
   const toggleSubtask = useTaskStore((state) => state.toggleSubtask);
 
   const [isSubtasksExpanded, setIsSubtasksExpanded] = useState(true);
+  
+  // Cache the last non-null task so that during the exit transition, the modal doesn't crash or display empty data
+  const [activeTask, setActiveTask] = useState<Task | null>(selectedTaskFromStore);
 
-  if (!selectedTask) return null;
+  useEffect(() => {
+    if (selectedTaskFromStore) {
+      setActiveTask(selectedTaskFromStore);
+    }
+  }, [selectedTaskFromStore]);
 
-  const categoryInfo = CATEGORIES.find((cat) => cat.id === selectedTask.category) || CATEGORIES[0];
+  if (!activeTask) return null;
+
+  const selectedTask = activeTask;
+
+  const categoryInfo = CATEGORIES.find((cat) => cat.id === activeTask.category) || CATEGORIES[0];
 
   const handleToggleTaskCompleted = () => {
-    updateTask(selectedTask.id, { completed: !selectedTask.completed });
+    updateTask(activeTask.id, { completed: !activeTask.completed });
   };
 
   const handleDelete = () => {
-    deleteTask(selectedTask.id);
+    deleteTask(activeTask.id);
     setSelectedTaskForDetails(null);
   };
 
   const handleEdit = () => {
-    setEditingTask(selectedTask);
+    setEditingTask(activeTask);
     setSelectedTaskForDetails(null); // Close details and open sheet
   };
 
   // Date formatting for human-friendly reading
-  const dateObj = new Date(selectedTask.date + 'T00:00:00');
+  const dateObj = new Date(activeTask.date + 'T00:00:00');
   const formattedDate = dateObj.toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -53,16 +64,19 @@ export const TaskDetailsModal: React.FC = () => {
   });
 
   return (
-    <AnimatePresence>
-      <div className="absolute inset-0 bg-black/35 backdrop-blur-3xs z-40 flex items-end justify-center p-0">
-        {/* Backdrop Tap to Close */}
-        <div 
-          className="absolute inset-0 cursor-default" 
-          onClick={() => setSelectedTaskForDetails(null)} 
-        />
+    <div className="fixed inset-0 z-40 flex items-end justify-center p-0 select-none">
+      {/* Premium Glass-blur Backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.25, ease: 'easeOut' }}
+        className="absolute inset-0 bg-black/40 cursor-default"
+        onClick={() => setSelectedTaskForDetails(null)}
+      />
 
-        {/* Modal Card */}
-        <motion.div
+      {/* Modal Card */}
+      <motion.div
           initial={{ y: '100%', opacity: 0.8 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: '100%', opacity: 0 }}
@@ -199,7 +213,6 @@ export const TaskDetailsModal: React.FC = () => {
             )}
           </div>
         </motion.div>
-      </div>
-    </AnimatePresence>
+    </div>
   );
 };

@@ -26,6 +26,7 @@
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "react-hook-form": "^7.80.0",
+    "react-swipeable": "^7.0.2",
     "vite": "^6.2.3",
     "zod": "^4.4.3",
     "zustand": "^5.0.14"

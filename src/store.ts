@@ -20,6 +20,7 @@ interface TaskState {
   
   // Non-persisted transient state
   currentDate: string; // ISO String of the current active date for calendar view
+  direction: 'next' | 'prev'; // For slide transitions
   selectedCategory: CategoryType | 'All';
   isFABOpen: boolean;
   editingTask: Task | null; // For editing existing tasks in the task sheet
@@ -29,6 +30,7 @@ interface TaskState {
   isHeaderCollapsed: boolean; // For Material 3 scroll-to-collapse header
   lastDeletedTask: Task | null; // For Undo snackbar
   isTasksOverlayOpen: boolean; // Global state for full-screen GCAL Tasks view
+  isBottomBarVisible: boolean; // For scroll hiding bottom bar
 }
 
 interface TaskActions {
@@ -38,6 +40,7 @@ interface TaskActions {
   addCategory: (name: string) => void;
   
   setCurrentDate: (date: Date) => void;
+  setDirection: (direction: 'next' | 'prev') => void;
   setSelectedCategory: (category: CategoryType | 'All') => void;
   setSelectedView: (view: ViewType) => void;
   toggleTheme: () => void;
@@ -50,6 +53,7 @@ interface TaskActions {
   setLastDeletedTask: (task: Task | null) => void;
   undoDeleteTask: () => void;
   setTasksOverlayOpen: (open: boolean) => void;
+  setBottomBarVisible: (visible: boolean) => void;
   
   // Subtask helpers
   toggleSubtask: (taskId: string, subtaskId: string) => void;
@@ -64,40 +68,171 @@ export const useTaskStore = create<TaskState & TaskActions>()(
       // Default state
       tasks: [
         {
-          id: 'sample-1',
-          title: 'Design Google Tasks UI System',
-          category: 'Work',
-          date: new Date().toISOString().split('T')[0], // Today
-          time: '10:00',
+          id: 'sample-gcal-1',
+          title: 'Birthday of Rabindranath',
+          category: 'Holidays',
+          date: '2026-05-09',
           completed: false,
-          subtasks: [
-            { id: 'sub-1-1', title: 'Replicate Material 3 guidelines', completed: true },
-            { id: 'sub-1-2', title: 'Build month, week, day, and schedule views', completed: false },
-            { id: 'sub-1-3', title: 'Integrate fluid spring motion with dnd-kit', completed: false }
-          ],
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: 'sample-2',
-          title: 'Morning Yoga and Cardiovascular Run',
-          category: 'Health',
-          date: new Date().toISOString().split('T')[0], // Today
-          time: '07:30',
-          completed: true,
           subtasks: [],
           createdAt: new Date().toISOString()
         },
         {
-          id: 'sample-3',
-          title: 'Review System Design Principles',
-          category: 'Other',
-          date: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Tomorrow
+          id: 'sample-gcal-1-curr',
+          title: 'Birthday of Rabindranath',
+          category: 'Holidays',
+          date: '2026-07-09',
+          completed: false,
+          subtasks: [],
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'sample-gcal-2',
+          title: 'VENTURE DAY DELHI',
+          category: 'Work',
+          date: '2026-05-16',
           time: '15:00',
           completed: false,
           subtasks: [
-            { id: 'sub-3-1', title: 'Read DynamoDB paper', completed: false },
-            { id: 'sub-3-2', title: 'Draft sequence diagrams', completed: false }
+            { id: 'sub-v-1', title: 'Keynote Speech', completed: false },
+            { id: 'sub-v-2', title: 'Investor Pitch Session', completed: false },
+            { id: 'sub-v-3', title: 'Networking & Co-working drinks', completed: false }
           ],
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'sample-gcal-2-curr',
+          title: 'VENTURE DAY DELHI',
+          category: 'Work',
+          date: '2026-07-16',
+          time: '15:00',
+          completed: false,
+          subtasks: [
+            { id: 'sub-v-1-c', title: 'Keynote Speech', completed: false },
+            { id: 'sub-v-2-c', title: 'Investor Pitch Session', completed: false },
+            { id: 'sub-v-3-c', title: 'Networking & Co-working drinks', completed: false }
+          ],
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'sample-gcal-3',
+          title: 'Happy birthday!',
+          category: 'Personal',
+          date: '2026-05-17',
+          completed: false,
+          subtasks: [],
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'sample-gcal-3-curr',
+          title: 'Happy birthday!',
+          category: 'Personal',
+          date: '2026-07-17',
+          completed: false,
+          subtasks: [],
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'sample-gcal-4',
+          title: '30 min with Edvin (Lucky singh)',
+          category: 'Work',
+          date: '2026-05-22',
+          time: '13:00',
+          completed: false,
+          subtasks: [],
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'sample-gcal-4-curr',
+          title: '30 min with Edvin (Lucky singh)',
+          category: 'Work',
+          date: '2026-07-22',
+          time: '13:00',
+          completed: false,
+          subtasks: [],
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'sample-gcal-5',
+          title: 'Bakrid',
+          category: 'Holidays',
+          date: '2026-05-28',
+          completed: false,
+          subtasks: [],
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'sample-gcal-5-curr',
+          title: 'Bakrid',
+          category: 'Holidays',
+          date: '2026-07-28',
+          completed: false,
+          subtasks: [],
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'sample-gcal-6',
+          title: 'Bakrid/Eid ul-Adha (tentative)',
+          category: 'Holidays',
+          date: '2026-05-28',
+          completed: false,
+          subtasks: [],
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'sample-gcal-6-curr',
+          title: 'Bakrid/Eid ul-Adha (tentative)',
+          category: 'Holidays',
+          date: '2026-07-28',
+          completed: false,
+          subtasks: [],
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'sample-gcal-7-curr',
+          title: 'Diwali Festival of Lights 🪔',
+          category: 'Holidays',
+          date: '2026-07-12',
+          completed: false,
+          subtasks: [],
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'sample-gcal-8-curr',
+          title: 'Independence Day Holiday 🇺🇸',
+          category: 'Holidays',
+          date: '2026-07-04',
+          completed: false,
+          subtasks: [],
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'sample-gcal-9-curr',
+          title: 'Netflix Movie Night 🍿',
+          category: 'Other',
+          date: '2026-07-10',
+          time: '20:00',
+          completed: false,
+          subtasks: [],
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'sample-gcal-10-curr',
+          title: 'Morning Yoga & Fitness Run 🏃‍♂️',
+          category: 'Health',
+          date: '2026-07-02',
+          time: '07:30',
+          completed: false,
+          subtasks: [],
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'sample-gcal-11-curr',
+          title: 'Dentist Checkup Appointment 🦷',
+          category: 'Health',
+          date: '2026-07-06',
+          time: '11:00',
+          completed: false,
+          subtasks: [],
           createdAt: new Date().toISOString()
         }
       ],
@@ -106,6 +241,7 @@ export const useTaskStore = create<TaskState & TaskActions>()(
       categories: CATEGORIES,
       
       currentDate: new Date().toISOString(),
+      direction: 'next',
       selectedCategory: 'All',
       isFABOpen: false,
       editingTask: null,
@@ -115,6 +251,7 @@ export const useTaskStore = create<TaskState & TaskActions>()(
       isHeaderCollapsed: false,
       lastDeletedTask: null,
       isTasksOverlayOpen: false,
+      isBottomBarVisible: true,
 
       // Actions
       addTask: (taskData) => set((state) => {
@@ -158,7 +295,14 @@ export const useTaskStore = create<TaskState & TaskActions>()(
         };
       }),
 
-      setCurrentDate: (date) => set({ currentDate: date.toISOString() }),
+      setCurrentDate: (date) => set((state) => {
+        const year = date.getFullYear();
+        if (year < 2024 || year > 2027) return {};
+        const current = new Date(state.currentDate);
+        const direction = date.getTime() >= current.getTime() ? 'next' : 'prev';
+        return { currentDate: date.toISOString(), direction };
+      }),
+      setDirection: (direction) => set({ direction }),
       
       setSelectedCategory: (category) => set({ selectedCategory: category }),
       
@@ -206,6 +350,8 @@ export const useTaskStore = create<TaskState & TaskActions>()(
       }),
 
       setTasksOverlayOpen: (open) => set({ isTasksOverlayOpen: open }),
+      
+      setBottomBarVisible: (visible) => set({ isBottomBarVisible: visible }),
 
       // Subtask specific methods
       toggleSubtask: (taskId, subtaskId) => set((state) => {

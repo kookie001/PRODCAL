@@ -17,7 +17,7 @@ export interface Task {
   createdAt: string;
 }
 
-export type ViewType = 'month' | 'week' | 'day' | 'schedule';
+export type ViewType = 'month' | 'week' | 'day' | 'schedule' | '3day';
 
 export interface CategoryConfig {
   id: CategoryType;
@@ -59,6 +59,16 @@ export const CATEGORIES: CategoryConfig[] = [
       bgLight: 'bg-rose-50',
       borderLight: 'border-rose-200',
       solid: '#e53935',
+    },
+  },
+  {
+    id: 'Holidays',
+    name: 'Holidays',
+    color: {
+      light: 'text-teal-700',
+      bgLight: 'bg-teal-50',
+      borderLight: 'border-teal-200',
+      solid: '#00897B',
     },
   },
   {
