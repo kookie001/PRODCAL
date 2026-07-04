@@ -12,6 +12,30 @@ export const CategoryTabBar: React.FC = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
+
+  useEffect(() => {
+    if (containerRef.current) {
+      // Run in a RAF/timeout to allow layout paints
+      const updateIndicator = () => {
+        const activeElement = containerRef.current?.querySelector('.active-tab') as HTMLElement;
+        if (activeElement) {
+          setIndicatorStyle({
+            left: activeElement.offsetLeft,
+            width: activeElement.clientWidth,
+          });
+          activeElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+      };
+      
+      updateIndicator();
+      // Double check shortly after to handle any layout shifts
+      const timer = setTimeout(updateIndicator, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedCategory, categories, isAdding]);
 
   useEffect(() => {
     if (isAdding) {
@@ -37,17 +61,27 @@ export const CategoryTabBar: React.FC = () => {
 
   return (
     <div 
-      className="w-full bg-white border-b border-gray-150 px-4 py-2 flex items-center overflow-x-auto scrollbar-none flex-shrink-0 h-12"
+      ref={containerRef}
+      className="w-full bg-white border-b border-gray-150 px-4 flex items-center overflow-x-auto scrollbar-none flex-shrink-0 h-12"
       style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' }}
     >
-      <div className="flex items-center space-x-2 whitespace-nowrap pr-4">
+      <div className="flex items-center space-x-3 whitespace-nowrap pr-8 relative h-full">
+        {/* Sliding indicator */}
+        <div 
+          className="absolute bottom-0 h-[3px] bg-[#1A73E8] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] rounded-t-full pointer-events-none"
+          style={{
+            left: `${indicatorStyle.left}px`,
+            width: `${indicatorStyle.width}px`
+          }}
+        />
+
         {/* All filter pill */}
         <button
           onClick={() => setSelectedCategory('All')}
-          className={`h-8 px-4 rounded-full text-xs font-medium transition-all duration-150 cursor-pointer select-none border flex items-center justify-center
+          className={`h-full px-2.5 text-xs font-semibold tracking-wide transition-colors cursor-pointer select-none flex items-center justify-center relative
             ${selectedCategory === 'All'
-              ? 'bg-[#1A73E8] border-transparent text-white'
-              : 'bg-transparent border-[#DADCE0] text-[#5F6368] hover:bg-gray-50'
+              ? 'active-tab text-[#1A73E8]'
+              : 'text-[#5F6368] hover:text-[#202124]'
             }
           `}
         >
@@ -61,16 +95,16 @@ export const CategoryTabBar: React.FC = () => {
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`flex items-center space-x-1.5 h-8 px-4 rounded-full text-xs font-medium transition-all duration-150 cursor-pointer select-none border
+              className={`flex items-center space-x-1.5 h-full px-2.5 text-xs font-semibold tracking-wide transition-colors cursor-pointer select-none
                 ${isActive
-                  ? 'bg-[#1A73E8] border-transparent text-white'
-                  : 'bg-transparent border-[#DADCE0] text-[#5F6368] hover:bg-gray-50'
+                  ? 'active-tab text-[#1A73E8]'
+                  : 'text-[#5F6368] hover:text-[#202124]'
                 }
               `}
             >
               <span 
-                className="w-1.5 h-1.5 rounded-full flex-shrink-0" 
-                style={{ backgroundColor: isActive ? '#ffffff' : cat.color.solid }} 
+                className="w-2 h-2 rounded-full flex-shrink-0 transition-transform" 
+                style={{ backgroundColor: cat.color.solid }} 
               />
               <span>{cat.name}</span>
             </button>
@@ -109,7 +143,7 @@ export const CategoryTabBar: React.FC = () => {
         ) : (
           <button
             onClick={() => setIsAdding(true)}
-            className="flex items-center space-x-1 h-8 px-3.5 rounded-full text-xs font-semibold text-[#1A73E8] border border-dashed border-[#1A73E8]/50 bg-blue-50/20 hover:bg-blue-50/50 transition-all duration-150 cursor-pointer select-none"
+            className="flex items-center space-x-1 h-8 px-3 rounded-full text-xs font-semibold text-[#1A73E8] border border-dashed border-[#1A73E8]/30 bg-blue-50/25 hover:bg-blue-50/55 transition-all duration-150 cursor-pointer select-none"
             title="Create new category"
           >
             <Plus size={14} />

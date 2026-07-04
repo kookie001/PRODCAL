@@ -22,6 +22,53 @@ export const MiniCalendar: React.FC = () => {
   const activeDate = new Date(currentDateStr);
   const [viewDate, setViewDate] = React.useState<Date>(activeDate);
 
+  // Touch Swipe navigation state
+  const [touchStartX, setTouchStartX] = React.useState<number | null>(null);
+  const [touchCurrentX, setTouchCurrentX] = React.useState<number | null>(null);
+  const [isSwiping, setIsSwiping] = React.useState(false);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX);
+    setIsSwiping(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartX === null) return;
+    setTouchCurrentX(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartX === null || touchCurrentX === null) {
+      setTouchStartX(null);
+      setTouchCurrentX(null);
+      setIsSwiping(false);
+      return;
+    }
+
+    const diffX = touchCurrentX - touchStartX;
+    const threshold = 50; // Minimum 50px swipe
+
+    if (diffX > threshold) {
+      // Swipe Right -> Previous Month
+      setViewDate(subMonths(viewDate, 1));
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(10);
+      }
+    } else if (diffX < -threshold) {
+      // Swipe Left -> Next Month
+      setViewDate(addMonths(viewDate, 1));
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(10);
+      }
+    }
+
+    setTouchStartX(null);
+    setTouchCurrentX(null);
+    setIsSwiping(false);
+  };
+
+  const currentTranslateX = touchStartX !== null && touchCurrentX !== null ? touchCurrentX - touchStartX : 0;
+
   // Sync viewDate with activeDate if external activeDate shifts months
   React.useEffect(() => {
     setViewDate(activeDate);
@@ -46,7 +93,12 @@ export const MiniCalendar: React.FC = () => {
   const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
   return (
-    <div className="p-2 select-none text-xs bg-white">
+    <div 
+      className="p-2 select-none text-xs bg-white overflow-hidden"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       <div className="flex items-center justify-between mb-2">
         <span className="font-semibold text-gray-800">
           {format(viewDate, 'MMMM yyyy')}
@@ -69,8 +121,15 @@ export const MiniCalendar: React.FC = () => {
         </div>
       </div>
       
-      {/* Grid of days */}
-      <div className="grid grid-cols-7 gap-y-1 text-center font-medium text-gray-500">
+      {/* Grid of days with translate3d swipe drag */}
+      <div 
+        className="grid grid-cols-7 gap-y-1 text-center font-medium text-gray-500"
+        style={{
+          transform: `translate3d(${currentTranslateX}px, 0, 0)`,
+          transition: isSwiping ? 'none' : 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+          willChange: 'transform'
+        }}
+      >
         {weekDays.map((day, i) => (
           <div key={i} className="h-6 flex items-center justify-center font-semibold text-[10px] text-gray-400">
             {day}

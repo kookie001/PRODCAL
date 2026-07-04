@@ -81,8 +81,11 @@ export const TaskDetailsModal: React.FC = () => {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: '100%', opacity: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-          className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden border border-gray-100 z-10"
+          className="relative bg-white w-full sm:max-w-md rounded-t-[24px] sm:rounded-2xl shadow-2xl overflow-hidden border border-gray-100 z-10"
         >
+          {/* Mobile Handle bar */}
+          <div className="w-8 h-1 bg-[#DADCE0] rounded-full mx-auto mt-4 mb-2 shrink-0 sm:hidden" />
+
           {/* Action Header */}
           <div className="flex items-center justify-end px-4 py-2 bg-gray-50 border-b border-gray-100 space-x-1">
             <button

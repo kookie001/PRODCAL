@@ -61,13 +61,6 @@
   background: rgba(60, 64, 67, 0.3);
 }
 
-/* Custom transitions and material animations */
-.transition-material {
-  transition-property: all;
-  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
-  transition-duration: 220ms;
-}
-
 body, button, input, select, textarea, label, span, div, p, h1, h2, h3, h4, h5, h6, li, a {
   font-family: "Google Sans", "Google Sans Text", Roboto, system-ui, sans-serif;
 }
@@ -79,4 +72,99 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: #ffffff;
   color: #3c4043;
+}
+
+#root {
+  transform: translateZ(0);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  box-sizing: border-box;
+}
+
+.scroll-container {
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.scroll-container * {
+  box-shadow: none !important;
+}
+
+/* High-performance CSS transitions replacing Framer Motion */
+.task-sheet {
+  transform: translateY(100%);
+  transition: transform 280ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.task-sheet.open {
+  transform: translateY(0);
+}
+
+.tasks-overlay {
+  transform: translateY(100%);
+  transition: transform 280ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.tasks-overlay.open {
+  transform: translateY(0);
+}
+
+.task-details-modal {
+  transform: translateY(100%);
+  transition: transform 280ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.task-details-modal.open {
+  transform: translateY(0);
+}
+
+/* Global Typography Polish */
+body, p, span, div, li, a, label {
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+/* Placeholder color consistency */
+input::placeholder, textarea::placeholder {
+  color: #BDC1C6 !important;
+  opacity: 1 !important; /* overrides browser default opacity */
+}
+
+/* Standardize focus styles across all inputs to remove default browser rings and enforce GCal blue */
+input:focus, textarea:focus, select:focus {
+  border-color: #1A73E8 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  --tw-ring-width: 0px !important;
+  --tw-ring-color: transparent !important;
+}
+
+/* Contain overscroll on scrollable lists to prevent browser pull-to-refresh from interrupting calendar swipe gestures */
+.overflow-y-auto, .overflow-y-scroll, [style*="overflow-y: auto"], [style*="overflow-y: scroll"] {
+  overscroll-behavior: contain !important;
+}
+
+/* Comfort tap targets - standard buttons, header icons, and action triggers */
+button, .tap-target, .header-btn, .sidebar-btn, .tab-btn, .action-btn {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Ensure mini button exceptions remain inline but have expanded touch pads if needed */
+button.p-1, button.p-1.5, button.p-2 {
+  min-width: 44px;
+  min-height: 44px;
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { 
   format, 
   addMonths, 
@@ -45,9 +45,9 @@ export const Header: React.FC<HeaderProps> = ({
   const activeDate = new Date(currentDateStr);
   const [isMiniCalendarOpen, setIsMiniCalendarOpen] = useState(false);
 
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const pendingToday = tasks.filter((task) => task.date === todayStr && !task.completed);
-  const pendingOverdue = tasks.filter((task) => task.date < todayStr && !task.completed);
+  const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+  const pendingToday = useMemo(() => tasks.filter((task) => task.date === todayStr && !task.completed), [tasks, todayStr]);
+  const pendingOverdue = useMemo(() => tasks.filter((task) => task.date < todayStr && !task.completed), [tasks, todayStr]);
 
   const calendarDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -67,7 +67,7 @@ export const Header: React.FC<HeaderProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handlePrev = () => {
+  const handlePrev = useCallback(() => {
     if (selectedView === 'month' || selectedView === 'schedule') {
       setCurrentDate(subMonths(activeDate, 1));
     } else if (selectedView === 'week') {
@@ -77,9 +77,9 @@ export const Header: React.FC<HeaderProps> = ({
     } else if (selectedView === '3day') {
       setCurrentDate(subDays(activeDate, 3));
     }
-  };
+  }, [selectedView, activeDate, setCurrentDate]);
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     if (selectedView === 'month' || selectedView === 'schedule') {
       setCurrentDate(addMonths(activeDate, 1));
     } else if (selectedView === 'week') {
@@ -89,11 +89,11 @@ export const Header: React.FC<HeaderProps> = ({
     } else if (selectedView === '3day') {
       setCurrentDate(addDays(activeDate, 3));
     }
-  };
+  }, [selectedView, activeDate, setCurrentDate]);
 
-  const handleToday = () => {
+  const handleToday = useCallback(() => {
     setCurrentDate(new Date());
-  };
+  }, [setCurrentDate]);
 
   const getHeaderDateLabel = () => {
     if (selectedView === 'month') {
@@ -125,7 +125,7 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  const todayDay = new Date().getDate();
+  const todayDay = useMemo(() => new Date().getDate(), []);
 
   return (
     <div className="relative flex flex-col bg-white border-b border-gray-150 select-none z-30">

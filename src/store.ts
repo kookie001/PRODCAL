@@ -57,6 +57,7 @@ interface TaskActions {
   
   // Subtask helpers
   toggleSubtask: (taskId: string, subtaskId: string) => void;
+  toggleSubtaskComplete: (taskId: string, subtaskIndex: number) => void;
   addSubtask: (taskId: string, title: string) => void;
   deleteSubtask: (taskId: string, subtaskId: string) => void;
   reorderSubtasks: (taskId: string, subtasks: Subtask[]) => void;
@@ -362,6 +363,25 @@ export const useTaskStore = create<TaskState & TaskActions>()(
             sub.id === subtaskId ? { ...sub, completed: !sub.completed } : sub
           );
           
+          return { ...task, subtasks: updatedSubtasks };
+        });
+
+        const updatedDetails = state.selectedTaskForDetails?.id === taskId
+          ? updatedTasks.find(t => t.id === taskId) || null
+          : state.selectedTaskForDetails;
+
+        return { 
+          tasks: updatedTasks,
+          selectedTaskForDetails: updatedDetails
+        };
+      }),
+
+      toggleSubtaskComplete: (taskId, subtaskIndex) => set((state) => {
+        const updatedTasks = state.tasks.map((task) => {
+          if (task.id !== taskId) return task;
+          const updatedSubtasks = task.subtasks.map((sub, i) =>
+            i === subtaskIndex ? { ...sub, completed: !sub.completed } : sub
+          );
           return { ...task, subtasks: updatedSubtasks };
         });
 

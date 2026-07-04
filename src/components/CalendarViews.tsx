@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   format,
   startOfMonth,
@@ -43,6 +43,48 @@ import { QuickCreatePopover } from './QuickCreatePopover';
 import { useSwipeable } from 'react-swipeable';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'motion/react';
 import { Ripple } from './Ripple';
+import { TaskSheet } from './TaskSheet';
+import { DndContext, closestCenter, TouchSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
+
+const addDebug = (msg: string) => {
+  console.log("DEBUG:", msg);
+  window.dispatchEvent(new CustomEvent('app-debug', { detail: msg }));
+};
+if (typeof window !== 'undefined') {
+  (window as any).addDebug = addDebug;
+}
+
+
+const useLongPress = (callback: (time: string) => void, delay = 600) => {
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const movedRef = useRef(false);
+
+  const start = (time: string) => (e: React.TouchEvent) => {
+    movedRef.current = false;
+    timerRef.current = setTimeout(() => {
+      if (!movedRef.current) {
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          navigator.vibrate(30);
+        }
+        callback(time);
+      }
+    }, delay);
+  };
+
+  const cancel = () => {
+    clearTimeout(timerRef.current);
+  };
+
+  const move = () => {
+    movedRef.current = true;
+    clearTimeout(timerRef.current);
+  };
+
+  return { start, cancel, move };
+};
 
 interface CalendarViewsProps {
   searchQuery: string;
@@ -66,15 +108,6 @@ export const CalendarViews: React.FC<CalendarViewsProps> = ({ searchQuery }) => 
   const [popoverHour, setPopoverHour] = useState<number>(9);
 
   const activeDate = new Date(currentDateStr);
-
-  // Continuous swipe / drag state tracking
-  const dragX = useMotionValue(0);
-  const x = useTransform(dragX, (val) => val);
-
-  // Reset offset when active date or view changes to avoid stale/stuck states
-  useEffect(() => {
-    dragX.set(0);
-  }, [selectedView, currentDateStr, dragX]);
 
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
 
@@ -185,106 +218,6 @@ export const CalendarViews: React.FC<CalendarViewsProps> = ({ searchQuery }) => 
 
     setFABOpen(true);
     setIsPopoverOpen(false);
-  };
-
-  const handleDragEnd = (event: any, info: any) => {
-    if (selectedView === 'schedule') return;
-
-    const dragDistance = info.offset.x;
-    const threshold = 40;
-
-    if (dragDistance < -threshold) {
-      // Swipe left = Next period
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(8);
-      }
-      
-      let nextDate = activeDate;
-      if (selectedView === 'day') {
-        nextDate = addDays(activeDate, 1);
-      } else if (selectedView === 'week') {
-        nextDate = addWeeks(activeDate, 1);
-      } else if (selectedView === '3day') {
-        nextDate = addDays(activeDate, 3);
-      } else if (selectedView === 'month') {
-        nextDate = addMonths(activeDate, 1);
-      }
-
-      const nextYear = nextDate.getFullYear();
-      if (nextYear >= 2024 && nextYear <= 2027) {
-        animate(dragX, -300, {
-          type: 'spring',
-          damping: 28,
-          stiffness: 220,
-          mass: 0.8
-        }).then(() => {
-          setCurrentDate(nextDate);
-          dragX.set(300);
-          animate(dragX, 0, {
-            type: 'spring',
-            damping: 28,
-            stiffness: 220,
-            mass: 0.8
-          });
-        });
-      } else {
-        animate(dragX, 0, {
-          type: 'spring',
-          damping: 28,
-          stiffness: 220,
-          mass: 0.8
-        });
-      }
-    } else if (dragDistance > threshold) {
-      // Swipe right = Previous period
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(8);
-      }
-
-      let prevDate = activeDate;
-      if (selectedView === 'day') {
-        prevDate = subDays(activeDate, 1);
-      } else if (selectedView === 'week') {
-        prevDate = subWeeks(activeDate, 1);
-      } else if (selectedView === '3day') {
-        prevDate = subDays(activeDate, 3);
-      } else if (selectedView === 'month') {
-        prevDate = subMonths(activeDate, 1);
-      }
-
-      const prevYear = prevDate.getFullYear();
-      if (prevYear >= 2024 && prevYear <= 2027) {
-        animate(dragX, 300, {
-          type: 'spring',
-          damping: 28,
-          stiffness: 220,
-          mass: 0.8
-        }).then(() => {
-          setCurrentDate(prevDate);
-          dragX.set(-300);
-          animate(dragX, 0, {
-            type: 'spring',
-            damping: 28,
-            stiffness: 220,
-            mass: 0.8
-          });
-        });
-      } else {
-        animate(dragX, 0, {
-          type: 'spring',
-          damping: 28,
-          stiffness: 220,
-          mass: 0.8
-        });
-      }
-    } else {
-      animate(dragX, 0, {
-        type: 'spring',
-        damping: 28,
-        stiffness: 220,
-        mass: 0.8
-      });
-    }
   };
 
   // Render the appropriate view
@@ -428,49 +361,8 @@ const MonthView: React.FC<ViewProps> = ({
     return isSameDay(taskDate, activeDate);
   });
 
-  const setDirection = useTaskStore((state) => state.setDirection);
-  const x = useMotionValue(0);
-  const touchStartX = React.useRef(0);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    const delta = e.touches[0].clientX - touchStartX.current;
-    x.set(delta);
-  };
-
-  const handleTouchEnd = () => {
-    const delta = x.get();
-    if (Math.abs(delta) > 40) {
-      const dir = delta < 0 ? 'next' : 'prev';
-      animate(x, delta < 0 ? -window.innerWidth : window.innerWidth, {
-        type: 'spring', damping: 28, stiffness: 220, mass: 0.6,
-        onComplete: () => {
-          setDirection(dir);
-          const nextDate = dir === 'next' ? addMonths(activeDate, 1) : subMonths(activeDate, 1);
-          setCurrentDate(nextDate);
-          x.set(dir === 'next' ? window.innerWidth : -window.innerWidth);
-          animate(x, 0, { type: 'spring', damping: 28, stiffness: 220, mass: 0.6 });
-        }
-      });
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(8);
-      }
-    } else {
-      animate(x, 0, { type: 'spring', damping: 32, stiffness: 300 });
-    }
-  };
-
   return (
-    <motion.div 
-      style={{ x, touchAction: 'pan-y', willChange: 'transform', transform: 'translateZ(0)' }}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      className="h-full w-full overflow-hidden bg-white"
-    >
+    <div className="h-full w-full overflow-hidden bg-white">
       <div className="flex-1 flex flex-col h-full bg-white overflow-hidden select-none">
             {/* Month Grid Panel */}
             <div className="flex-1 flex flex-col min-h-0">
@@ -657,7 +549,7 @@ const MonthView: React.FC<ViewProps> = ({
         )}
       </div>
     </div>
-  </motion.div>
+  </div>
   );
 };
 
@@ -854,45 +746,45 @@ const WeekView: React.FC<WeekViewProps> = ({
     return () => clearInterval(interval);
   }, []);
 
-  const setCurrentDate = useTaskStore((state) => state.setCurrentDate);
-  const direction = useTaskStore((state) => state.direction);
+  const [expandedTasks, setExpandedTasks] = useState<Record<string, boolean>>({});
 
-  const setDirection = useTaskStore((state) => state.setDirection);
-  const x = useMotionValue(0);
-  const touchStartX = React.useRef(0);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    const delta = e.touches[0].clientX - touchStartX.current;
-    x.set(delta);
-  };
-
-  const handleTouchEnd = () => {
-    const delta = x.get();
-    if (Math.abs(delta) > 40) {
-      const dir = delta < 0 ? 'next' : 'prev';
-      animate(x, delta < 0 ? -window.innerWidth : window.innerWidth, {
-        type: 'spring', damping: 28, stiffness: 220, mass: 0.6,
-        onComplete: () => {
-          setDirection(dir);
-          const nextDate = dir === 'next' 
-            ? (isThreeDay ? addDays(activeDate, 3) : addWeeks(activeDate, 1)) 
-            : (isThreeDay ? subDays(activeDate, 3) : subWeeks(activeDate, 1));
-          setCurrentDate(nextDate);
-          x.set(dir === 'next' ? window.innerWidth : -window.innerWidth);
-          animate(x, 0, { type: 'spring', damping: 28, stiffness: 220, mass: 0.6 });
-        }
-      });
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(8);
+  useEffect(() => {
+    const handleScrollToTask = (e: any) => {
+      const timeStr = e.detail?.time;
+      if (timeStr && scrollContainerRef.current) {
+        const [h, m] = timeStr.split(':').map(Number);
+        const hourDecimal = h + (m || 0) / 60;
+        scrollContainerRef.current.scrollTop = Math.max(0, hourDecimal * 64 - 120);
       }
-    } else {
-      animate(x, 0, { type: 'spring', damping: 32, stiffness: 300 });
-    }
-  };
+    };
+    window.addEventListener('scroll-to-task', handleScrollToTask);
+    return () => window.removeEventListener('scroll-to-task', handleScrollToTask);
+  }, []);
+
+  useEffect(() => {
+    if (!draggedTaskId) return;
+
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      onTaskDragMove(touch.clientY);
+    };
+
+    const handleTouchEnd = () => {
+      onTaskDragEnd();
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(10);
+      }
+    };
+
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [draggedTaskId, onTaskDragMove, onTaskDragEnd]);
 
   // Scroll collapsing top app bar
   const lastScrollTop = useRef(0);
@@ -918,33 +810,15 @@ const WeekView: React.FC<WeekViewProps> = ({
     }
   }, []);
 
-  // Long-press detection to trigger popover
-  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
-
-  const handleLongPressStart = (day: Date, hour: number) => {
-    longPressTimer.current = setTimeout(() => {
-      openPopover(day, hour);
-    }, 600);
-  };
-
-  const handleLongPressEnd = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-    }
-  };
-
-  const handleHourCellClick = (day: Date, hour: number) => {
-    openPopover(day, hour);
-  };
+  const longPress = useLongPress((timeStr) => {
+    const [dateStr, hourStr] = timeStr.split('|');
+    const d = new Date(dateStr + 'T00:00:00');
+    const h = parseInt(hourStr, 10);
+    openPopover(d, h);
+  });
 
   return (
-    <motion.div 
-      style={{ x, touchAction: 'pan-y', willChange: 'transform', transform: 'translateZ(0)' }}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      className="h-full w-full overflow-hidden bg-white"
-    >
+    <div className="h-full w-full overflow-hidden bg-white">
       <div className="flex-1 flex flex-col h-full bg-white overflow-hidden select-none">
       {/* Week Headers Row */}
       <div className="flex border-b border-gray-200 flex-shrink-0">
@@ -1009,15 +883,18 @@ const WeekView: React.FC<WeekViewProps> = ({
               <div key={day.toString()} className="relative h-full flex flex-col">
                 
                 {/* 24 vertical slot grids */}
-                {hours.map((hour) => (
-                  <div
-                    key={hour}
-                    onClick={() => handleHourCellClick(day, hour)}
-                    onTouchStart={() => handleLongPressStart(day, hour)}
-                    onTouchEnd={handleLongPressEnd}
-                    className="h-16 border-b border-gray-100 hover:bg-gray-50/40 cursor-pointer transition-colors"
-                  />
-                ))}
+                {hours.map((hour) => {
+                  const slotTime = `${format(day, 'yyyy-MM-dd')}|${hour}`;
+                  return (
+                    <div
+                      key={hour}
+                      onTouchStart={longPress.start(slotTime)}
+                      onTouchEnd={longPress.cancel}
+                      onTouchMove={longPress.move}
+                      className="h-16 border-b border-gray-100 hover:bg-gray-50/40 cursor-pointer transition-colors"
+                    />
+                  );
+                })}
 
                 {/* Today's Red line time indicator */}
                 {isTodayDay && (
@@ -1074,9 +951,9 @@ const WeekView: React.FC<WeekViewProps> = ({
 
                   const cat = CATEGORIES.find((c) => c.id === task.category) || CATEGORIES[0];
                   
-                  const isCollapsed = collapsedTasks[task.id] ?? true; 
+                  const isExpanded = !!expandedTasks[task.id];
+                  const isCollapsed = !isExpanded;
                   const hasSubtasks = task.subtasks && task.subtasks.length > 0;
-                  const isExpanded = !isCollapsed;
 
                   const isDraggingThis = draggedTaskId === task.id;
                   const currentTop = isDraggingThis ? Math.max(0, dragStartTop + dragCurrentOffset) : topPos;
@@ -1091,8 +968,8 @@ const WeekView: React.FC<WeekViewProps> = ({
                       className="absolute left-1 right-1 overflow-hidden rounded-xl"
                       style={{ 
                         top: `${currentTop}px`,
-                        height: isExpanded ? 'auto' : '52px',
-                        minHeight: '52px',
+                        height: isExpanded ? 'auto' : '48px',
+                        minHeight: '48px',
                         zIndex: isDraggingThis ? 100 : isExpanded ? 40 : 5,
                       }}
                     >
@@ -1116,18 +993,18 @@ const WeekView: React.FC<WeekViewProps> = ({
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          toggleTaskCollapse(task.id);
+                          setExpandedTasks(prev => ({ ...prev, [task.id]: !prev[task.id] }));
                         }}
-                        className={`w-full p-2.5 rounded-xl border text-xs shadow-xs transition-all duration-150 flex flex-col select-none pl-6.5 z-10 relative group
+                        className={`w-full p-2 rounded-xl border text-xs shadow-xs transition-colors duration-150 flex flex-col select-none pl-6.5 z-10 relative group
                           ${isDraggingThis 
                             ? 'scale-[1.02] shadow-sm opacity-95 border-blue-500 ring-2 ring-blue-500/30' 
                             : isExpanded 
-                              ? 'ring-1.5 ring-blue-400/50 border-blue-400 shadow-xs scale-[1.005]' 
-                              : 'hover:scale-[1.005] hover:shadow-xs'
+                              ? 'ring-1.5 ring-blue-400/50 border-blue-400 shadow-xs' 
+                              : 'hover:scale-[1.002]'
                           }
                           ${task.completed
-                            ? 'bg-gray-50 text-gray-400 border-gray-200'
-                            : `${cat.color.bgLight} ${cat.color.light} ${cat.color.borderLight}`
+                            ? 'bg-[#E8EAFD] text-[#5F6368] border-[#DADCE0]'
+                            : 'bg-[#1A73E8] text-white border-[#1A73E8]'
                           }
                         `}
                         style={{ 
@@ -1206,9 +1083,10 @@ const WeekView: React.FC<WeekViewProps> = ({
                           <GripVertical size={11} className="opacity-60" />
                         </button>
 
-                        {/* Header row with custom checkbox */}
-                        <div className="flex items-start justify-between min-w-0 relative z-10">
+                        {/* Header row containing checkbox, title, and chevron */}
+                        <div className="flex items-center justify-between min-w-0 relative z-10 w-full h-8">
                           <div className="flex items-center min-w-0 flex-1">
+                            {/* Custom checkbox */}
                             <button
                               type="button"
                               onPointerDown={(e) => e.stopPropagation()}
@@ -1216,98 +1094,102 @@ const WeekView: React.FC<WeekViewProps> = ({
                                 e.stopPropagation();
                                 updateTask(task.id, { completed: !task.completed });
                               }}
-                              className="p-0.5 rounded-full text-gray-500 hover:text-gray-800 transition-colors flex-shrink-0 mr-1.5 cursor-pointer"
+                              className="p-0.5 rounded-full text-current hover:opacity-80 transition-opacity flex-shrink-0 mr-1.5 cursor-pointer"
                             >
                               <span 
-                                className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center transition-all
+                                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all
                                   ${task.completed 
                                     ? 'bg-blue-600 border-blue-600 text-white' 
-                                    : 'bg-transparent border-gray-400 hover:border-gray-600'
+                                    : 'bg-transparent border-current'
                                   }
                                 `}
-                                style={task.completed ? { backgroundColor: cat.color.solid, borderColor: cat.color.solid } : { borderColor: cat.color.solid }}
                               >
-                                {task.completed && <Check size={8} className="stroke-[3px] text-white" />}
+                                {task.completed && <Check size={10} className="stroke-[3px] text-white" />}
                               </span>
                             </button>
                             
-                            <div className={`font-semibold truncate leading-tight flex-1 relative inline-block ${task.completed ? 'text-gray-400 font-normal' : ''}`}>
+                            <div className={`font-semibold truncate leading-tight flex-1 relative ${task.completed ? 'opacity-60 line-through' : ''}`}>
                               <span>{task.title}</span>
-                              <motion.span
-                                initial={{ width: 0 }}
-                                animate={{ width: task.completed ? '100%' : 0 }}
-                                transition={{ duration: 0.25, ease: 'easeOut' }}
-                                className="absolute left-0 top-1/2 h-[1.5px] bg-gray-400"
-                                style={{ transform: 'translateY(-50%)' }}
-                              />
                             </div>
                           </div>
 
-                          <div className="flex items-center space-x-1 pl-1 flex-shrink-0">
-                            {hasSubtasks && (
-                              <button
-                                type="button"
-                                onPointerDown={(e) => e.stopPropagation()}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleTaskCollapse(task.id);
-                                }}
-                                className="p-0.5 hover:bg-black/5 rounded transition-transform duration-150 cursor-pointer"
-                                style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}
-                              >
-                                <ChevronRight size={11} />
-                              </button>
-                            )}
-                            <span className="text-[9px] opacity-75 font-bold flex items-center space-x-0.5 whitespace-nowrap">
-                              <Clock size={9} />
-                              <span>{displayTime}</span>
+                          <div className="flex items-center space-x-1.5 pl-1 flex-shrink-0">
+                            <span className="text-[10px] opacity-75 font-medium whitespace-nowrap">
+                              {displayTime}
                             </span>
+                            <ChevronRight 
+                              size={14} 
+                              className={`transition-transform duration-200 transform ${isExpanded ? 'rotate-90' : 'rotate-0'}`} 
+                            />
                           </div>
                         </div>
 
-                        {/* Sub-header details */}
-                        <div className="text-[9px] opacity-80 mt-0.5 flex items-center justify-between relative z-10">
-                          <div className="flex items-center min-w-0">
-                            <span 
-                              className="w-1 h-1 rounded-full mr-1 flex-shrink-0"
-                              style={!task.completed ? { backgroundColor: cat.color.solid } : undefined}
-                            />
-                            <span className="font-semibold truncate">{cat.name}</span>
-                          </div>
-
-                          {/* Subtasks Progress Status Dots when Collapsed */}
-                          {hasSubtasks && isCollapsed && (
-                            <div className="flex items-center space-x-0.5 bg-black/5 px-1.5 py-0.2 rounded-full scale-90 border border-black/5 flex-shrink-0">
-                              <span className="text-[8px] font-bold font-mono mr-0.5">
-                                {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
+                        {/* Expanded details container */}
+                        {isExpanded && (
+                          <div className="mt-2 pt-2 border-t border-white/10 flex flex-col space-y-2 relative z-10 w-full">
+                            {/* Category Pill */}
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-white/15 text-current border border-white/10">
+                                {cat.name}
                               </span>
-                              <div className="flex items-center space-x-0.5">
-                                {task.subtasks.slice(0, 4).map((s) => (
-                                  <span 
-                                    key={s.id} 
-                                    className={`w-1 h-1 rounded-full border
-                                      ${s.completed 
-                                        ? 'bg-blue-600 border-blue-600' 
-                                        : 'bg-transparent border-gray-400'
-                                      }
-                                    `} 
-                                  />
-                                ))}
-                                {task.subtasks.length > 4 && <span className="text-[6px] font-bold">+</span>}
+                              {/* Date & Time info */}
+                              <div className="flex items-center space-x-1 text-[10px] opacity-80">
+                                <CalendarDays size={11} />
+                                <span>{task.date}</span>
                               </div>
                             </div>
-                          )}
-                        </div>
 
-                        {/* Inline expanded details */}
-                        {isExpanded && (
-                          <div className="mt-2 pt-2 border-t border-black/5 flex flex-col space-y-1.5 animate-fadeIn relative z-10">
-                            <div className="flex items-center space-x-1 text-[9px] text-gray-500 font-medium">
-                              <CalendarDays size={10} />
-                              <span>{task.date} {task.time ? `at ${task.time}` : '(All Day)'}</span>
-                            </div>
+                            {/* Subtasks inside expanded task as a bulleted list */}
+                            {hasSubtasks && (
+                              <div className="space-y-1.5 border-t border-white/5 pt-2">
+                                {task.subtasks.map((sub, idx) => {
+                                  const isDragging = draggedSubTaskId === task.id && draggedSubIndex === idx;
+                                  return (
+                                    <div 
+                                      key={sub.id} 
+                                      className={`flex items-center space-x-2 py-0.5 transition-shadow select-none relative
+                                        ${isDragging ? 'z-50 opacity-70 scale-[1.02]' : ''}
+                                      `}
+                                      style={isDragging ? { transform: `translateY(${subDraggedOffset}px)`, position: 'relative' } : undefined}
+                                    >
+                                      {/* Grab Handle */}
+                                      <span
+                                        onPointerDown={(e) => handleSubPointerDown(task.id, idx, e)}
+                                        onPointerMove={(e) => handleSubPointerMove(task.id, idx, e)}
+                                        onPointerUp={(e) => handleSubPointerUp(task.id, idx, e)}
+                                        className="text-current/60 hover:text-current cursor-grab active:cursor-grabbing px-1 touch-none select-none flex items-center justify-center w-5 h-5 hover:bg-white/10 rounded font-bold"
+                                      >
+                                        ≡
+                                      </span>
 
-                            <div className="flex items-center space-x-1.5 pt-0.5">
+                                      <button
+                                        type="button"
+                                        onPointerDown={(e) => e.stopPropagation()}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          toggleSubtask(task.id, sub.id);
+                                        }}
+                                        className="p-0.5 text-current hover:opacity-80 rounded flex-shrink-0 cursor-pointer"
+                                      >
+                                        <span 
+                                          className={`w-3 h-3 rounded-full flex items-center justify-center border border-current flex-shrink-0 transition-all
+                                            ${sub.completed ? 'bg-white border-white' : 'bg-transparent'}
+                                          `}
+                                        >
+                                          {sub.completed && <Check size={7} className="stroke-[3px] text-blue-600" />}
+                                        </span>
+                                      </button>
+                                      <span className={`text-[11px] flex-1 truncate ${sub.completed ? 'line-through opacity-50' : 'font-medium'}`}>
+                                        {sub.title}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Actions: Edit & Delete */}
+                            <div className="flex items-center space-x-2 pt-1">
                               <button
                                 type="button"
                                 onPointerDown={(e) => e.stopPropagation()}
@@ -1316,10 +1198,9 @@ const WeekView: React.FC<WeekViewProps> = ({
                                   setEditingTask(task);
                                   setFABOpen(true);
                                 }}
-                                className="flex items-center space-x-0.5 px-2 py-0.5 rounded bg-black/5 hover:bg-black/10 text-gray-700 font-semibold text-[9px] select-none cursor-pointer transition-colors"
-                                title="Edit task"
+                                className="flex items-center space-x-1 px-2.5 py-1 rounded bg-white/15 hover:bg-white/25 text-current font-semibold text-[10px] select-none cursor-pointer transition-colors"
                               >
-                                <Edit3 size={10} />
+                                <Edit3 size={11} />
                                 <span>Edit</span>
                               </button>
                               <button
@@ -1329,75 +1210,12 @@ const WeekView: React.FC<WeekViewProps> = ({
                                   e.stopPropagation();
                                   deleteTask(task.id);
                                 }}
-                                className="flex items-center space-x-0.5 px-2 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-[9px] select-none cursor-pointer transition-colors"
-                                title="Delete task"
+                                className="flex items-center space-x-1 px-2.5 py-1 rounded bg-rose-500/80 hover:bg-rose-600 text-white font-semibold text-[10px] select-none cursor-pointer transition-colors"
                               >
-                                <Trash2 size={10} />
+                                <Trash2 size={11} />
                                 <span>Delete</span>
                               </button>
                             </div>
-                          </div>
-                        )}
-
-                        {/* Display subtasks below parent block if expanded */}
-                        {!isCollapsed && hasSubtasks && (
-                          <div className="mt-1.5 space-y-0.5 border-t border-black/5 pt-1.5 flex-1 overflow-visible relative z-10">
-                            {task.subtasks.map((sub, sIdx) => {
-                              const isDraggingSub = draggedSubTaskId === task.id && draggedSubIndex === sIdx;
-                              const subTopOffset = isDraggingSub ? subDraggedOffset : 0;
-
-                              return (
-                                <div 
-                                  key={sub.id} 
-                                  className={`group flex items-center space-x-1 py-0.5 px-1 rounded hover:bg-black/5 relative select-none transition-all duration-150
-                                    ${isDraggingSub ? 'bg-black/10 shadow-sm z-50 scale-[1.02] ring-1 ring-blue-500/20' : ''}
-                                    ${sub.completed ? 'opacity-60' : 'hover:translate-x-0.5'}
-                                  `}
-                                  style={{
-                                    transform: isDraggingSub ? `translate(${subDraggedOffsetX}px, ${subTopOffset}px)` : 'none',
-                                    touchAction: 'none'
-                                  }}
-                                >
-                                  {/* Small drag handle (≡) */}
-                                  <button
-                                    type="button"
-                                    onPointerDown={(e) => handleSubPointerDown(task.id, sIdx, e)}
-                                    onPointerMove={(e) => handleSubPointerMove(task.id, sIdx, e)}
-                                    onPointerUp={(e) => handleSubPointerUp(task.id, sIdx, e)}
-                                    className="p-0.5 text-gray-400 hover:text-gray-700 rounded cursor-grab active:cursor-grabbing flex-shrink-0 opacity-30 group-hover:opacity-100 transition-opacity"
-                                    title="Drag subtask to prioritize"
-                                  >
-                                    <GripVertical size={10} />
-                                  </button>
-
-                                  {/* Completion dot/checkbox */}
-                                  <button
-                                    type="button"
-                                    onPointerDown={(e) => e.stopPropagation()}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toggleSubtask(task.id, sub.id);
-                                    }}
-                                    className="p-0.5 text-gray-500 hover:text-gray-800 rounded flex-shrink-0 cursor-pointer relative overflow-hidden"
-                                    title={sub.completed ? "Mark incomplete" : "Mark complete"}
-                                  >
-                                    <span 
-                                      className={`w-2 h-2 rounded-full flex items-center justify-center border border-current flex-shrink-0 transition-all
-                                        ${sub.completed ? 'bg-blue-600 border-blue-600 text-white' : 'bg-transparent border-gray-400'}
-                                      `}
-                                      style={!sub.completed ? { color: cat.color.solid, borderColor: cat.color.solid } : undefined}
-                                    >
-                                      {sub.completed && <Check size={5} className="stroke-[3.5px] text-white" />}
-                                    </span>
-                                  </button>
-
-                                  {/* Title */}
-                                  <span className={`truncate text-[9px] flex-1 ${sub.completed ? 'line-through opacity-50 text-gray-400 font-normal' : 'font-medium text-gray-700 group-hover:text-gray-900'}`}>
-                                    {sub.title}
-                                  </span>
-                                </div>
-                              );
-                            })}
                           </div>
                         )}
                       </motion.div>
@@ -1540,29 +1358,48 @@ const WeekView: React.FC<WeekViewProps> = ({
                               {/* Subtasks inside expanded all-day task */}
                               {hasSubtasks && (
                                 <div className="mt-1 space-y-0.5 pt-1 border-t border-black/5">
-                                  {task.subtasks.map((sub) => (
-                                    <div key={sub.id} className="flex items-center space-x-1 py-0.5">
-                                      <button
-                                        type="button"
-                                        onPointerDown={(e) => e.stopPropagation()}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          toggleSubtask(task.id, sub.id);
-                                        }}
-                                        className="p-0.5 text-gray-500 hover:text-gray-800 rounded flex-shrink-0 cursor-pointer"
+                                  {task.subtasks.map((sub, idx) => {
+                                    const isDragging = draggedSubTaskId === task.id && draggedSubIndex === idx;
+                                    return (
+                                      <div 
+                                        key={sub.id} 
+                                        className={`flex items-center space-x-1 py-0.5 transition-shadow select-none relative
+                                          ${isDragging ? 'z-50 opacity-70 scale-[1.02]' : ''}
+                                        `}
+                                        style={isDragging ? { transform: `translateY(${subDraggedOffset}px)`, position: 'relative' } : undefined}
                                       >
-                                        <span 
-                                          className={`w-1.5 h-1.5 rounded-full flex items-center justify-center border border-current flex-shrink-0 transition-all
-                                            ${sub.completed ? 'bg-blue-600 border-blue-600' : 'bg-transparent border-gray-400'}
-                                          `}
-                                          style={!sub.completed ? { color: cat.color.solid, borderColor: cat.color.solid } : undefined}
-                                        />
-                                      </button>
-                                      <span className={`truncate text-[8px] flex-1 ${sub.completed ? 'line-through opacity-50' : 'font-medium text-gray-700'}`}>
-                                        {sub.title}
-                                      </span>
-                                    </div>
-                                  ))}
+                                        {/* Grab Handle */}
+                                        <span
+                                          onPointerDown={(e) => handleSubPointerDown(task.id, idx, e)}
+                                          onPointerMove={(e) => handleSubPointerMove(task.id, idx, e)}
+                                          onPointerUp={(e) => handleSubPointerUp(task.id, idx, e)}
+                                          className="text-gray-400 hover:text-gray-800 cursor-grab active:cursor-grabbing px-0.5 touch-none select-none flex items-center justify-center w-3 h-3 hover:bg-gray-100 rounded text-[9px] font-bold"
+                                        >
+                                          ≡
+                                        </span>
+
+                                        <button
+                                          type="button"
+                                          onPointerDown={(e) => e.stopPropagation()}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleSubtask(task.id, sub.id);
+                                          }}
+                                          className="p-0.5 text-gray-500 hover:text-gray-800 rounded flex-shrink-0 cursor-pointer"
+                                        >
+                                          <span 
+                                            className={`w-1.5 h-1.5 rounded-full flex items-center justify-center border border-current flex-shrink-0 transition-all
+                                              ${sub.completed ? 'bg-blue-600 border-blue-600' : 'bg-transparent border-gray-400'}
+                                            `}
+                                            style={!sub.completed ? { color: cat.color.solid, borderColor: cat.color.solid } : undefined}
+                                          />
+                                        </button>
+                                        <span className={`truncate text-[8px] flex-1 ${sub.completed ? 'line-through opacity-50' : 'font-medium text-gray-700'}`}>
+                                          {sub.title}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>
@@ -1578,9 +1415,621 @@ const WeekView: React.FC<WeekViewProps> = ({
         </div>
       </div>
     </div>
-  </motion.div>
+  </div>
   );
 };
+
+// Helper functions for time conversion
+const timeToMinutes = (time: string): number => {
+  if (!time) return 0;
+  const [h, m] = time.split(':').map(Number);
+  return h * 60 + (m || 0);
+};
+
+const minutesToTime = (minutes: number): string => {
+  const h = Math.floor(minutes / 60).toString().padStart(2, '0');
+  const m = (minutes % 60).toString().padStart(2, '0');
+  return `${h}:${m}`;
+};
+
+const SortableSubtaskRow = React.memo(({
+  sub, index, taskId, fgSub, onToggle
+}: {
+  sub: any, index: number, taskId: string, fgSub: string, onToggle: (i: number) => void
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging: isSortDragging
+  } = useSortable({ id: sub.id || `subtask-${index}` })
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        marginBottom: '5px',
+        transform: CSS.Transform.toString(transform),
+        transition: transition || 'transform 150ms ease',
+        opacity: isSortDragging ? 0.4 : 1,
+        background: isSortDragging ? 'rgba(255,255,255,0.1)' : 'transparent',
+        borderRadius: '4px',
+      }}
+    >
+
+      {/* LEFT: drag handle — only this triggers drag */}
+      <div
+        {...attributes}
+        {...listeners}
+        data-subtask-drag-handle="true"
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          listeners?.onPointerDown?.(e);
+        }}
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          listeners?.onMouseDown?.(e);
+        }}
+        onTouchStart={(e) => {
+          e.stopPropagation();
+          listeners?.onTouchStart?.(e);
+        }}
+        style={{
+          width: '24px',
+          height: '28px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'grab',
+          touchAction: 'none',
+          flexShrink: 0,
+        }}
+      >
+        <svg width="10" height="14" viewBox="0 0 10 14" fill="none">
+          <circle cx="3" cy="3" r="1.2" fill={fgSub}/>
+          <circle cx="7" cy="3" r="1.2" fill={fgSub}/>
+          <circle cx="3" cy="7" r="1.2" fill={fgSub}/>
+          <circle cx="7" cy="7" r="1.2" fill={fgSub}/>
+          <circle cx="3" cy="11" r="1.2" fill={fgSub}/>
+          <circle cx="7" cy="11" r="1.2" fill={fgSub}/>
+        </svg>
+      </div>
+
+      {/* MIDDLE: subtask text — takes all remaining space */}
+      <span
+        style={{
+          flex: 1,
+          fontSize: '11px',
+          color: sub.completed ? `${fgSub}66` : fgSub,
+          textDecoration: sub.completed ? 'line-through' : 'none',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {sub.title || sub.text || ''}
+      </span>
+
+      {/* RIGHT: completion circle */}
+      <button
+        onPointerDown={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => { e.stopPropagation(); onToggle(index) }}
+        onClick={(e) => { e.stopPropagation(); onToggle(index) }}
+        style={{
+          width: '12px',
+          height: '12px',
+          minWidth: '12px',
+          minHeight: '12px',
+          maxWidth: '12px',
+          maxHeight: '12px',
+          borderRadius: '50%',
+          border: '1.2px solid #2563eb',
+          background: sub.completed ? '#2563eb' : 'transparent',
+          padding: 0,
+          margin: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          flexShrink: 0,
+          alignSelf: 'center',
+          boxSizing: 'border-box',
+        }}
+      >
+      </button>
+
+    </div>
+  )
+})
+
+SortableSubtaskRow.displayName = "SortableSubtaskRow";
+
+interface DraggableTaskBlockProps {
+  task: Task;
+  pixelsPerMinute?: number;
+  onReschedule: (taskId: string, newTime: string) => void;
+  style?: React.CSSProperties;
+  onEditOpen: (task: Task) => void;
+}
+
+const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, onReschedule, onEditOpen }) => {
+  const [expanded, setExpanded] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editTitle, setEditTitle] = useState(task.title)
+  const [isDraggingSubtask, setIsDraggingSubtask] = useState(false)
+  const lastTap = useRef<number>(0)
+  const tapTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const tapCount = useRef(0)
+  const tapTimer = useRef<ReturnType<typeof setTimeout>>()
+
+  const blockRef = useRef<HTMLDivElement>(null)
+  const touchStart = useRef({ x: 0, y: 0, time: 0 })
+  const moved = useRef(false)
+  const dragging = useRef(false)
+  const dragStartY = useRef(0)
+  const currentTop = useRef(0)
+  const lastTouchTime = useRef(0)
+
+  useEffect(() => {
+    setEditTitle(task.title)
+  }, [task.title])
+
+  useEffect(() => {
+    const widthStr = style?.width || 'unknown';
+    const leftStr = style?.left || 'unknown';
+    addDebug(`CARD ${task.title.slice(0, 6)}: width=${widthStr} left=${leftStr}`);
+  }, [task.title, style?.width, style?.left]);
+
+  useEffect(() => {
+    return () => {
+      if (tapTimeout.current) clearTimeout(tapTimeout.current)
+      if (tapTimer.current) clearTimeout(tapTimer.current)
+    }
+  }, [])
+
+  const updateTask = useTaskStore((state) => state.updateTask)
+  const deleteTask = useTaskStore((state) => state.deleteTask)
+  const toggleSubtaskComplete = useTaskStore((state) => state.toggleSubtaskComplete)
+  const toggleTaskComplete = (id: string) => {
+    updateTask(id, { completed: !task.completed })
+  }
+
+  const handleUnifiedTap = (isTitle: boolean) => {
+    if (moved.current) return;
+    tapCount.current += 1;
+    clearTimeout(tapTimer.current);
+    addDebug(`tap=${tapCount.current} title=${isTitle}`);
+    if (tapCount.current >= 3) {
+      tapCount.current = 0;
+      addDebug(`DELETE ${task.title}`);
+      if (navigator.vibrate) {
+        navigator.vibrate([30, 40, 30]);
+      }
+      deleteTask(task.id);
+      return;
+    }
+    tapTimer.current = setTimeout(() => {
+      if (tapCount.current === 1 && isTitle) {
+        addDebug(`EDIT ${task.title}`);
+        onEditOpen(task);
+      }
+      tapCount.current = 0;
+    }, 350);
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 4 }
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { distance: 4 }
+    })
+  )
+
+  const handleSubtaskReorder = useCallback(({ active, over }: any) => {
+    if (!over || active.id === over.id) return
+    const subtasks = task.subtasks || []
+    const oldIndex = subtasks.findIndex((s) => (s.id || `subtask-${subtasks.indexOf(s)}`) === active.id)
+    const newIndex = subtasks.findIndex((s) => (s.id || `subtask-${subtasks.indexOf(s)}`) === over.id)
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const reordered = arrayMove(subtasks, oldIndex, newIndex) as Subtask[]
+      updateTask(task.id, { subtasks: reordered })
+    }
+  }, [task.subtasks, task.id, updateTask])
+
+  const completed = task.completed
+  const bg = completed ? '#F3F4F6' : '#EBF5FF'
+  const fg = completed ? '#9CA3AF' : '#1E40AF'
+  const fgSub = completed ? '#9CA3AF' : '#2563EB'
+  const borderStyle = completed ? '1px solid #E5E7EB' : '1px solid #BFDBFE'
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (isDraggingSubtask) return
+    const target = e.target as HTMLElement
+    if (target.closest('button') || target.closest('[data-subtask-drag-handle]') || target.closest('[data-subtask-panel]')) {
+      return
+    }
+    touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, time: Date.now() }
+    moved.current = false
+    dragging.current = true
+    dragStartY.current = e.touches[0].clientY
+    if (blockRef.current) {
+      currentTop.current = parseFloat(blockRef.current.style.top || '0')
+    }
+  }
+
+  const handleTouchEnd = () => {
+    if (dragging.current && moved.current && blockRef.current) {
+      const finalTop = parseFloat(blockRef.current.style.top || '0')
+      const pixelsPerMinute = 64 / 60
+      const minutes = finalTop / pixelsPerMinute
+      const snappedMinutes = Math.round(minutes / 15) * 15
+      const clampedMins = Math.max(0, Math.min(1425, snappedMinutes))
+      const h = Math.floor(clampedMins / 60)
+      const m = clampedMins % 60
+      const newTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+      onReschedule(task.id, newTime)
+    }
+    dragging.current = false
+    moved.current = false
+  }
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (isDraggingSubtask) return
+    if (e.button !== 0) return
+    const target = e.target as HTMLElement
+    if (target.closest('button') || target.closest('[data-subtask-drag-handle]') || target.closest('[data-subtask-panel]')) {
+      return
+    }
+    touchStart.current = { x: e.clientX, y: e.clientY, time: Date.now() }
+    moved.current = false
+    dragging.current = true
+    dragStartY.current = e.clientY
+    if (blockRef.current) {
+      currentTop.current = parseFloat(blockRef.current.style.top || '0')
+    }
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (isDraggingSubtask) return
+      if (!dragging.current) return
+      const dy = moveEvent.clientY - touchStart.current.y
+      const dx = moveEvent.clientX - touchStart.current.x
+      if (Math.abs(dy) > 8 || Math.abs(dx) > 8) {
+        moved.current = true
+      }
+      if (moved.current) {
+        const newTop = currentTop.current + dy
+        if (blockRef.current) {
+          blockRef.current.style.top = `${newTop}px`
+        }
+      }
+    };
+
+    const onMouseUp = () => {
+      if (dragging.current && moved.current && blockRef.current) {
+        const finalTop = parseFloat(blockRef.current.style.top || '0')
+        const pixelsPerMinute = 64 / 60
+        const minutes = finalTop / pixelsPerMinute
+        const snappedMinutes = Math.round(minutes / 15) * 15
+        const clampedMins = Math.max(0, Math.min(1425, snappedMinutes))
+        const h = Math.floor(clampedMins / 60)
+        const m = clampedMins % 60
+        const newTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+        onReschedule(task.id, newTime)
+      }
+      dragging.current = false
+      moved.current = false
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+  }
+
+  useEffect(() => {
+    const el = blockRef.current
+    if (!el) return
+    const onMove = (e: TouchEvent) => {
+      if (isDraggingSubtask) return
+      if (!dragging.current) return
+      const dy = e.touches[0].clientY - touchStart.current.y
+      const dx = e.touches[0].clientX - touchStart.current.x
+      if (Math.abs(dy) > 8 || Math.abs(dx) > 8) {
+        moved.current = true
+        e.preventDefault()
+      }
+      if (moved.current) {
+        const newTop = currentTop.current + dy
+        if (blockRef.current) {
+          blockRef.current.style.top = `${newTop}px`
+        }
+      }
+    }
+    el.addEventListener('touchmove', onMove, { passive: false })
+    return () => el.removeEventListener('touchmove', onMove)
+  }, [isDraggingSubtask])
+
+  return (
+    <motion.div
+      ref={blockRef}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={(e) => {
+        lastTouchTime.current = Date.now()
+        if (e.target === e.currentTarget) {
+          handleUnifiedTap(false)
+        }
+        handleTouchEnd()
+      }}
+      onMouseUp={(e) => {
+        if (Date.now() - lastTouchTime.current < 500) return
+        if (e.target === e.currentTarget) {
+          handleUnifiedTap(false)
+        }
+      }}
+      onMouseDown={handleMouseDown}
+      whileHover={{
+        y: -1,
+        boxShadow: completed ? '0 4px 8px rgba(0,0,0,0.04)' : '0 8px 16px rgba(30,64,175,0.12)',
+      }}
+      transition={{ duration: 0.2, type: 'spring', stiffness: 300, damping: 20 }}
+      style={{
+        ...style,
+        position: 'absolute',
+        backgroundColor: bg,
+        borderRadius: '12px',
+        border: borderStyle,
+        minHeight: '44px',
+        overflow: expanded ? 'visible' : 'hidden',
+        touchAction: 'none',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        boxSizing: 'border-box',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        zIndex: expanded ? 200 : dragging.current ? 100 : (style?.zIndex || 1),
+      }}
+    >
+      {/* MAIN ROW — always visible */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '0 8px',
+        height: '44px',
+        gap: '8px',
+        width: '100%',
+        boxSizing: 'border-box',
+      }}>
+
+        {/* LEFT: expand toggle — small, minimal */}
+        <button
+          onTouchEnd={(e) => {
+            lastTouchTime.current = Date.now()
+            e.stopPropagation()
+            e.preventDefault()
+            if (!moved.current) setExpanded(p => !p)
+          }}
+          onMouseUp={(e) => {
+            if (Date.now() - lastTouchTime.current < 500) return
+            e.stopPropagation()
+            if (!moved.current) setExpanded(p => !p)
+          }}
+          style={{
+            width: '44px',
+            height: '44px',
+            minWidth: '44px',
+            marginLeft: '-14px',
+            marginRight: '-14px',
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
+        >
+          <div style={{
+            width: '16px',
+            height: '16px',
+            borderRadius: '50%',
+            background: completed ? 'rgba(0,0,0,0.05)' : 'rgba(30,64,175,0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'transform 180ms ease',
+            transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+          }}>
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+              <path d="M2 3L4 5L6 3" stroke={fg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+        </button>
+
+        {/* CENTER: task title — takes all remaining space, priority */}
+        {isEditing ? (
+          <input
+            type="text"
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            onBlur={() => {
+              setIsEditing(false)
+              if (editTitle.trim() && editTitle.trim() !== task.title) {
+                updateTask(task.id, { title: editTitle.trim() })
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                (e.target as HTMLInputElement).blur()
+              } else if (e.key === 'Escape') {
+                setEditTitle(task.title)
+                setIsEditing(false)
+              }
+            }}
+            autoFocus
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            style={{
+              flex: 1,
+              fontSize: '14px',
+              fontWeight: 600,
+              color: fg,
+              background: 'rgba(255, 255, 255, 0.7)',
+              border: `1px solid ${completed ? '#D1D5DB' : '#BFDBFE'}`,
+              borderRadius: '6px',
+              outline: 'none',
+              padding: '2px 6px',
+              margin: 0,
+              width: '100%',
+              fontFamily: 'inherit',
+            }}
+          />
+        ) : (
+          <p
+            onTouchEnd={(e) => {
+              lastTouchTime.current = Date.now()
+              e.stopPropagation()
+              e.preventDefault()  // CRITICAL — prevents the synthetic onClick from also firing
+              handleUnifiedTap(true)
+            }}
+            onMouseUp={(e) => {
+              if (Date.now() - lastTouchTime.current < 500) return
+              e.stopPropagation()
+              handleUnifiedTap(true)
+            }}
+            style={{
+              flex: 1,
+              fontSize: '14px',
+              fontWeight: 600,
+              color: fg,
+              textDecoration: completed ? 'line-through' : 'none',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              margin: 0,
+              padding: 0,
+              cursor: 'pointer',
+              lineHeight: '1.2',
+            }}
+          >
+            {task.title}
+          </p>
+        )}
+
+        {/* RIGHT: task completion circle — small, right aligned */}
+        <motion.button
+          onTouchEnd={(e) => {
+            lastTouchTime.current = Date.now()
+            e.stopPropagation()
+            e.preventDefault()
+            toggleTaskComplete(task.id)
+          }}
+          onMouseUp={(e) => {
+            if (Date.now() - lastTouchTime.current < 500) return
+            e.stopPropagation()
+            toggleTaskComplete(task.id)
+          }}
+          whileTap={{ scale: 0.8 }}
+          transition={{ type: "spring", stiffness: 500, damping: 15 }}
+          style={{
+            width: '44px',
+            height: '44px',
+            minWidth: '44px',
+            marginLeft: '-14px',
+            marginRight: '-14px',
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
+        >
+          <div style={{
+            width: '16px',
+            height: '16px',
+            borderRadius: '50%',
+            border: completed ? 'none' : `2px solid ${fg}`,
+            background: completed ? '#FFFFFF' : 'transparent',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            {completed && (
+              <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+                <path d="M1.5 4.5L3.5 6.5L7.5 2.5" stroke={completed ? '#9CA3AF' : '#1E40AF'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
+          </div>
+        </motion.button>
+
+      </div>
+
+      {/* SUBTASKS — expand below */}
+      {expanded && (
+        <div 
+          data-subtask-panel="true"
+          onClick={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
+          style={{
+            position: 'relative',
+            zIndex: 200,
+            backgroundColor: completed ? '#F3F4F6' : '#EBF5FF',
+            borderRadius: '0 0 12px 12px',
+            padding: '4px 8px 8px 8px',
+            borderTop: borderStyle,
+            overflow: 'hidden',  // CRITICAL — clips subtask to stay inside card
+          }}
+        >
+          {(task.subtasks || []).length === 0 && (
+            <span style={{ fontSize: '10px', color: fgSub }}>No subtasks</span>
+          )}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={() => setIsDraggingSubtask(true)}
+            onDragEnd={(event) => {
+              setIsDraggingSubtask(false)
+              handleSubtaskReorder(event)
+            }}
+            onDragCancel={() => setIsDraggingSubtask(false)}
+            modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+          >
+            <SortableContext
+              items={(task.subtasks || []).map((sub: any, i: number) => sub.id || `subtask-${i}`)}
+              strategy={verticalListSortingStrategy}
+            >
+              {(task.subtasks || []).map((sub: any, i: number) => (
+                <SortableSubtaskRow
+                  key={sub.id || `subtask-${i}`}
+                  sub={sub}
+                  index={i}
+                  taskId={task.id}
+                  fgSub={fgSub}
+                  onToggle={(idx) => toggleSubtaskComplete(task.id, idx)}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
+        </div>
+      )}
+
+    </motion.div>
+  )
+})
+
+DraggableTaskBlock.displayName = "DraggableTaskBlock";
 
 /* ============================================================================
    3. DAY VIEW COMPONENT
@@ -1606,6 +2055,69 @@ interface DayViewProps {
   setExpandedTaskId: (id: string | null) => void;
 }
 
+const layoutTasks = (tasksList: Task[]): Array<Task & { column: number; totalColumns: number }> => {
+  const sorted = [...tasksList].sort((a, b) => timeToMinutes(a.time || "00:00") - timeToMinutes(b.time || "00:00"));
+  
+  // Group tasks into overlapping groups (clusters) where contiguous tasks overlap
+  // A task overlaps with another if their start times are within 60 minutes of each other
+  const clusters: Task[][] = [];
+  sorted.forEach(task => {
+    if (clusters.length === 0) {
+      clusters.push([task]);
+    } else {
+      const lastCluster = clusters[clusters.length - 1];
+      const lastTask = lastCluster[lastCluster.length - 1];
+      const currentStart = timeToMinutes(task.time || "00:00");
+      const lastStart = timeToMinutes(lastTask.time || "00:00");
+      
+      // If the current task starts within 60 minutes of the last task, they belong to the same cluster
+      if (currentStart - lastStart < 60) {
+        lastCluster.push(task);
+      } else {
+        clusters.push([task]);
+      }
+    }
+  });
+
+  const result: Array<Task & { column: number; totalColumns: number }> = [];
+
+  clusters.forEach(cluster => {
+    // Within each cluster, assign columns.
+    // We want to find the smallest column number for each task such that it doesn't overlap with another task in the same column
+    const columns: Task[][] = [];
+    cluster.forEach(task => {
+      const taskStart = timeToMinutes(task.time || "00:00");
+      let placed = false;
+      for (let col = 0; col < columns.length; col++) {
+        const lastInCol = columns[col][columns[col].length - 1];
+        const lastEnd = timeToMinutes(lastInCol.time || "00:00") + 60; // 60 min default duration
+        if (taskStart >= lastEnd) {
+          columns[col].push(task);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        columns.push([task]);
+      }
+    });
+
+    // Now assign column and totalColumns for tasks in this cluster
+    const clusterTotalColumns = columns.length;
+    columns.forEach((col, colIndex) => {
+      col.forEach(task => {
+        result.push({
+          ...task,
+          column: colIndex,
+          totalColumns: clusterTotalColumns
+        });
+      });
+    });
+  });
+
+  return result;
+};
+
 const DayView: React.FC<DayViewProps> = ({
   activeDate,
   tasks,
@@ -1625,6 +2137,17 @@ const DayView: React.FC<DayViewProps> = ({
   expandedTaskId,
   setExpandedTaskId,
 }) => {
+  const [debugLog, setDebugLog] = useState<string[]>([]);
+  useEffect(() => {
+    const handleDebug = (e: any) => {
+      setDebugLog(prev => [...prev.slice(-4), `${new Date().toLocaleTimeString()}: ${e.detail}`]);
+    };
+    window.addEventListener('app-debug', handleDebug);
+    return () => {
+      window.removeEventListener('app-debug', handleDebug);
+    };
+  }, []);
+
   const hours = Array.from({ length: 24 }, (_, i) => i);
   const isTodayDay = isToday(activeDate);
   const setTasksOverlayOpen = useTaskStore((state) => state.setTasksOverlayOpen);
@@ -1633,7 +2156,25 @@ const DayView: React.FC<DayViewProps> = ({
   const toggleSubtask = useTaskStore((state) => state.toggleSubtask);
   const updateTask = useTaskStore((state) => state.updateTask);
 
-  const [draggedSubIndex, setDraggedSubIndex] = useState<number | null>(null);
+  const handleReschedule = useCallback((taskId: string, newTime: string) => {
+    updateTask(taskId, { time: newTime });
+  }, [updateTask]);
+
+  const deleteTask = useTaskStore((state) => state.deleteTask);
+  const setEditingTask = useTaskStore((state) => state.setEditingTask);
+
+  const [editingTaskState, setEditingTaskState] = useState<Task | null>(null);
+
+  const openEditSheet = useCallback((task: Task) => {
+    setEditingTaskState(task);
+  }, []);
+
+  const closeEditSheet = useCallback(() => {
+    setEditingTaskState(null);
+  }, []);
+
+  const draggedSubIndex: number | null = null;
+  const [draggedSubId, setDraggedSubId] = useState<string | null>(null);
   const [draggedSubTaskId, setDraggedSubTaskId] = useState<string | null>(null);
   const [subPointerStartY, setSubPointerStartY] = useState<number>(0);
   const [subDraggedOffset, setSubDraggedOffset] = useState<number>(0);
@@ -1641,14 +2182,14 @@ const DayView: React.FC<DayViewProps> = ({
   const [subDraggedOffsetX, setSubDraggedOffsetX] = useState<number>(0);
   const [subDraggedHour, setSubDraggedHour] = useState<number | null>(null);
 
-  const handleSubPointerDown = (taskId: string, index: number, e: React.PointerEvent) => {
+  const handleSubPointerDown = (taskId: string, subtaskId: string, e: React.PointerEvent) => {
     e.stopPropagation();
     e.preventDefault();
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     const target = e.currentTarget as HTMLElement;
     target.setPointerCapture(e.pointerId);
     setDraggedSubTaskId(taskId);
-    setDraggedSubIndex(index);
+    setDraggedSubId(subtaskId);
     setSubPointerStartY(e.clientY);
     setSubPointerStartX(e.clientX);
     setSubDraggedOffset(0);
@@ -1656,9 +2197,9 @@ const DayView: React.FC<DayViewProps> = ({
     setSubDraggedHour(null);
   };
 
-  const handleSubPointerMove = (taskId: string, index: number, e: React.PointerEvent) => {
+  const handleSubPointerMove = (taskId: string, subtaskId: string, e: React.PointerEvent) => {
     e.stopPropagation();
-    if (draggedSubTaskId !== taskId || draggedSubIndex !== index) return;
+    if (draggedSubTaskId !== taskId || draggedSubId !== subtaskId) return;
     const currentY = e.clientY;
     const currentX = e.clientX;
     const diffY = currentY - subPointerStartY;
@@ -1685,6 +2226,8 @@ const DayView: React.FC<DayViewProps> = ({
       const task = tasks.find(t => t.id === taskId);
       if (!task) return;
       const subtasks = [...task.subtasks];
+      const index = subtasks.findIndex(s => s.id === subtaskId);
+      if (index === -1) return;
 
       if (diffY > swapThreshold && index < subtasks.length - 1) {
         const temp = subtasks[index];
@@ -1692,7 +2235,6 @@ const DayView: React.FC<DayViewProps> = ({
         subtasks[index + 1] = temp;
 
         setSubPointerStartY((prev) => prev + rowHeight);
-        setDraggedSubIndex(index + 1);
         reorderSubtasks(taskId, subtasks);
         setSubDraggedOffset(diffY - rowHeight);
       } else if (diffY < -swapThreshold && index > 0) {
@@ -1701,22 +2243,22 @@ const DayView: React.FC<DayViewProps> = ({
         subtasks[index - 1] = temp;
 
         setSubPointerStartY((prev) => prev - rowHeight);
-        setDraggedSubIndex(index - 1);
         reorderSubtasks(taskId, subtasks);
         setSubDraggedOffset(diffY + rowHeight);
       }
     }
   };
 
-  const handleSubPointerUp = (taskId: string, index: number, e: React.PointerEvent) => {
+  const handleSubPointerUp = (taskId: string, subtaskId: string, e: React.PointerEvent) => {
     e.stopPropagation();
-    if (draggedSubTaskId === taskId && draggedSubIndex === index) {
+    if (draggedSubTaskId === taskId && draggedSubId === subtaskId) {
       const target = e.currentTarget as HTMLElement;
       target.releasePointerCapture(e.pointerId);
 
       if (subDraggedHour !== null) {
         const parentTask = tasks.find(t => t.id === taskId);
         if (parentTask) {
+          const index = parentTask.subtasks.findIndex(s => s.id === subtaskId);
           const subtask = parentTask.subtasks[index];
           if (subtask) {
             const timeStr = `${String(subDraggedHour).padStart(2, '0')}:00`;
@@ -1738,7 +2280,7 @@ const DayView: React.FC<DayViewProps> = ({
       }
     }
     setDraggedSubTaskId(null);
-    setDraggedSubIndex(null);
+    setDraggedSubId(null);
     setSubDraggedOffset(0);
     setSubDraggedOffsetX(0);
     setSubDraggedHour(null);
@@ -1756,43 +2298,45 @@ const DayView: React.FC<DayViewProps> = ({
     return () => clearInterval(interval);
   }, []);
 
-  const setCurrentDate = useTaskStore((state) => state.setCurrentDate);
-  const direction = useTaskStore((state) => state.direction);
+  const [expandedTasks, setExpandedTasks] = useState<Record<string, boolean>>({});
 
-  const setDirection = useTaskStore((state) => state.setDirection);
-  const x = useMotionValue(0);
-  const touchStartX = React.useRef(0);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    const delta = e.touches[0].clientX - touchStartX.current;
-    x.set(delta);
-  };
-
-  const handleTouchEnd = () => {
-    const delta = x.get();
-    if (Math.abs(delta) > 40) {
-      const dir = delta < 0 ? 'next' : 'prev';
-      animate(x, delta < 0 ? -window.innerWidth : window.innerWidth, {
-        type: 'spring', damping: 28, stiffness: 220, mass: 0.6,
-        onComplete: () => {
-          setDirection(dir);
-          const nextDate = dir === 'next' ? addDays(activeDate, 1) : subDays(activeDate, 1);
-          setCurrentDate(nextDate);
-          x.set(dir === 'next' ? window.innerWidth : -window.innerWidth);
-          animate(x, 0, { type: 'spring', damping: 28, stiffness: 220, mass: 0.6 });
-        }
-      });
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(8);
+  useEffect(() => {
+    const handleScrollToTask = (e: any) => {
+      const timeStr = e.detail?.time;
+      if (timeStr && scrollContainerRef.current) {
+        const [h, m] = timeStr.split(':').map(Number);
+        const hourDecimal = h + (m || 0) / 60;
+        scrollContainerRef.current.scrollTop = Math.max(0, hourDecimal * 64 - 120);
       }
-    } else {
-      animate(x, 0, { type: 'spring', damping: 32, stiffness: 300 });
-    }
-  };
+    };
+    window.addEventListener('scroll-to-task', handleScrollToTask);
+    return () => window.removeEventListener('scroll-to-task', handleScrollToTask);
+  }, []);
+
+  useEffect(() => {
+    if (!draggedTaskId) return;
+
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      onTaskDragMove(touch.clientY);
+    };
+
+    const handleTouchEnd = () => {
+      onTaskDragEnd();
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(10);
+      }
+    };
+
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [draggedTaskId, onTaskDragMove, onTaskDragEnd]);
 
   // Scroll collapsing top app bar
   const lastScrollTop = useRef(0);
@@ -1818,38 +2362,39 @@ const DayView: React.FC<DayViewProps> = ({
     }
   }, []);
 
-  // Long-press detection to trigger popover
-  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
-
-  const handleLongPressStart = (hour: number) => {
-    longPressTimer.current = setTimeout(() => {
-      openPopover(activeDate, hour);
-    }, 600);
-  };
-
-  const handleLongPressEnd = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-    }
-  };
+  const longPress = useLongPress((timeStr) => {
+    const [dateStr, hourStr] = timeStr.split('|');
+    const d = new Date(dateStr + 'T00:00:00');
+    const h = parseInt(hourStr, 10);
+    openPopover(d, h);
+  });
 
   const dayTasks = tasks.filter((task) => {
     const taskDate = new Date(task.date + 'T00:00:00');
     return isSameDay(taskDate, activeDate);
   });
 
-  const handleHourCellClick = (hour: number) => {
-    openPopover(activeDate, hour);
-  };
-
   return (
-    <motion.div 
-      style={{ x, touchAction: 'pan-y', willChange: 'transform', transform: 'translateZ(0)' }}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      className="h-full w-full overflow-hidden bg-white"
-    >
+    <div className="h-full w-full overflow-hidden bg-white">
+      {/* TEMPORARY DEBUG PANEL */}
+      <div style={{
+        position: 'fixed',
+        top: '4px',
+        left: '4px',
+        right: '4px',
+        background: 'rgba(0,0,0,0.85)',
+        color: '#0f0',
+        fontSize: '9px',
+        fontFamily: 'monospace',
+        padding: '4px',
+        zIndex: 99999,
+        borderRadius: '4px',
+        maxHeight: '60px',
+        overflow: 'auto',
+      }}>
+        {debugLog.map((line, i) => <div key={i}>{line}</div>)}
+      </div>
+
       <div className="flex-1 flex flex-col h-full bg-white overflow-hidden select-none">
       {/* Pending Task Viewer (GCAL Style) */}
       {(() => {
@@ -1883,27 +2428,38 @@ const DayView: React.FC<DayViewProps> = ({
       <div 
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto flex relative text-gray-800"
+        className="flex-1 overflow-y-auto text-gray-800"
       >
-        <div className="w-16 border-r border-gray-200 flex-shrink-0 bg-gray-50/10 text-right pr-3 text-[10px] font-semibold text-gray-400">
-          {hours.map((hour) => (
-            <div key={hour} className="h-16 pt-1">
-              {hour === 0 ? '12 AM' : hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
-            </div>
-          ))}
-        </div>
+        <div 
+          style={{ position: 'relative', overflow: 'hidden' }}
+          className="flex w-full min-h-[1536px]"
+        >
+          {/* Time column width — increase to 56px */}
+          <div 
+            style={{ width: '56px', minWidth: '56px' }} 
+            className="border-r border-gray-200 flex-shrink-0 bg-gray-50/10 text-right pr-3 text-[10px] font-semibold text-gray-400"
+          >
+            {hours.map((hour) => (
+              <div key={hour} className="h-16 pt-1">
+                {hour === 0 ? '12 AM' : hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
+              </div>
+            ))}
+          </div>
 
-        {/* 24 hour content canvas */}
-        <div className="flex-1 relative min-h-[1536px]">
-          {hours.map((hour) => (
-            <div
-              key={hour}
-              onClick={() => handleHourCellClick(hour)}
-              onTouchStart={() => handleLongPressStart(hour)}
-              onTouchEnd={handleLongPressEnd}
-              className="h-16 border-b border-gray-100 hover:bg-gray-50/40 cursor-pointer transition-colors"
-            />
-          ))}
+          {/* 24 hour content canvas */}
+          <div className="flex-1 relative min-h-[1536px]">
+          {hours.map((hour) => {
+            const slotTime = `${format(activeDate, 'yyyy-MM-dd')}|${hour}`;
+            return (
+              <div
+                key={hour}
+                onTouchStart={longPress.start(slotTime)}
+                onTouchEnd={longPress.cancel}
+                onTouchMove={longPress.move}
+                className="h-16 border-b border-gray-100 hover:bg-gray-50/40 cursor-pointer transition-colors"
+              />
+            );
+          })}
 
           {/* Red line time indicator */}
           {isTodayDay && (
@@ -1953,8 +2509,8 @@ const DayView: React.FC<DayViewProps> = ({
             </div>
           )}
 
-          {/* Timed Tasks placement */}
-          {dayTasks.map((task) => {
+          {/* Legacy inline drag-and-drop code disabled */}
+          {false && dayTasks.map((task) => {
             if (!task.time && draggedTaskId !== task.id) return null;
 
             const [taskHour, taskMin] = (task.time || "00:00").split(':').map(Number);
@@ -1963,9 +2519,9 @@ const DayView: React.FC<DayViewProps> = ({
 
             const cat = CATEGORIES.find((c) => c.id === task.category) || CATEGORIES[0];
 
-            const isCollapsed = collapsedTasks[task.id] ?? true; 
+            const isExpanded = !!expandedTasks[task.id];
+            const isCollapsed = !isExpanded;
             const hasSubtasks = task.subtasks && task.subtasks.length > 0;
-            const isExpanded = !isCollapsed;
 
             const isDraggingThis = draggedTaskId === task.id;
             const currentTop = isDraggingThis ? Math.max(0, dragStartTop + dragCurrentOffset) : topPos;
@@ -1980,8 +2536,8 @@ const DayView: React.FC<DayViewProps> = ({
                 className="absolute left-4 right-4 overflow-hidden rounded-2xl"
                 style={{ 
                   top: `${currentTop}px`,
-                  height: isExpanded ? 'auto' : '64px',
-                  minHeight: '64px',
+                  height: isExpanded ? 'auto' : '48px',
+                  minHeight: '48px',
                   zIndex: isDraggingThis ? 100 : isExpanded ? 40 : 5,
                 }}
               >
@@ -2005,18 +2561,18 @@ const DayView: React.FC<DayViewProps> = ({
                    }}
                    onClick={(e) => {
                      e.stopPropagation();
-                     toggleTaskCollapse(task.id);
+                     setExpandedTasks(prev => ({ ...prev, [task.id]: !prev[task.id] }));
                    }}
-                   className={`w-full p-3.5 rounded-2xl border text-sm shadow-xs transition-all duration-150 flex flex-col select-none pl-8 z-10 relative group
+                   className={`w-full p-2 rounded-2xl border text-xs shadow-xs transition-colors duration-150 flex flex-col select-none pl-8 z-10 relative group
                      ${isDraggingThis 
                        ? 'scale-[1.02] shadow-sm opacity-95 border-blue-500 ring-2 ring-blue-500/30' 
                        : isExpanded 
-                         ? 'ring-1.5 ring-blue-400/50 border-blue-400 shadow-sm scale-[1.005]'
-                         : 'hover:scale-[1.005] hover:shadow-xs'
+                         ? 'ring-1.5 ring-blue-400/50 border-blue-400 shadow-xs'
+                         : 'hover:scale-[1.002]'
                      }
                      ${task.completed
-                       ? 'bg-gray-50 text-gray-400 border-gray-200 shadow-xs'
-                       : `${cat.color.bgLight} ${cat.color.light} ${cat.color.borderLight}`
+                       ? 'bg-[#E8EAFD] text-[#5F6368] border-[#DADCE0]'
+                       : 'bg-[#1A73E8] text-white border-[#1A73E8]'
                      }
                    `}
                    style={{ 
@@ -2026,6 +2582,12 @@ const DayView: React.FC<DayViewProps> = ({
                  >
                    {/* Ripple effect */}
                    <Ripple color={task.completed ? 'rgba(0, 0, 0, 0.04)' : 'rgba(0, 0, 0, 0.07)'} />
+
+                   {/* Left accent stripe */}
+                   <div 
+                     className="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-2xl transition-colors" 
+                     style={{ backgroundColor: task.completed ? '#cbd5e1' : cat.color.solid }}
+                   />
 
                    {/* Dedicated vertical drag handle */}
                    <button
@@ -2089,210 +2651,144 @@ const DayView: React.FC<DayViewProps> = ({
                      <GripVertical size={13} className="opacity-60" />
                    </button>
 
-                   {/* Left accent stripe */}
-                   <div 
-                     className="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-xl transition-colors" 
-                     style={{ backgroundColor: task.completed ? '#cbd5e1' : cat.color.solid }}
-                   />
+                   {/* Header row containing checkbox, title, and chevron */}
+                   <div className="flex items-center justify-between min-w-0 relative z-10 w-full h-8">
+                     <div className="flex items-center min-w-0 flex-1">
+                       {/* Custom checkbox */}
+                       <button
+                         type="button"
+                         onPointerDown={(e) => e.stopPropagation()}
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           updateTask(task.id, { completed: !task.completed });
+                         }}
+                         className="p-0.5 rounded-full text-current hover:opacity-80 transition-opacity flex-shrink-0 mr-2 cursor-pointer"
+                       >
+                         <span 
+                           className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all
+                             ${task.completed 
+                               ? 'bg-blue-600 border-blue-600 text-white' 
+                               : 'bg-transparent border-current'
+                             }
+                           `}
+                         >
+                           {task.completed && <Check size={10} className="stroke-[3px] text-white" />}
+                         </span>
+                       </button>
 
-                  {/* Header row with custom checkbox */}
-                  <div className="flex items-start justify-between min-w-0 relative z-10">
-                    <div className="flex items-center min-w-0 flex-1">
-                      <button
-                        type="button"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          updateTask(task.id, { completed: !task.completed });
-                        }}
-                        className="p-0.5 rounded-full text-gray-500 hover:text-gray-800 transition-colors flex-shrink-0 mr-2 cursor-pointer"
-                      >
-                        <span 
-                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all
-                            ${task.completed 
-                              ? 'bg-blue-600 border-blue-600 text-white' 
-                              : 'bg-transparent border-gray-400 hover:border-gray-600'
-                            }
-                          `}
-                          style={task.completed ? { backgroundColor: cat.color.solid, borderColor: cat.color.solid } : { borderColor: cat.color.solid }}
-                        >
-                          {task.completed && <Check size={10} className="stroke-[3px] text-white" />}
-                        </span>
-                      </button>
+                       <div className={`font-semibold truncate leading-tight flex-1 relative ${task.completed ? 'opacity-60 line-through' : ''}`}>
+                         <span>{task.title}</span>
+                       </div>
+                     </div>
 
-                      <div className={`font-bold truncate leading-tight flex-1 relative inline-block ${task.completed ? 'text-gray-400 font-normal' : ''}`}>
-                        <span>{task.title}</span>
-                        <motion.span
-                          initial={{ width: 0 }}
-                          animate={{ width: task.completed ? '100%' : 0 }}
-                          transition={{ duration: 0.25, ease: 'easeOut' }}
-                          className="absolute left-0 top-1/2 h-[1.5px] bg-gray-400"
-                          style={{ transform: 'translateY(-50%)' }}
-                        />
-                      </div>
-                    </div>
+                     <div className="flex items-center space-x-1.5 pl-2 flex-shrink-0">
+                       <span className="text-xs opacity-75 font-medium whitespace-nowrap">
+                         {displayTime}
+                       </span>
+                       <ChevronRight 
+                         size={16} 
+                         className={`transition-transform duration-200 transform ${isExpanded ? 'rotate-90' : 'rotate-0'}`} 
+                       />
+                     </div>
+                   </div>
 
-                    <div className="flex items-center space-x-1.5 pl-2 flex-shrink-0">
-                      {hasSubtasks && (
-                        <button
-                          type="button"
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleTaskCollapse(task.id);
-                          }}
-                          className="p-1 hover:bg-black/5 rounded transition-transform duration-150 cursor-pointer"
-                          style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}
-                        >
-                          <ChevronRight size={14} />
-                        </button>
-                      )}
-                      <span className="text-xs opacity-75 font-bold flex items-center space-x-1 whitespace-nowrap">
-                        <Clock size={12} />
-                        <span>{displayTime}</span>
-                      </span>
-                    </div>
-                  </div>
+                   {/* Expanded details container */}
+                   {isExpanded && (
+                     <div className="mt-2.5 pt-2.5 border-t border-white/10 flex flex-col space-y-2 relative z-10 w-full">
+                       {/* Category Pill and Date Info */}
+                       <div className="flex items-center justify-between">
+                         <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-white/15 text-current border border-white/10">
+                           {cat.name}
+                         </span>
+                         <div className="flex items-center space-x-1.5 text-xs opacity-85">
+                           <CalendarDays size={13} />
+                           <span>{task.date}</span>
+                         </div>
+                       </div>
 
-                   {/* Sub-header details */}
-                  <div className="text-xs opacity-80 mt-1 flex items-center justify-between relative z-10">
-                    <div className="flex items-center min-w-0">
-                      <span 
-                        className="w-2.5 h-2.5 rounded-full mr-2"
-                        style={!task.completed ? { backgroundColor: cat.color.solid } : undefined}
-                      />
-                      <span className="font-semibold truncate">{cat.name}</span>
-                    </div>
+                       {/* Subtasks inside expanded task as a bulleted list */}
+                       {hasSubtasks && (
+                         <div className="space-y-1.5 border-t border-white/5 pt-2.5">
+                           {task.subtasks.map((sub, idx) => {
+                             const isDragging = draggedSubTaskId === task.id && draggedSubIndex === idx;
+                             return (
+                               <div 
+                                 key={sub.id} 
+                                 className={`flex items-center space-x-2 py-0.5 transition-shadow select-none relative
+                                   ${isDragging ? 'z-50 opacity-70 scale-[1.02]' : ''}
+                                 `}
+                                 style={isDragging ? { transform: `translateY(${subDraggedOffset}px)`, position: 'relative' } : undefined}
+                               >
+                                 {/* Grab Handle */}
+                                 <span
+                                   onPointerDown={(e) => handleSubPointerDown(task.id, idx, e)}
+                                   onPointerMove={(e) => handleSubPointerMove(task.id, idx, e)}
+                                   onPointerUp={(e) => handleSubPointerUp(task.id, idx, e)}
+                                   className="text-current/60 hover:text-current cursor-grab active:cursor-grabbing px-1 touch-none select-none flex items-center justify-center w-5 h-5 hover:bg-white/10 rounded font-bold"
+                                 >
+                                   ≡
+                                 </span>
 
-                    {/* Subtasks Progress Status Dots when Collapsed */}
-                    {hasSubtasks && isCollapsed && (
-                      <div className="flex items-center space-x-1 bg-black/5 px-2 py-0.5 rounded-full scale-95 border border-black/5 flex-shrink-0">
-                        <span className="text-[10px] font-bold font-mono mr-1">
-                          {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
-                        </span>
-                        <div className="flex items-center space-x-0.5">
-                          {task.subtasks.slice(0, 5).map((s) => (
-                            <span 
-                              key={s.id} 
-                              className={`w-1.5 h-1.5 rounded-full border
-                                ${s.completed 
-                                  ? 'bg-blue-600 border-blue-600' 
-                                  : 'bg-transparent border-gray-400'
-                                }
-                              `} 
-                            />
-                          ))}
-                          {task.subtasks.length > 5 && <span className="text-[8px] font-bold">+</span>}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                                 <button
+                                   type="button"
+                                   onPointerDown={(e) => e.stopPropagation()}
+                                   onClick={(e) => {
+                                     e.stopPropagation();
+                                     toggleSubtask(task.id, sub.id);
+                                   }}
+                                   className="p-1 text-current hover:opacity-80 rounded flex-shrink-0 cursor-pointer"
+                                 >
+                                   <span 
+                                     className={`w-3.5 h-3.5 rounded-full flex items-center justify-center border border-current flex-shrink-0 transition-all
+                                       ${sub.completed ? 'bg-white border-white' : 'bg-transparent'}
+                                     `}
+                                   >
+                                     {sub.completed && <Check size={8} className="stroke-[3px] text-blue-600" />}
+                                   </span>
+                                 </button>
+                                 <span className={`text-xs flex-1 truncate ${sub.completed ? 'line-through opacity-50' : 'font-medium'}`}>
+                                   {sub.title}
+                                 </span>
+                               </div>
+                             );
+                           })}
+                         </div>
+                       )}
 
-                  {/* Inline expanded details */}
-                  {isExpanded && (
-                    <div className="mt-2.5 pt-2.5 border-t border-black/5 flex flex-col space-y-2 animate-fadeIn relative z-10">
-                      <div className="flex items-center space-x-1.5 text-xs text-gray-500 font-medium">
-                        <CalendarDays size={13} />
-                        <span>{task.date} {task.time ? `at ${task.time}` : '(All Day)'}</span>
-                      </div>
-
-                      <div className="flex items-center space-x-2 pt-0.5">
-                        <button
-                          type="button"
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingTask(task);
-                            setFABOpen(true);
-                          }}
-                          className="flex items-center space-x-1 px-3 py-1 rounded bg-black/5 hover:bg-black/10 text-gray-700 font-semibold text-xs select-none cursor-pointer transition-colors"
-                          title="Edit task"
-                        >
-                          <Edit3 size={12} />
-                          <span>Edit</span>
-                        </button>
-                        <button
-                          type="button"
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteTask(task.id);
-                          }}
-                          className="flex items-center space-x-1 px-3 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs select-none cursor-pointer transition-colors"
-                          title="Delete task"
-                        >
-                          <Trash2 size={12} />
-                          <span>Delete</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Display subtasks below parent block if expanded */}
-                  {!isCollapsed && hasSubtasks && (
-                    <div className="mt-2 space-y-1 border-t border-black/5 pt-2 flex-1 overflow-visible relative z-10">
-                      {task.subtasks.map((sub, sIdx) => {
-                        const isDraggingSub = draggedSubTaskId === task.id && draggedSubIndex === sIdx;
-                        const subTopOffset = isDraggingSub ? subDraggedOffset : 0;
-
-                        return (
-                          <div 
-                            key={sub.id} 
-                            className={`group flex items-center space-x-2 py-0.5 px-1.5 rounded hover:bg-black/5 relative select-none transition-all duration-150
-                              ${isDraggingSub ? 'bg-black/10 shadow-sm z-50 scale-[1.01] ring-1 ring-blue-500/20' : ''}
-                              ${sub.completed ? 'opacity-60' : 'hover:translate-x-0.5'}
-                            `}
-                            style={{
-                              transform: isDraggingSub ? `translate(${subDraggedOffsetX}px, ${subTopOffset}px)` : 'none',
-                              touchAction: 'none'
-                            }}
-                          >
-                            {/* Drag handle (≡) */}
-                            <button
-                              type="button"
-                              onPointerDown={(e) => handleSubPointerDown(task.id, sIdx, e)}
-                              onPointerMove={(e) => handleSubPointerMove(task.id, sIdx, e)}
-                              onPointerUp={(e) => handleSubPointerUp(task.id, sIdx, e)}
-                              className="p-1 text-gray-400 hover:text-gray-700 rounded cursor-grab active:cursor-grabbing flex-shrink-0 opacity-30 group-hover:opacity-100 transition-opacity"
-                              title="Drag subtask to prioritize"
-                            >
-                              <GripVertical size={13} />
-                            </button>
-
-                            {/* Completion checkbox/dot */}
-                            <button
-                              type="button"
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleSubtask(task.id, sub.id);
-                              }}
-                              className="p-1 text-gray-500 hover:text-gray-800 rounded flex-shrink-0 cursor-pointer relative overflow-hidden"
-                              title={sub.completed ? "Mark incomplete" : "Mark complete"}
-                            >
-                              <span 
-                                className={`w-2.5 h-2.5 rounded-full flex items-center justify-center border border-current flex-shrink-0 transition-all
-                                  ${sub.completed ? 'bg-blue-600 border-blue-600 text-white' : 'bg-transparent border-gray-400'}
-                                `}
-                                style={!sub.completed ? { color: cat.color.solid, borderColor: cat.color.solid } : undefined}
-                              >
-                                {sub.completed && <Check size={6} className="stroke-[3.5px] text-white" />}
-                              </span>
-                            </button>
-
-                            {/* Title */}
-                            <span className={`truncate text-xs flex-1 ${sub.completed ? 'line-through opacity-50 text-gray-400 font-normal' : 'font-medium text-gray-700 group-hover:text-gray-900'}`}>
-                              {sub.title}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </motion.div>
-              </div>
-            );
-          })}
+                       {/* Actions: Edit & Delete */}
+                       <div className="flex items-center space-x-2 pt-1">
+                         <button
+                           type="button"
+                           onPointerDown={(e) => e.stopPropagation()}
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             setEditingTask(task);
+                             setFABOpen(true);
+                           }}
+                           className="flex items-center space-x-1 px-3 py-1 rounded bg-white/15 hover:bg-white/25 text-current font-semibold text-xs select-none cursor-pointer transition-colors"
+                         >
+                           <Edit3 size={12} />
+                           <span>Edit</span>
+                         </button>
+                         <button
+                           type="button"
+                           onPointerDown={(e) => e.stopPropagation()}
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             deleteTask(task.id);
+                           }}
+                           className="flex items-center space-x-1 px-3 py-1 rounded bg-rose-500/80 hover:bg-rose-600 text-white font-semibold text-xs select-none cursor-pointer transition-colors"
+                         >
+                           <Trash2 size={12} />
+                           <span>Delete</span>
+                         </button>
+                       </div>
+                     </div>
+                   )}
+                 </motion.div>
+               </div>
+             );
+           })}
 
           {/* Non-timed tasks list */}
           <div className="absolute top-2 left-4 right-4 flex flex-col space-y-1.5">
@@ -2430,29 +2926,48 @@ const DayView: React.FC<DayViewProps> = ({
                         {/* Subtasks inside expanded all-day task */}
                         {hasSubtasks && (
                           <div className="mt-2 space-y-1 pt-2 border-t border-black/5">
-                            {task.subtasks.map((sub) => (
-                              <div key={sub.id} className="flex items-center space-x-2 py-0.5">
-                                <button
-                                  type="button"
-                                  onPointerDown={(e) => e.stopPropagation()}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleSubtask(task.id, sub.id);
-                                  }}
-                                  className="p-0.5 text-gray-500 hover:text-gray-800 rounded flex-shrink-0 cursor-pointer"
+                            {task.subtasks.map((sub, idx) => {
+                              const isDragging = draggedSubTaskId === task.id && draggedSubId === sub.id;
+                              return (
+                                <div 
+                                  key={sub.id} 
+                                  className={`flex items-center space-x-2 py-0.5 transition-shadow select-none relative
+                                    ${isDragging ? 'z-50 opacity-70 scale-[1.02]' : ''}
+                                  `}
+                                  style={isDragging ? { transform: `translateY(${subDraggedOffset}px)`, position: 'relative' } : undefined}
                                 >
-                                  <span 
-                                    className={`w-2 h-2 rounded-full flex items-center justify-center border border-current flex-shrink-0 transition-all
-                                      ${sub.completed ? 'bg-blue-600 border-blue-600' : 'bg-transparent border-gray-400'}
-                                    `}
-                                    style={!sub.completed ? { color: cat.color.solid, borderColor: cat.color.solid } : undefined}
-                                  />
-                                </button>
-                                <span className={`truncate text-xs flex-1 ${sub.completed ? 'line-through opacity-50' : 'font-medium text-gray-700'}`}>
-                                  {sub.title}
-                                </span>
-                              </div>
-                            ))}
+                                  {/* Grab Handle */}
+                                  <span
+                                    onPointerDown={(e) => handleSubPointerDown(task.id, sub.id, e)}
+                                    onPointerMove={(e) => handleSubPointerMove(task.id, sub.id, e)}
+                                    onPointerUp={(e) => handleSubPointerUp(task.id, sub.id, e)}
+                                    className="text-gray-400 hover:text-gray-800 cursor-grab active:cursor-grabbing px-1 touch-none select-none flex items-center justify-center w-5 h-5 hover:bg-gray-100 rounded font-bold"
+                                  >
+                                    ≡
+                                  </span>
+
+                                  <button
+                                    type="button"
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleSubtask(task.id, sub.id);
+                                    }}
+                                    className="p-0.5 text-gray-500 hover:text-gray-800 rounded flex-shrink-0 cursor-pointer"
+                                  >
+                                    <span 
+                                      className={`w-2 h-2 rounded-full flex items-center justify-center border border-current flex-shrink-0 transition-all
+                                        ${sub.completed ? 'bg-blue-600 border-blue-600' : 'bg-transparent border-gray-400'}
+                                      `}
+                                      style={!sub.completed ? { color: cat.color.solid, borderColor: cat.color.solid } : undefined}
+                                    />
+                                  </button>
+                                  <span className={`truncate text-xs flex-1 ${sub.completed ? 'line-through opacity-50' : 'font-medium text-gray-700'}`}>
+                                    {sub.title}
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -2463,9 +2978,52 @@ const DayView: React.FC<DayViewProps> = ({
             })}
           </div>
         </div>
+
+        {/* Timed Tasks placement */}
+        {(() => {
+          const timedTasks = dayTasks.filter((t) => !!t.time);
+          const laidOut = layoutTasks(timedTasks);
+          return laidOut.map((task) => {
+            const cat = CATEGORIES.find((c) => c.id === task.category) || CATEGORIES[0];
+            const isExpanded = !!expandedTasks[task.id];
+            const MAX_COLUMNS = 2;
+            const effectiveColumns = Math.min(task.totalColumns, MAX_COLUMNS);
+            const blockWidth = `calc((100% - 56px) / ${effectiveColumns} - 6px)`;
+            const blockLeft = `calc(56px + (100% - 56px) / ${effectiveColumns} * ${task.column % MAX_COLUMNS} + 3px)`;
+
+            const [taskHour, taskMin] = (task.time || "00:00").split(':').map(Number);
+            const totalMins = (taskHour * 60) + (taskMin || 0);
+            const topOffset = totalMins * (64 / 60);
+
+            return (
+              <DraggableTaskBlock
+                key={task.id}
+                task={task}
+                pixelsPerMinute={64 / 60}
+                onReschedule={handleReschedule}
+                onEditOpen={openEditSheet}
+                style={{
+                  width: blockWidth,
+                  left: blockLeft,
+                  top: `${topOffset}px`,
+                }}
+              />
+            );
+          });
+        })()}
+
       </div>
     </div>
-  </motion.div>
+    {editingTaskState && (
+        <TaskSheet
+          isOpen={true}
+          onClose={closeEditSheet}
+          editTask={editingTaskState}
+          mode="edit"
+        />
+      )}
+    </div>
+  </div>
   );
 };
 
@@ -2552,43 +3110,9 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({
   tasks,
   setSelectedTaskForDetails,
 }) => {
-  const setDirection = useTaskStore((state) => state.setDirection);
-  const setCurrentDate = useTaskStore((state) => state.setCurrentDate);
-  const x = useMotionValue(0);
-  const touchStartX = React.useRef(0);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    const delta = e.touches[0].clientX - touchStartX.current;
-    x.set(delta);
-  };
-
-  const handleTouchEnd = () => {
-    const delta = x.get();
-    if (Math.abs(delta) > 40) {
-      const dir = delta < 0 ? 'next' : 'prev';
-      animate(x, delta < 0 ? -window.innerWidth : window.innerWidth, {
-        type: 'spring', damping: 28, stiffness: 220, mass: 0.6,
-        onComplete: () => {
-          setDirection(dir);
-          const nextDate = dir === 'next' ? addMonths(activeDate, 1) : subMonths(activeDate, 1);
-          setCurrentDate(nextDate);
-          x.set(dir === 'next' ? window.innerWidth : -window.innerWidth);
-          animate(x, 0, { type: 'spring', damping: 28, stiffness: 220, mass: 0.6 });
-        }
-      });
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(8);
-      }
-    } else {
-      animate(x, 0, { type: 'spring', damping: 32, stiffness: 300 });
-    }
-  };
   const containerRef = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
+  const updateTask = useTaskStore((state) => state.updateTask);
 
   // Auto-scroll to today
   useEffect(() => {
@@ -2679,13 +3203,7 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({
   }, [tasks]);
 
   return (
-    <motion.div
-      style={{ x, touchAction: 'pan-y', willChange: 'transform', transform: 'translateZ(0)' }}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      className="h-full w-full overflow-hidden bg-white"
-    >
+    <div className="h-full w-full overflow-hidden bg-white">
       <div 
         ref={containerRef}
         onScroll={handleScroll}
@@ -2750,23 +3268,33 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({
                     <div
                       key={task.id}
                       onClick={() => setSelectedTaskForDetails(task)}
-                      className={`relative w-full rounded-[8px] cursor-pointer px-3 py-2.5 select-none transition-all duration-150 flex items-center justify-between
-                        ${task.completed 
-                          ? 'bg-[#E8EAFD] text-[#5F6368]' 
-                          : 'bg-[#1A73E8] text-white'
-                        }
-                      `}
+                      className="flex items-center bg-white rounded-xl border border-[#F1F3F4] px-4 py-3 min-h-[64px] select-none transition-all duration-150 cursor-pointer hover:bg-gray-50 active:bg-gray-100"
                     >
+                      {/* Right: task content */}
                       <div className="flex-1 min-w-0">
-                        <h4 className={`text-sm font-medium truncate ${task.completed ? 'text-[#5F6368] line-through' : 'text-white'}`}>
+                        <p className={`text-base font-medium truncate ${task.completed ? 'line-through text-[#BDC1C6]' : 'text-[#202124]'}`}>
                           {task.title}
-                        </h4>
+                        </p>
                         {task.time && (
-                          <div className={`text-xs flex items-center space-x-1 mt-0.5 ${task.completed ? 'text-[#5F6368]/80' : 'text-white/85'}`}>
-                            <Clock size={11} className="mr-0.5 opacity-80" />
-                            <span>{task.time}</span>
-                          </div>
+                          <p className="text-xs text-[#5F6368] mt-0.5">{task.time}</p>
                         )}
+                        {task.category && (
+                          <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] bg-[#E8F0FE] text-[#1A73E8]">
+                            {task.category}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Right: checkbox only */}
+                      <div className="ml-3 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => updateTask(task.id, { completed: !task.completed })}
+                          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors cursor-pointer select-none
+                            ${task.completed ? 'bg-[#1A73E8] border-[#1A73E8] text-white' : 'border-[#DADCE0] bg-white'}
+                          `}
+                        >
+                          {task.completed && <Check size={14} className="text-white" />}
+                        </button>
                       </div>
                     </div>
                   );
@@ -2784,7 +3312,7 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({
         })}
       </div>
     </div>
-  </motion.div>
+  </div>
   );
 };
 
@@ -3062,7 +3590,7 @@ interface ScheduleTaskCardProps {
   onViewDetails: () => void;
 }
 
-const ScheduleTaskCard: React.FC<ScheduleTaskCardProps> = ({ task, onViewDetails }) => {
+const ScheduleTaskCard = React.memo<ScheduleTaskCardProps>(({ task, onViewDetails }) => {
   const updateTask = useTaskStore((state) => state.updateTask);
   const toggleSubtask = useTaskStore((state) => state.toggleSubtask);
 
@@ -3171,4 +3699,6 @@ const ScheduleTaskCard: React.FC<ScheduleTaskCardProps> = ({ task, onViewDetails
       </div>
     </div>
   );
-};
+});
+
+ScheduleTaskCard.displayName = 'ScheduleTaskCard';

@@ -32,6 +32,43 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [previousView, setPreviousView] = useState(selectedView);
+  const [toastMsg, setToastMsg] = useState('');
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+  };
+
+  useEffect(() => {
+    if (toastMsg) {
+      const timer = setTimeout(() => setToastMsg(''), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMsg]);
+
+  // Intercept back button to prevent accidental exits (Android back button pattern)
+  useEffect(() => {
+    let lastBackPress = 0;
+
+    const handleBackButton = (e: PopStateEvent) => {
+      const now = Date.now();
+      if (now - lastBackPress < 2000) {
+        // Second press within 2 seconds — allow exit
+        return;
+      }
+      // First press — prevent exit, show toast, record time
+      e.preventDefault();
+      lastBackPress = now;
+      showToast('Press back again to exit');
+      // Push state back so app doesn't close
+      window.history.pushState(null, '', window.location.href);
+    };
+
+    // Push initial state to intercept back
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', handleBackButton);
+
+    return () => window.removeEventListener('popstate', handleBackButton);
+  }, []);
 
   // Auto-dismiss the last deleted task notification after 5 seconds
   useEffect(() => {
@@ -144,21 +181,23 @@ export default function App() {
           </motion.main>
 
           {/* Floating "+" FAB */}
-          <div className="absolute bottom-20 right-4 z-30">
-            <motion.button
-              whileHover={{ scale: 1.08 }}
-              whileTap={{ scale: 0.94 }}
-              onClick={() => setFABOpen(true)}
-              className="w-14 h-14 bg-[#E8F0FE] hover:opacity-90 rounded-[16px] shadow-lg hover:shadow-xl flex items-center justify-center transition-all cursor-pointer group relative overflow-hidden"
-              title="Create Task"
-            >
-              <Ripple color="rgba(0, 0, 0, 0.08)" />
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="relative z-10 scale-125 transition-transform duration-300 group-hover:rotate-90">
-                <path d="M5 12h14" stroke="#1A73E8" strokeWidth="4" strokeLinecap="round" />
-                <path d="M12 5v14" stroke="#1A73E8" strokeWidth="4" strokeLinecap="round" />
-              </svg>
-            </motion.button>
-          </div>
+          {!isTasksOverlayOpen && !isSidebarOpen && (selectedView === 'schedule' || selectedView === 'day' || selectedView === 'week' || selectedView === 'month' || selectedView === '3day') ? (
+            <div className="absolute bottom-20 right-4 z-30">
+              <motion.button
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.94 }}
+                onClick={() => setFABOpen(true)}
+                className="w-14 h-14 bg-[#E8F0FE] hover:opacity-90 rounded-[16px] shadow-lg hover:shadow-xl flex items-center justify-center transition-all cursor-pointer group relative overflow-hidden"
+                title="Create Task"
+              >
+                <Ripple color="rgba(0, 0, 0, 0.08)" />
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="relative z-10 scale-125 transition-transform duration-300 group-hover:rotate-90">
+                  <path d="M5 12h14" stroke="#1A73E8" strokeWidth="4" strokeLinecap="round" />
+                  <path d="M12 5v14" stroke="#1A73E8" strokeWidth="4" strokeLinecap="round" />
+                </svg>
+              </motion.button>
+            </div>
+          ) : null}
         </div>
 
          {/* Material 3 Undo Snackbar */}
@@ -211,6 +250,27 @@ export default function App() {
         <AnimatePresence>
           {isTasksOverlayOpen && <TasksOverlay />}
         </AnimatePresence>
+
+        {/* Toast Notification */}
+        {toastMsg && (
+          <div style={{
+            position: 'absolute',
+            bottom: '80px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: '#323232',
+            color: '#FFFFFF',
+            padding: '10px 20px',
+            borderRadius: '24px',
+            fontSize: '13px',
+            fontWeight: 500,
+            zIndex: 9999,
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+          }}>
+            {toastMsg}
+          </div>
+        )}
       </div>
     </div>
   );
