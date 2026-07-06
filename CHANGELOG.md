@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-07-06]
+- Replaced the static "New task" / "Edit task" header title with live mirroring of the active task title being typed, displaying a faint "New task" or "Edit task" placeholder when empty.
+- Abandoned unreliable browser history popstate/PWA back-button interception completely, ensuring the hardware back button is safely ignored while the sheet is open.
+- Added a highly reliable on-screen down-chevron back/close button in the sheet's top-left header that blurs active input/keyboard on first tap, and closes the sheet on the next tap (no save).
+- Extended the back/close behavior to the top gray handle bar and the dark backdrop/scrim clicks for a cohesive, intuitive dismissal experience.
+- Fixed subtask row height, margin, padding, and min-height in `SortableSubtask` to be extremely compact while keeping font sizes identical, ensuring 4+ subtask rows are comfortably visible even when typing.
+- Perfected the double-back-to-exit flow for sheets: popstate handler in `TaskSheet` blurs the active input on first back, and pushes a state back to re-arm the handler so that a second back tap closes the sheet.
+- Integrated a programmatic back button bypass using `window.isProgrammaticBack` to ensure that programmatic sheet closure (on Save/backdrop click) never triggers the global double-tap app-exit toast.
+- Fixed subtask vertical stacking space by conditionally hiding Category pills and Date & Time sections when the keyboard is open (any input is focused), restoring full height of the subtask list to comfortably display 5+ rows and allowing natural scrolling.
+- Scoped back gesture completely to the Task Sheet while open, disabling global app exit popstate listener using a new `isTaskSheetOpen` store state flag.
+- Integrated seamless keyboard-first sheet dismissal flow: first back tap blurs active input, second back tap safely closes the task sheet without saving.
+- Fixed ghost card issue: conditionally disabled background timeline/DayView `DraggableTaskBlock` absolutely-positioned cards when the `TasksOverlay` (My Tasks / Pending Tasks) list is open.
+- Rearranged `TaskSheet` layout: placed the scrollable subtasks container immediately below the task title input, and above the category and date/time selectors, keeping saved subtasks and the inline subtask adder fully visible and stacked in order at the top.
+- Removed the "X" close button from the top-left of the task sheet header.
+- Implemented a double-tap/gesture keyboard-first exit flow: wired `handleExit` to popstate (back gesture), backdrop, and top handlebar so the first tap blurs the active input (closes keyboard) and the second tap (within 2 seconds) safely closes the sheet. Added a subtle "Tap top bar again to close" pill notification for first tap feedback.
+
 ## [2026-07-05]
 - Implemented subtask auto-scroll: newly added inline subtasks automatically scroll the subtask list container to the bottom.
 - Added delayed scroll-into-view handler on subtask input focus to ensure they remain completely visible above the virtual keyboard when typing.

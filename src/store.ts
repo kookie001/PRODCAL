@@ -31,6 +31,7 @@ interface TaskState {
   lastDeletedTask: Task | null; // For Undo snackbar
   isTasksOverlayOpen: boolean; // Global state for full-screen GCAL Tasks view
   isBottomBarVisible: boolean; // For scroll hiding bottom bar
+  isTaskSheetOpen: boolean; // True when the task create/edit sheet is open
 }
 
 interface TaskActions {
@@ -54,6 +55,7 @@ interface TaskActions {
   undoDeleteTask: () => void;
   setTasksOverlayOpen: (open: boolean) => void;
   setBottomBarVisible: (visible: boolean) => void;
+  setTaskSheetOpen: (open: boolean) => void;
   
   // Subtask helpers
   toggleSubtask: (taskId: string, subtaskId: string) => void;
@@ -253,6 +255,7 @@ export const useTaskStore = create<TaskState & TaskActions>()(
       lastDeletedTask: null,
       isTasksOverlayOpen: false,
       isBottomBarVisible: true,
+      isTaskSheetOpen: false,
 
       // Actions
       addTask: (taskData) => set((state) => {
@@ -353,6 +356,8 @@ export const useTaskStore = create<TaskState & TaskActions>()(
       setTasksOverlayOpen: (open) => set({ isTasksOverlayOpen: open }),
       
       setBottomBarVisible: (visible) => set({ isBottomBarVisible: visible }),
+
+      setTaskSheetOpen: (open) => set({ isTaskSheetOpen: open }),
 
       // Subtask specific methods
       toggleSubtask: (taskId, subtaskId) => set((state) => {

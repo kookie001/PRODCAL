@@ -47,8 +47,10 @@ const SortableSubtask = React.memo<SortableSubtaskProps>(({ id, value, onChange,
         touchAction: 'none',
         userSelect: 'none',
         WebkitUserSelect: 'none',
+        minHeight: '32px',
+        marginBottom: '4px',
       }}
-      className="flex items-center gap-2 mb-2 bg-white rounded-lg px-3 py-2 cursor-grab active:cursor-grabbing"
+      className="flex items-center gap-1.5 bg-white rounded-md px-2 cursor-grab active:cursor-grabbing"
     >
       <span className="text-[#BDC1C6] text-base select-none">≡</span>
       <input
@@ -62,13 +64,17 @@ const SortableSubtask = React.memo<SortableSubtaskProps>(({ id, value, onChange,
           }, 300); // wait for keyboard to open
         }}
         placeholder="Subtask"
-        className="flex-1 text-sm text-[#202124] placeholder-[#BDC1C6] border-0 border-b border-[#F1F3F4] pb-1 focus:outline-none focus:border-[#1A73E8] bg-transparent cursor-text"
+        style={{
+          paddingTop: '4px',
+          paddingBottom: '4px',
+        }}
+        className="flex-1 text-sm text-[#202124] placeholder-[#BDC1C6] border-0 border-b border-[#F1F3F4] focus:outline-none focus:border-[#1A73E8] bg-transparent cursor-text"
       />
       <button
         type="button"
         onClick={e => { e.stopPropagation(); onRemove(); }}
         onPointerDown={e => e.stopPropagation()}
-        className="text-[#BDC1C6] text-lg leading-none p-1"
+        className="text-[#BDC1C6] text-lg leading-none p-0.5"
       >
         ×
       </button>
@@ -306,6 +312,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
   const setPrefilledTitle = useTaskStore((state) => state.setPrefilledTitle);
   const currentDateStr = useTaskStore((state) => state.currentDate);
   const categories = useTaskStore((state) => state.categories);
+  const setTaskSheetOpen = useTaskStore((state) => state.setTaskSheetOpen);
 
   const activeIsOpen = propIsOpen !== undefined ? propIsOpen : isFABOpen;
   const activeMode = propEditTask ? 'edit' : (propMode || (editingTask ? 'edit' : 'create'));
@@ -321,6 +328,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [isDateTimeExpanded, setIsDateTimeExpanded] = useState(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
 
   // Subtasks list local editing state
   const [subtasks, setSubtasks] = useState<Omit<Subtask, 'completed'>[]>([]);
@@ -342,6 +350,36 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const subtaskScrollRef = useRef<HTMLDivElement>(null);
+
+  const handleFocus = () => {
+    setKeyboardOpen(true);
+  };
+
+  const handleBlur = () => {
+    setTimeout(() => {
+      const active = document.activeElement;
+      if (!active || (active.tagName !== 'INPUT' && active.tagName !== 'TEXTAREA')) {
+        setKeyboardOpen(false);
+      }
+    }, 50);
+  };
+
+  const handleSheetBack = () => {
+    const active = document.activeElement as HTMLElement;
+    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+      active.blur(); // keyboard open → just close keyboard
+      return;
+    }
+    handleClose(); // keyboard already closed → close the sheet (no save)
+  };
+
+  // Sync sheet open status to the store for global back gesture bypass
+  useEffect(() => {
+    setTaskSheetOpen(isOpen);
+    return () => {
+      setTaskSheetOpen(false);
+    };
+  }, [isOpen, setTaskSheetOpen]);
 
   // Animate sheet sliding in on mount
   useEffect(() => {
@@ -521,12 +559,14 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
         className={`absolute inset-0 bg-black/40 cursor-default transition-opacity duration-280 ${
           isOpen ? 'opacity-100' : 'opacity-0'
         }`}
-        onClick={handleClose}
+        onClick={handleSheetBack}
       />
 
       {/* Modal Core Sheet — full height, flex column */}
       <form
         onSubmit={handleSaveSubmit}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
         className={`relative bg-white w-full rounded-t-[24px] shadow-2xl flex flex-col z-10 task-sheet ${
           isOpen ? 'open' : ''
         }`}
@@ -553,27 +593,58 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
           }
         }}
       >
-        {/* FIXED TOP: handle bar + X and Save buttons — never moves */}
-        <div style={{ flexShrink: 0 }} className="pt-4 pb-2 px-6">
+        {/* FIXED TOP: handle bar + Save button — never moves */}
+        <div 
+          style={{ flexShrink: 0, cursor: 'pointer' }} 
+          className="pt-4 pb-2 px-6 select-none"
+          onClick={(e) => {
+            const target = e.target as HTMLElement;
+            if (!target.closest('button, input, select, textarea')) {
+              e.stopPropagation();
+              handleSheetBack();
+            }
+          }}
+        >
           <div className="w-8 h-1 bg-[#DADCE0] rounded-full mx-auto mb-3" />
           
           <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-[#F1F3F4] active:bg-[#E0E0E0] transition-colors duration-150 cursor-pointer"
-            >
-              <X size={20} className="text-[#5F6368]" />
-            </button>
+            <div className="flex items-center space-x-2 flex-1 min-w-0 mr-4">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSheetBack();
+                }}
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  border: 'none',
+                  background: 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  touchAction: 'manipulation',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                }}
+                className="hover:bg-gray-100 rounded-full transition-colors"
+              >
+                {/* down-chevron icon */}
+                <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                  <path d="M6 9L11 14L16 9" stroke="#5F6368" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
 
-            <span className="text-base font-medium text-[#202124]">
-              {activeMode === 'edit' ? 'Edit task' : 'New task'}
-            </span>
+              <span className={`text-base font-semibold truncate ${title.trim() ? 'text-[#202124]' : 'text-gray-400'}`}>
+                {title.trim() || (activeMode === 'edit' ? 'Edit task' : 'New task')}
+              </span>
+            </div>
 
             <button
               type="submit"
               disabled={!title.trim()}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors duration-150 cursor-pointer ${
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors duration-150 cursor-pointer flex-shrink-0 ${
                 title.trim()
                   ? 'bg-[#1A73E8] text-white active:bg-[#0B57D0]'
                   : 'bg-[#F1F3F4] text-[#BDC1C6] cursor-not-allowed'
@@ -600,129 +671,6 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
             }}
             className="w-full bg-transparent text-xl font-medium text-gray-900 border-b border-gray-200 focus:border-blue-600 focus:outline-none py-1 transition-all placeholder-gray-400"
           />
-        </div>
-
-        {/* FIXED: Category selector — never moves */}
-        <div style={{ flexShrink: 0 }} className="px-6 py-2 space-y-1.5">
-          <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center space-x-1.5">
-            <Bookmark size={13} className="text-blue-500" />
-            <span>Category</span>
-          </label>
-          <div className="flex items-center space-x-1.5 overflow-x-auto scrollbar-none py-0.5">
-            {categories.map((cat) => {
-              const isSelected = category === cat.id;
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setCategory(cat.id)}
-                  className={`flex items-center px-3.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer select-none active:scale-95
-                    ${isSelected ? 'text-white' : ''}
-                  `}
-                  style={
-                    isSelected 
-                      ? { backgroundColor: cat.color.solid, borderColor: cat.color.solid }
-                      : { backgroundColor: 'transparent', borderColor: cat.color.solid + '50', color: cat.color.solid }
-                  }
-                >
-                  {cat.name}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* FIXED: Date/time row — never moves */}
-        <div style={{ flexShrink: 0 }} className="px-6 py-2">
-          <div className="border border-gray-200 rounded-2xl overflow-hidden bg-gray-50/30">
-            <button
-              type="button"
-              onClick={() => setIsDateTimeExpanded(!isDateTimeExpanded)}
-              className="flex items-center justify-between w-full px-4 py-2.5 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50/80 transition-colors cursor-pointer select-none"
-            >
-              <div className="flex items-center space-x-2">
-                <Calendar size={16} className="text-blue-500" />
-                <span>Date & Time</span>
-                <span className="text-xs font-normal text-gray-400 ml-2">
-                  ({date || 'Today'}{time ? `, ${time}` : ', All-day'})
-                </span>
-              </div>
-              <ChevronDown 
-                size={16} 
-                className={`text-gray-400 transition-transform duration-200 ${
-                  isDateTimeExpanded ? 'transform rotate-180' : ''
-                }`}
-              />
-            </button>
-
-            {isDateTimeExpanded && (
-              <div className="px-4 pb-4 pt-2 border-t border-gray-150/50 bg-white grid grid-cols-2 gap-4 animate-fadeIn">
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center space-x-1.5">
-                    <Calendar size={13} className="text-blue-500" />
-                    <span>Date</span>
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                </div>
-                <div className="space-y-2 flex flex-col">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center space-x-1.5">
-                    <Clock size={13} className="text-blue-500" />
-                    <span>Time</span>
-                  </label>
-                  
-                  <div className="flex items-center space-x-2 mb-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setTime('')}
-                      className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer select-none
-                        ${!time 
-                          ? 'bg-blue-50 border-blue-200 text-blue-700' 
-                          : 'bg-transparent border-gray-200 text-gray-500 hover:bg-gray-50'
-                        }
-                      `}
-                    >
-                      All-Day
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!time) {
-                          const now = new Date();
-                          const hrs = String(now.getHours()).padStart(2, '0');
-                          const mins = String(Math.round(now.getMinutes() / 15) * 15 % 60).padStart(2, '0');
-                          setTime(`${hrs}:${mins}`);
-                        }
-                      }}
-                      className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer select-none
-                        ${time 
-                          ? 'bg-blue-600 border-blue-600 text-white' 
-                          : 'bg-transparent border-gray-200 text-gray-500 hover:bg-gray-50'
-                        }
-                      `}
-                    >
-                      Set Time
-                    </button>
-                  </div>
-
-                  {time ? (
-                    <div className="flex justify-center pt-1">
-                      <TimeWheelPicker value={time} onChange={setTime} />
-                    </div>
-                  ) : (
-                    <div className="h-[120px] flex items-center justify-center rounded-2xl bg-gray-50 border border-dashed border-gray-200">
-                      <span className="text-[11px] text-gray-400 italic font-medium">All day</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
         </div>
 
         {/* SCROLLABLE: Subtasks area — this is the ONLY part that scrolls */}
@@ -787,6 +735,133 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
             </div>
           )}
         </div>
+
+        {!keyboardOpen && (
+          <>
+            {/* FIXED: Category selector — never moves */}
+            <div style={{ flexShrink: 0 }} className="px-6 py-2 space-y-1.5 border-t border-gray-100">
+              <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center space-x-1.5">
+                <Bookmark size={13} className="text-blue-500" />
+                <span>Category</span>
+              </label>
+              <div className="flex items-center space-x-1.5 overflow-x-auto scrollbar-none py-0.5">
+                {categories.map((cat) => {
+                  const isSelected = category === cat.id;
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setCategory(cat.id)}
+                      className={`flex items-center px-3.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer select-none active:scale-95
+                        ${isSelected ? 'text-white' : ''}
+                      `}
+                      style={
+                        isSelected 
+                          ? { backgroundColor: cat.color.solid, borderColor: cat.color.solid }
+                          : { backgroundColor: 'transparent', borderColor: cat.color.solid + '50', color: cat.color.solid }
+                      }
+                    >
+                      {cat.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* FIXED: Date/time row — never moves */}
+            <div style={{ flexShrink: 0 }} className="px-6 py-2">
+              <div className="border border-gray-200 rounded-2xl overflow-hidden bg-gray-50/30">
+                <button
+                  type="button"
+                  onClick={() => setIsDateTimeExpanded(!isDateTimeExpanded)}
+                  className="flex items-center justify-between w-full px-4 py-2.5 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50/80 transition-colors cursor-pointer select-none"
+                >
+                  <div className="flex items-center space-x-2">
+                    <Calendar size={16} className="text-blue-500" />
+                    <span>Date & Time</span>
+                    <span className="text-xs font-normal text-gray-400 ml-2">
+                      ({date || 'Today'}{time ? `, ${time}` : ', All-day'})
+                    </span>
+                  </div>
+                  <ChevronDown 
+                    size={16} 
+                    className={`text-gray-400 transition-transform duration-200 ${
+                      isDateTimeExpanded ? 'transform rotate-180' : ''
+                    }`}
+                  />
+                </button>
+
+                {isDateTimeExpanded && (
+                  <div className="px-4 pb-4 pt-2 border-t border-gray-150/50 bg-white grid grid-cols-2 gap-4 animate-fadeIn">
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center space-x-1.5">
+                        <Calendar size={13} className="text-blue-500" />
+                        <span>Date</span>
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      />
+                    </div>
+                    <div className="space-y-2 flex flex-col">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center space-x-1.5">
+                        <Clock size={13} className="text-blue-500" />
+                        <span>Time</span>
+                      </label>
+                      
+                      <div className="flex items-center space-x-2 mb-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setTime('')}
+                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer select-none
+                            ${!time 
+                              ? 'bg-blue-50 border-blue-200 text-blue-700' 
+                              : 'bg-transparent border-gray-200 text-gray-500 hover:bg-gray-50'
+                            }
+                          `}
+                        >
+                          All-Day
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!time) {
+                              const now = new Date();
+                              const hrs = String(now.getHours()).padStart(2, '0');
+                              const mins = String(Math.round(now.getMinutes() / 15) * 15 % 60).padStart(2, '0');
+                              setTime(`${hrs}:${mins}`);
+                            }
+                          }}
+                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer select-none
+                            ${time 
+                              ? 'bg-blue-600 border-blue-600 text-white' 
+                              : 'bg-transparent border-gray-200 text-gray-500 hover:bg-gray-50'
+                            }
+                          `}
+                        >
+                          Set Time
+                        </button>
+                      </div>
+
+                      {time ? (
+                        <div className="flex justify-center pt-1">
+                          <TimeWheelPicker value={time} onChange={setTime} />
+                        </div>
+                      ) : (
+                        <div className="h-[120px] flex items-center justify-center rounded-2xl bg-gray-50 border border-dashed border-gray-200">
+                          <span className="text-[11px] text-gray-400 italic font-medium">All day</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Bottom spacer for safe area */}
         <div style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)', flexShrink: 0 }} />

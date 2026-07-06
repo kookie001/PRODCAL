@@ -50,6 +50,12 @@ export default function App() {
     let lastBackPress = 0;
 
     const handleBackButton = (e: PopStateEvent) => {
+      if (useTaskStore.getState().isTaskSheetOpen) {
+        return; // sheet handles its own back
+      }
+      if (useTaskStore.getState().isFABOpen) {
+        return;
+      }
       const now = Date.now();
       if (now - lastBackPress < 2000) {
         // Second press within 2 seconds — allow exit

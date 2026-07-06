@@ -2154,6 +2154,7 @@ const DayView: React.FC<DayViewProps> = ({
   const hours = Array.from({ length: 24 }, (_, i) => i);
   const isTodayDay = isToday(activeDate);
   const setTasksOverlayOpen = useTaskStore((state) => state.setTasksOverlayOpen);
+  const isTasksOverlayOpen = useTaskStore((state) => state.isTasksOverlayOpen);
 
   const reorderSubtasks = useTaskStore((state) => state.reorderSubtasks);
   const toggleSubtask = useTaskStore((state) => state.toggleSubtask);
@@ -2966,7 +2967,7 @@ const DayView: React.FC<DayViewProps> = ({
         </div>
 
         {/* Timed Tasks placement */}
-        {(() => {
+        {!isTasksOverlayOpen && (() => {
           const timedTasks = dayTasks.filter((t) => !!t.time);
           const laidOut = layoutTasks(timedTasks);
           return laidOut.map((task) => {
