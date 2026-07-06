@@ -1819,50 +1819,52 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       }}>
 
         {/* LEFT: expand toggle — small, minimal */}
-        <button
-          onTouchEnd={(e) => {
-            lastTouchTime.current = Date.now()
-            e.stopPropagation()
-            e.preventDefault()
-            if (!moved.current) setExpanded(p => !p)
-          }}
-          onMouseUp={(e) => {
-            if (Date.now() - lastTouchTime.current < 500) return
-            e.stopPropagation()
-            if (!moved.current) setExpanded(p => !p)
-          }}
-          style={{
-            width: '44px',
-            height: '44px',
-            minWidth: '44px',
-            marginLeft: '-14px',
-            marginRight: '-14px',
-            background: 'transparent',
-            border: 'none',
-            padding: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            flexShrink: 0,
-          }}
-        >
-          <div style={{
-            width: '16px',
-            height: '16px',
-            borderRadius: '50%',
-            background: completed ? 'rgba(0,0,0,0.05)' : 'rgba(30,64,175,0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'transform 180ms ease',
-            transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
-          }}>
-            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-              <path d="M2 3L4 5L6 3" stroke={fg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-        </button>
+        {task.subtasks && task.subtasks.length > 0 && (
+          <button
+            onTouchEnd={(e) => {
+              lastTouchTime.current = Date.now()
+              e.stopPropagation()
+              e.preventDefault()
+              if (!moved.current) setExpanded(p => !p)
+            }}
+            onMouseUp={(e) => {
+              if (Date.now() - lastTouchTime.current < 500) return
+              e.stopPropagation()
+              if (!moved.current) setExpanded(p => !p)
+            }}
+            style={{
+              width: '44px',
+              height: '44px',
+              minWidth: '44px',
+              marginLeft: '-14px',
+              marginRight: '-14px',
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            <div style={{
+              width: '16px',
+              height: '16px',
+              borderRadius: '50%',
+              background: completed ? 'rgba(0,0,0,0.05)' : 'rgba(30,64,175,0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'transform 180ms ease',
+              transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+            }}>
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                <path d="M2 3L4 5L6 3" stroke={fg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+          </button>
+        )}
 
         {/* CENTER: task title — takes all remaining space, priority */}
         {isEditing ? (

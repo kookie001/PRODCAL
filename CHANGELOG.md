@@ -1,6 +1,9 @@
 # Changelog
 
 ## [2026-07-06]
+- **Task Title in Header**: Replaced separate task title row and "New task" text with a single header row containing the V (close) button, the live task title input field, and the Save button, saving significant vertical space.
+- **Subtask Auto-Save & Enter creation**: Configured subtasks to save live on every keystroke. Pressing Enter inside a subtask row automatically creates a new empty subtask row and focuses it. Completely empty subtask rows are automatically filtered out when saving the task.
+- **Conditional Chevron Button**: Wrapped the expand/collapse chevron button on timeline task cards inside a conditional check, so it is only rendered if the task has one or more subtasks. Otherwise, the title expands cleanly from the left.
 - Replaced the static "New task" / "Edit task" header title with live mirroring of the active task title being typed, displaying a faint "New task" or "Edit task" placeholder when empty.
 - Abandoned unreliable browser history popstate/PWA back-button interception completely, ensuring the hardware back button is safely ignored while the sheet is open.
 - Added a highly reliable on-screen down-chevron back/close button in the sheet's top-left header that blurs active input/keyboard on first tap, and closes the sheet on the next tap (no save).

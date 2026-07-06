@@ -21,9 +21,10 @@ interface SortableSubtaskProps {
   value: string;
   onChange: (value: string) => void;
   onRemove: () => void;
+  onEnterPressed: () => void;
 }
 
-const SortableSubtask = React.memo<SortableSubtaskProps>(({ id, value, onChange, onRemove }) => {
+const SortableSubtask = React.memo<SortableSubtaskProps>(({ id, value, onChange, onRemove, onEnterPressed }) => {
   const {
     attributes,
     listeners,
@@ -56,6 +57,12 @@ const SortableSubtask = React.memo<SortableSubtaskProps>(({ id, value, onChange,
       <input
         value={value}
         onChange={e => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            onEnterPressed();
+          }
+        }}
         onClick={e => e.stopPropagation()}
         onPointerDown={e => e.stopPropagation()}
         onFocus={(e) => {
@@ -68,7 +75,7 @@ const SortableSubtask = React.memo<SortableSubtaskProps>(({ id, value, onChange,
           paddingTop: '4px',
           paddingBottom: '4px',
         }}
-        className="flex-1 text-sm text-[#202124] placeholder-[#BDC1C6] border-0 border-b border-[#F1F3F4] focus:outline-none focus:border-[#1A73E8] bg-transparent cursor-text"
+        className="subtask-input flex-1 text-sm text-[#202124] placeholder-[#BDC1C6] border-0 border-b border-[#F1F3F4] focus:outline-none focus:border-[#1A73E8] bg-transparent cursor-text"
       />
       <button
         type="button"
@@ -327,7 +334,6 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
   // Animation & UI states
   const [isOpen, setIsOpen] = useState(false);
   const [isDateTimeExpanded, setIsDateTimeExpanded] = useState(false);
-  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [keyboardOpen, setKeyboardOpen] = useState(false);
 
   // Subtasks list local editing state
@@ -442,21 +448,41 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
     }, 280);
   };
 
-  const handleAddNewSubtaskInline = () => {
-    if (!newSubtaskTitle.trim() || subtasks.length >= 50) return;
+  const handleAddEmptySubtask = () => {
+    if (subtasks.length >= 50) return;
+
+    // If the last subtask is already empty, just focus it instead of adding another empty one
+    const lastSub = subtasks[subtasks.length - 1];
+    if (lastSub && lastSub.title.trim() === '') {
+      setTimeout(() => {
+        const inputs = document.querySelectorAll('.subtask-input');
+        const lastInput = inputs[inputs.length - 1] as HTMLInputElement;
+        if (lastInput) {
+          lastInput.focus();
+        }
+      }, 50);
+      return;
+    }
+
+    const newId = `sub-temp-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
     const newSub = {
-      id: `sub-temp-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      title: newSubtaskTitle.trim(),
+      id: newId,
+      title: '',
     };
     setSubtasks([...subtasks, newSub]);
-    setNewSubtaskTitle('');
-    // Scroll to bottom after the new row renders
+
+    // Focus the newly added subtask input
     setTimeout(() => {
+      const inputs = document.querySelectorAll('.subtask-input');
+      const lastInput = inputs[inputs.length - 1] as HTMLInputElement;
+      if (lastInput) {
+        lastInput.focus();
+      }
       subtaskScrollRef.current?.scrollTo({
         top: subtaskScrollRef.current.scrollHeight,
         behavior: 'smooth'
       });
-    }, 100);
+    }, 50);
   };
 
   const handleDeleteSubtask = (subId: string) => {
@@ -497,15 +523,17 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
     if (e) e.preventDefault();
     if (!title.trim()) return;
 
-    const finalSubtasks: Subtask[] = subtasks.map((sub) => {
-      // Retain existing completion status if editing, else default to false
-      const existing = activeEditTask?.subtasks.find((s) => s.id === sub.id);
-      return {
-        id: sub.id,
-        title: sub.title.trim() || 'Untitled Subtask',
-        completed: existing ? existing.completed : false,
-      };
-    });
+    const finalSubtasks: Subtask[] = subtasks
+      .filter((sub) => sub.title.trim() !== '')
+      .map((sub) => {
+        // Retain existing completion status if editing, else default to false
+        const existing = activeEditTask?.subtasks.find((s) => s.id === sub.id);
+        return {
+          id: sub.id,
+          title: sub.title.trim(),
+          completed: existing ? existing.completed : false,
+        };
+      });
 
     let finalTime: string;
     if (activeMode === 'edit' && activeEditTask) {
@@ -636,9 +664,27 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
                 </svg>
               </button>
 
-              <span className={`text-base font-semibold truncate ${title.trim() ? 'text-[#202124]' : 'text-gray-400'}`}>
-                {title.trim() || (activeMode === 'edit' ? 'Edit task' : 'New task')}
-              </span>
+              <input
+                ref={inputRef}
+                type="text"
+                required
+                placeholder="Task title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                  }
+                }}
+                className="flex-1 bg-transparent text-[#202124] placeholder-gray-400 focus:outline-none py-1 truncate"
+                style={{
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  border: 'none',
+                  outline: 'none',
+                  boxShadow: 'none',
+                }}
+              />
             </div>
 
             <button
@@ -653,24 +699,6 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
               Save
             </button>
           </div>
-        </div>
-
-        {/* FIXED: Title input — never moves */}
-        <div style={{ flexShrink: 0 }} className="px-6 pb-2">
-          <input
-            ref={inputRef}
-            type="text"
-            required
-            placeholder="Task Title (e.g. Weekly Sync)"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-              }
-            }}
-            className="w-full bg-transparent text-xl font-medium text-gray-900 border-b border-gray-200 focus:border-blue-600 focus:outline-none py-1 transition-all placeholder-gray-400"
-          />
         </div>
 
         {/* SCROLLABLE: Subtasks area — this is the ONLY part that scrolls */}
@@ -708,6 +736,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
                         setSubtasks(updated);
                       }}
                       onRemove={() => handleDeleteSubtask(sub.id)}
+                      onEnterPressed={handleAddEmptySubtask}
                     />
                   ))}
                 </div>
@@ -715,24 +744,16 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
             </DndContext>
           )}
 
-          {/* Add subtask button / Mini-input */}
+          {/* Add subtask button */}
           {subtasks.length < 50 && (
-            <div className="flex items-center space-x-2 border-b border-gray-150 py-1 pl-1 mt-2">
-              <Plus size={14} className="text-gray-400" />
-              <input
-                type="text"
-                placeholder="Add subtask..."
-                value={newSubtaskTitle}
-                onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddNewSubtaskInline();
-                  }
-                }}
-                className="flex-1 bg-transparent text-sm text-gray-800 placeholder-gray-400 focus:outline-none"
-              />
-            </div>
+            <button
+              type="button"
+              onClick={handleAddEmptySubtask}
+              className="flex items-center space-x-2 py-1.5 pl-1 mt-2 text-sm text-gray-400 hover:text-gray-600 w-full text-left focus:outline-none"
+            >
+              <Plus size={14} className="text-gray-400 flex-shrink-0" />
+              <span>Add subtask...</span>
+            </button>
           )}
         </div>
 
