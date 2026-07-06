@@ -56,6 +56,11 @@ const SortableSubtask = React.memo<SortableSubtaskProps>(({ id, value, onChange,
         onChange={e => onChange(e.target.value)}
         onClick={e => e.stopPropagation()}
         onPointerDown={e => e.stopPropagation()}
+        onFocus={(e) => {
+          setTimeout(() => {
+            e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          }, 300); // wait for keyboard to open
+        }}
         placeholder="Subtask"
         className="flex-1 text-sm text-[#202124] placeholder-[#BDC1C6] border-0 border-b border-[#F1F3F4] pb-1 focus:outline-none focus:border-[#1A73E8] bg-transparent cursor-text"
       />
@@ -336,6 +341,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
   );
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const subtaskScrollRef = useRef<HTMLDivElement>(null);
 
   // Animate sheet sliding in on mount
   useEffect(() => {
@@ -356,7 +362,6 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
         setDate(activeEditTask.date || '');
         setTime(activeEditTask.time || '');
         setSubtasks((activeEditTask.subtasks || []).map(({ id, title }) => ({ id, title })));
-        addDebug(`EDIT LOADED: time=${activeEditTask.time}`);
       } else {
         // Create mode
         setTitle(prefilledTitle || '');
@@ -407,33 +412,47 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
     };
     setSubtasks([...subtasks, newSub]);
     setNewSubtaskTitle('');
+    // Scroll to bottom after the new row renders
+    setTimeout(() => {
+      subtaskScrollRef.current?.scrollTo({
+        top: subtaskScrollRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }, 100);
   };
 
   const handleDeleteSubtask = (subId: string) => {
     setSubtasks(subtasks.filter((sub) => sub.id !== subId));
   };
 
-  const addDebug = (msg: string) => {
-    if (typeof window !== 'undefined' && (window as any).addDebug) {
-      (window as any).addDebug(msg);
-    } else {
-      console.log("DEBUG:", msg);
-    }
-  };
-
   const getDefaultTime = (): string => {
-    const now = new Date();
-    const m = Math.round(now.getMinutes() / 15) * 15;
-    const d = new Date(now);
-    if (m >= 60) {
-      d.setHours(d.getHours() + 1);
-      d.setMinutes(0);
-    } else {
-      d.setMinutes(m);
+    const allTasks = useTaskStore.getState().tasks;
+    const targetDate = date || formatDate(new Date());
+    const sameDayTasks = allTasks.filter((t) => t.date === targetDate);
+
+    if (sameDayTasks.length === 0) {
+      // First task of the day — use current time snapped to 15 min
+      const now = new Date();
+      const m = Math.round(now.getMinutes() / 15) * 15;
+      const d = new Date(now);
+      if (m >= 60) {
+        d.setHours(d.getHours() + 1);
+        d.setMinutes(0);
+      } else {
+        d.setMinutes(m);
+      }
+      return formatTime(d);
     }
-    const result = formatTime(d);
-    addDebug(`getDefaultTime = ${result} (current time)`);
-    return result;
+
+    // Find the latest task time on this day, place new one 60 min below
+    const latestMins = sameDayTasks.reduce((max, t) => {
+      const [h, mm] = (t.time || '00:00').split(':').map(Number);
+      return Math.max(max, h * 60 + mm);
+    }, 0);
+    const newMins = Math.min(latestMins + 60, 23 * 60 + 30);
+    const h = Math.floor(newMins / 60).toString().padStart(2, '0');
+    const m2 = (newMins % 60).toString().padStart(2, '0');
+    return `${h}:${m2}`;
   };
 
   const handleSaveSubmit = (e?: React.FormEvent) => {
@@ -454,11 +473,9 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
     if (activeMode === 'edit' && activeEditTask) {
       // EDIT MODE: keep the existing time unless user changed it
       finalTime = time.trim() || activeEditTask.time || getDefaultTime();
-      addDebug(`EDIT SAVE: keeping time=${finalTime} (was ${activeEditTask.time})`);
     } else {
       // CREATE MODE: use selected time, or default to creation time
       finalTime = time.trim() || getDefaultTime();
-      addDebug(`CREATE SAVE: time=${finalTime}`);
     }
 
     const taskPayload = {
@@ -710,6 +727,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
 
         {/* SCROLLABLE: Subtasks area — this is the ONLY part that scrolls */}
         <div 
+          ref={subtaskScrollRef}
           style={{
             flex: 1,
             minHeight: 0, // CRITICAL for Android flex scrolling

@@ -49,13 +49,7 @@ import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } 
 import { CSS } from '@dnd-kit/utilities';
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
 
-const addDebug = (msg: string) => {
-  console.log("DEBUG:", msg);
-  window.dispatchEvent(new CustomEvent('app-debug', { detail: msg }));
-};
-if (typeof window !== 'undefined') {
-  (window as any).addDebug = addDebug;
-}
+
 
 
 const useLongPress = (callback: (time: string) => void, delay = 600) => {
@@ -1579,11 +1573,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
     setEditTitle(task.title)
   }, [task.title])
 
-  useEffect(() => {
-    const widthStr = style?.width || 'unknown';
-    const leftStr = style?.left || 'unknown';
-    addDebug(`CARD ${task.title.slice(0, 6)}: width=${widthStr} left=${leftStr}`);
-  }, [task.title, style?.width, style?.left]);
+
 
   useEffect(() => {
     return () => {
@@ -1603,10 +1593,8 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
     if (moved.current) return;
     tapCount.current += 1;
     clearTimeout(tapTimer.current);
-    addDebug(`tap=${tapCount.current} title=${isTitle}`);
     if (tapCount.current >= 3) {
       tapCount.current = 0;
-      addDebug(`DELETE ${task.title}`);
       if (navigator.vibrate) {
         navigator.vibrate([30, 40, 30]);
       }
@@ -1615,7 +1603,6 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
     }
     tapTimer.current = setTimeout(() => {
       if (tapCount.current === 1 && isTitle) {
-        addDebug(`EDIT ${task.title}`);
         onEditOpen(task);
       }
       tapCount.current = 0;
@@ -2137,16 +2124,7 @@ const DayView: React.FC<DayViewProps> = ({
   expandedTaskId,
   setExpandedTaskId,
 }) => {
-  const [debugLog, setDebugLog] = useState<string[]>([]);
-  useEffect(() => {
-    const handleDebug = (e: any) => {
-      setDebugLog(prev => [...prev.slice(-4), `${new Date().toLocaleTimeString()}: ${e.detail}`]);
-    };
-    window.addEventListener('app-debug', handleDebug);
-    return () => {
-      window.removeEventListener('app-debug', handleDebug);
-    };
-  }, []);
+
 
   const hours = Array.from({ length: 24 }, (_, i) => i);
   const isTodayDay = isToday(activeDate);
@@ -2376,24 +2354,7 @@ const DayView: React.FC<DayViewProps> = ({
 
   return (
     <div className="h-full w-full overflow-hidden bg-white">
-      {/* TEMPORARY DEBUG PANEL */}
-      <div style={{
-        position: 'fixed',
-        top: '4px',
-        left: '4px',
-        right: '4px',
-        background: 'rgba(0,0,0,0.85)',
-        color: '#0f0',
-        fontSize: '9px',
-        fontFamily: 'monospace',
-        padding: '4px',
-        zIndex: 99999,
-        borderRadius: '4px',
-        maxHeight: '60px',
-        overflow: 'auto',
-      }}>
-        {debugLog.map((line, i) => <div key={i}>{line}</div>)}
-      </div>
+
 
       <div className="flex-1 flex flex-col h-full bg-white overflow-hidden select-none">
       {/* Pending Task Viewer (GCAL Style) */}
