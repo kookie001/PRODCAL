@@ -1512,29 +1512,52 @@ const SortableSubtaskRow = React.memo(({
       {/* RIGHT: completion circle */}
       <button
         onPointerDown={(e) => e.stopPropagation()}
-        onTouchEnd={(e) => { e.stopPropagation(); onToggle(index) }}
-        onClick={(e) => { e.stopPropagation(); onToggle(index) }}
+        onTouchStart={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          onToggle(index);
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle(index);
+        }}
         style={{
-          width: '12px',
-          height: '12px',
-          minWidth: '12px',
-          minHeight: '12px',
-          maxWidth: '12px',
-          maxHeight: '12px',
-          borderRadius: '50%',
-          border: '1.2px solid #2563eb',
-          background: sub.completed ? '#2563eb' : 'transparent',
-          padding: 0,
-          margin: 0,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          width: '40px',
+          height: '40px',
+          minWidth: '40px',
+          padding: 0,
+          margin: '-14px',
+          background: 'transparent',
+          border: 'none',
           cursor: 'pointer',
           flexShrink: 0,
           alignSelf: 'center',
-          boxSizing: 'border-box',
+          touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent',
         }}
       >
+        <span style={{
+          width: '12px',
+          height: '12px',
+          borderRadius: '50%',
+          border: '1.2px solid #2563eb',
+          background: sub.completed ? '#2563eb' : 'transparent',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxSizing: 'border-box',
+        }}>
+          {sub.completed && (
+            <svg width="7" height="7" viewBox="0 0 9 9" fill="none">
+              <path d="M1.5 4.5L3.5 6.5L7.5 2.5" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          )}
+        </span>
       </button>
 
     </div>
@@ -1913,7 +1936,10 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         )}
 
         {/* RIGHT: task completion circle — small, right aligned */}
-        <motion.button
+        <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
           onTouchEnd={(e) => {
             lastTouchTime.current = Date.now()
             e.stopPropagation()
@@ -1925,25 +1951,24 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
             e.stopPropagation()
             toggleTaskComplete(task.id)
           }}
-          whileTap={{ scale: 0.8 }}
-          transition={{ type: "spring", stiffness: 500, damping: 15 }}
           style={{
-            width: '44px',
-            height: '44px',
-            minWidth: '44px',
-            marginLeft: '-14px',
-            marginRight: '-14px',
-            background: 'transparent',
-            border: 'none',
-            padding: 0,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            width: '40px',
+            height: '40px',
+            minWidth: '40px',
+            padding: 0,
+            margin: '-12px',
+            background: 'transparent',
+            border: 'none',
             cursor: 'pointer',
             flexShrink: 0,
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
           }}
         >
-          <div style={{
+          <span style={{
             width: '16px',
             height: '16px',
             borderRadius: '50%',
@@ -1958,8 +1983,8 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
                 <path d="M1.5 4.5L3.5 6.5L7.5 2.5" stroke={completed ? '#9CA3AF' : '#1E40AF'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             )}
-          </div>
-        </motion.button>
+          </span>
+        </button>
 
       </div>
 
