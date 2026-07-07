@@ -1974,17 +1974,17 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
           <span style={{
             width: '16px',
             height: '16px',
+            minWidth: '16px',
             borderRadius: '50%',
-            border: completed ? 'none' : `2px solid ${fg}`,
-            background: completed ? '#FFFFFF' : 'transparent',
+            border: `2px solid ${fg}`,
+            background: completed ? fg : 'transparent',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            transition: 'all 100ms ease',
           }}>
             {completed && (
-              <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
-                <path d="M1.5 4.5L3.5 6.5L7.5 2.5" stroke={completed ? '#9CA3AF' : '#1E40AF'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <Check size={10} className="text-white" style={{ strokeWidth: 3 }} />
             )}
           </span>
         </button>
@@ -2158,6 +2158,8 @@ const DayView: React.FC<DayViewProps> = ({
   const isTodayDay = isToday(activeDate);
   const setTasksOverlayOpen = useTaskStore((state) => state.setTasksOverlayOpen);
   const isTasksOverlayOpen = useTaskStore((state) => state.isTasksOverlayOpen);
+  const allTasks = useTaskStore((state) => state.tasks);
+  const pendingCount = allTasks.filter((task) => !task.completed).length;
 
   const reorderSubtasks = useTaskStore((state) => state.reorderSubtasks);
   const toggleSubtask = useTaskStore((state) => state.toggleSubtask);
@@ -2394,9 +2396,21 @@ const DayView: React.FC<DayViewProps> = ({
               onClick={() => setTasksOverlayOpen(true)}
               className="flex items-center h-10 px-3 cursor-pointer hover:bg-gray-50/70 transition-colors"
             >
-              <div className="flex items-center space-x-2">
-                <span className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-                  Pending Tasks
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 800, letterSpacing: '0.05em', color: '#202124' }}>
+                  PENDING TASKS
+                </span>
+                <span style={{
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  color: '#1A73E8',
+                  backgroundColor: '#E8F0FE',
+                  borderRadius: '12px',
+                  padding: '2px 10px',
+                  minWidth: '28px',
+                  textAlign: 'center',
+                }}>
+                  {pendingCount}
                 </span>
               </div>
             </div>

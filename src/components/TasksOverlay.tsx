@@ -96,11 +96,24 @@ const TaskItemRow = React.memo(({
           e.stopPropagation();
           updateTask(task.id, { completed: !task.completed });
         }}
-        className={`ml-3 w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 active:scale-95 transition-transform duration-100 cursor-pointer ${
-          task.completed ? 'bg-[#1A73E8] border-[#1A73E8]' : 'border-[#DADCE0] bg-white'
-        }`}
+        className="ml-3 w-10 h-10 rounded-full flex items-center justify-center shrink-0 active:scale-95 transition-transform duration-100 cursor-pointer"
       >
-        {task.completed && <Check size={12} className="text-white" />}
+        <span style={{
+          width: '16px',
+          height: '16px',
+          minWidth: '16px',
+          borderRadius: '50%',
+          border: task.completed ? '2px solid #1A73E8' : '2px solid #DADCE0',
+          background: task.completed ? '#1A73E8' : '#FFFFFF',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'all 100ms ease',
+        }}>
+          {task.completed && (
+            <Check size={10} className="text-white" style={{ strokeWidth: 3 }} />
+          )}
+        </span>
       </button>
     </div>
   );
