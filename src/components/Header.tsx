@@ -16,6 +16,7 @@ import {
   Search,
   Calendar,
   ListTodo,
+  X,
 } from 'lucide-react';
 import { useTaskStore } from '../store';
 import { MiniCalendar } from './MiniCalendar';
@@ -131,8 +132,8 @@ export const Header: React.FC<HeaderProps> = ({
     <div className="relative flex flex-col bg-white border-b border-gray-150 select-none z-30">
       <div className="flex items-center justify-between px-3 h-14">
         
-        {/* Left Side: Hamburger Menu & Date Toggler with Search icon next to it */}
-        <div className="flex items-center space-x-1 min-w-0 flex-1">
+        {/* Left Side: Hamburger Menu & Today's Date formatted as "MMMM d" */}
+        <div className="flex items-center space-x-2 min-w-0 flex-shrink-0">
           <button
             onClick={onToggleSidebar}
             className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition-colors cursor-pointer flex-shrink-0"
@@ -141,87 +142,114 @@ export const Header: React.FC<HeaderProps> = ({
             <Menu size={20} />
           </button>
 
-          {/* Month/Year selector */}
-          <div className="flex items-center min-w-0">
+          {/* Today's date text (e.g. "July 7") without dropdown chevron */}
+          <span className="text-xl font-medium text-gray-900 select-none px-1 flex-shrink-0">
+            {format(new Date(), 'MMMM d')}
+          </span>
+        </div>
+
+        {/* Center/Right Side: Actual wide search bar taking remaining width */}
+        <div className="flex-1 ml-4 mr-1 max-w-md md:max-w-lg relative flex items-center bg-gray-100 hover:bg-gray-150 focus-within:bg-white focus-within:ring-1 focus-within:ring-blue-600 focus-within:shadow-sm rounded-full h-9.5 px-3.5 transition-all">
+          <Search size={16} className="text-gray-500 mr-2 flex-shrink-0" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search tasks"
+            className="w-full bg-transparent border-none outline-none text-sm text-gray-800 placeholder-gray-400 py-1"
+          />
+          {searchQuery && (
             <button
-              onClick={() => setIsMiniCalendarOpen(!isMiniCalendarOpen)}
-              className="flex items-center px-2 py-1.5 hover:bg-gray-100/70 rounded-xl transition-all cursor-pointer min-w-0"
-              title="Toggle mini calendar"
+              onClick={() => setSearchQuery('')}
+              className="p-1 hover:bg-gray-200 rounded-full text-gray-500 transition-colors cursor-pointer ml-1"
+              title="Clear search"
             >
-              <span className="text-xl font-medium text-gray-900 truncate tracking-normal leading-none">
-                {getHeaderDateLabel()}
-              </span>
-              <ChevronDown size={14} className={`text-gray-500 ml-1 transition-transform flex-shrink-0 ${isMiniCalendarOpen ? 'rotate-180' : ''}`} />
+              <X size={14} />
             </button>
-          </div>
-
-          {/* Search Toggle (immediately after month title) */}
-          <button
-            onClick={onSearchClick}
-            className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 cursor-pointer transition-colors flex-shrink-0 ml-1"
-            title="Search tasks"
-          >
-            <Search size={18} />
-          </button>
+          )}
         </div>
 
-        {/* Right Side: Quick navigation actions, utility count and user avatar */}
-        <div className="flex items-center space-x-0.5 flex-shrink-0">
-          
-          {/* 1. Prev & Next buttons */}
-          <button
-            onClick={handlePrev}
-            className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 cursor-pointer transition-colors"
-            title="Previous"
-          >
-            <ChevronLeft size={18} />
-          </button>
-
-          <button
-            onClick={handleNext}
-            className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 cursor-pointer transition-colors"
-            title="Next"
-          >
-            <ChevronRight size={18} />
-          </button>
-
-          {/* 2. Today Dynamic Calendar Icon */}
-          <button
-            onClick={handleToday}
-            className="p-1.5 hover:bg-[#E8F0FE] rounded-full text-gray-700 relative flex items-center justify-center transition-colors cursor-pointer"
-            title="Today"
-          >
-            <div className="relative w-5.5 h-5.5 border-2 border-gray-700 rounded-md flex flex-col overflow-hidden items-center">
-              <div className="bg-[#1A73E8] w-full h-1.5 flex-shrink-0" />
-              <span className="text-[9px] font-extrabold text-gray-800 leading-none mt-0.5 select-none">{todayDay}</span>
+        {/* HIDDEN 2026-07-07 — removed from header per request, keep for future re-enable */}
+        {false && (
+          <div className="hidden-header-elements-debug">
+            {/* Original Month/Year selector with chevron */}
+            <div className="flex items-center min-w-0">
+              <button
+                onClick={() => setIsMiniCalendarOpen(!isMiniCalendarOpen)}
+                className="flex items-center px-2 py-1.5 hover:bg-gray-100/70 rounded-xl transition-all cursor-pointer min-w-0"
+                title="Toggle mini calendar"
+              >
+                <span className="text-xl font-medium text-gray-900 truncate tracking-normal leading-none">
+                  {getHeaderDateLabel()}
+                </span>
+                <ChevronDown size={14} className={`text-gray-500 ml-1 transition-transform flex-shrink-0 ${isMiniCalendarOpen ? 'rotate-180' : ''}`} />
+              </button>
             </div>
-          </button>
 
-          {/* 3. Task Count Check Utility button */}
-          <button
-            onClick={() => setTasksOverlayOpen(true)}
-            className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 cursor-pointer transition-colors relative"
-            title="View pending tasks"
-          >
-            <ListTodo size={18} />
-            {(pendingToday.length + pendingOverdue.length) > 0 && (
-              <span className="absolute top-1 right-1 bg-red-500 text-white rounded-full text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center scale-90">
-                {pendingToday.length + pendingOverdue.length}
-              </span>
+            {/* Original Search Toggle */}
+            <button
+              onClick={onSearchClick}
+              className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 cursor-pointer transition-colors flex-shrink-0 ml-1"
+              title="Search tasks"
+            >
+              <Search size={18} />
+            </button>
+
+            {/* Original Right Side: Prev & Next, Today, and Task Count Badge */}
+            <div className="flex items-center space-x-0.5 flex-shrink-0">
+              <button
+                onClick={handlePrev}
+                className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 cursor-pointer transition-colors"
+                title="Previous"
+              >
+                <ChevronLeft size={18} />
+              </button>
+
+              <button
+                onClick={handleNext}
+                className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 cursor-pointer transition-colors"
+                title="Next"
+              >
+                <ChevronRight size={18} />
+              </button>
+
+              <button
+                onClick={handleToday}
+                className="p-1.5 hover:bg-[#E8F0FE] rounded-full text-gray-700 relative flex items-center justify-center transition-colors cursor-pointer"
+                title="Today"
+              >
+                <div className="relative w-5.5 h-5.5 border-2 border-gray-700 rounded-md flex flex-col overflow-hidden items-center">
+                  <div className="bg-[#1A73E8] w-full h-1.5 flex-shrink-0" />
+                  <span className="text-[9px] font-extrabold text-gray-800 leading-none mt-0.5 select-none">{todayDay}</span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setTasksOverlayOpen(true)}
+                className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 cursor-pointer transition-colors relative"
+                title="View pending tasks"
+              >
+                <ListTodo size={18} />
+                {(pendingToday.length + pendingOverdue.length) > 0 && (
+                  <span className="absolute top-1 right-1 bg-red-500 text-white rounded-full text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center scale-90">
+                    {pendingToday.length + pendingOverdue.length}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Mini calendar dropdown */}
+            {isMiniCalendarOpen && (
+              <div 
+                ref={calendarDropdownRef}
+                className="absolute left-1/2 -translate-x-1/2 top-14 w-full max-w-[340px] bg-white border border-gray-150 rounded-b-2xl shadow-xl p-3 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+              >
+                <MiniCalendar />
+              </div>
             )}
-          </button>
-        </div>
+          </div>
+        )}
       </div>
-
-      {/* Mini calendar dropdown below Header bar */}
-      {isMiniCalendarOpen && (
-        <div 
-          ref={calendarDropdownRef}
-          className="absolute left-1/2 -translate-x-1/2 top-14 w-full max-w-[340px] bg-white border border-gray-150 rounded-b-2xl shadow-xl p-3 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
-        >
-          <MiniCalendar />
-        </div>
-      )}
     </div>
   );
 };

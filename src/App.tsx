@@ -119,7 +119,8 @@ export default function App() {
         
         {/* Header Bar or Search Overlay */}
         <AnimatePresence mode="wait">
-          {isSearchActive ? (
+          {/* HIDDEN 2026-07-07 — removed from header per request, keep for future re-enable */}
+          {false ? (
             <motion.div
               initial={{ y: -10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -185,26 +186,29 @@ export default function App() {
             <CategoryTabBar />
             <CalendarViews searchQuery={searchQuery} />
           </motion.main>
-
-          {/* Floating "+" FAB */}
-          {!isTasksOverlayOpen && !isSidebarOpen && (selectedView === 'schedule' || selectedView === 'day' || selectedView === 'week' || selectedView === 'month' || selectedView === '3day') ? (
-            <div className="absolute bottom-20 right-4 z-30">
-              <motion.button
-                whileHover={{ scale: 1.08 }}
-                whileTap={{ scale: 0.94 }}
-                onClick={() => setFABOpen(true)}
-                className="w-14 h-14 bg-[#E8F0FE] hover:opacity-90 rounded-[16px] shadow-lg hover:shadow-xl flex items-center justify-center transition-all cursor-pointer group relative overflow-hidden"
-                title="Create Task"
-              >
-                <Ripple color="rgba(0, 0, 0, 0.08)" />
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="relative z-10 scale-125 transition-transform duration-300 group-hover:rotate-90">
-                  <path d="M5 12h14" stroke="#1A73E8" strokeWidth="4" strokeLinecap="round" />
-                  <path d="M12 5v14" stroke="#1A73E8" strokeWidth="4" strokeLinecap="round" />
-                </svg>
-              </motion.button>
-            </div>
-          ) : null}
         </div>
+
+        {/* Floating "+" FAB (always on top of timeline/cards with zIndex: 900) */}
+        {!isTasksOverlayOpen && !isSidebarOpen && (selectedView === 'schedule' || selectedView === 'day' || selectedView === 'week' || selectedView === 'month' || selectedView === '3day') ? (
+          <div 
+            className="absolute bottom-20 right-4"
+            style={{ zIndex: 900 }}
+          >
+            <motion.button
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.94 }}
+              onClick={() => setFABOpen(true)}
+              className="w-14 h-14 bg-[#E8F0FE] hover:opacity-90 rounded-[16px] shadow-lg hover:shadow-xl flex items-center justify-center transition-all cursor-pointer group relative overflow-hidden"
+              title="Create Task"
+            >
+              <Ripple color="rgba(0, 0, 0, 0.08)" />
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="relative z-10 scale-125 transition-transform duration-300 group-hover:rotate-90">
+                <path d="M5 12h14" stroke="#1A73E8" strokeWidth="4" strokeLinecap="round" />
+                <path d="M12 5v14" stroke="#1A73E8" strokeWidth="4" strokeLinecap="round" />
+              </svg>
+            </motion.button>
+          </div>
+        ) : null}
 
          {/* Material 3 Undo Snackbar */}
         <AnimatePresence>

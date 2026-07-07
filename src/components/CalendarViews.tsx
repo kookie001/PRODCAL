@@ -169,8 +169,9 @@ export const CalendarViews: React.FC<CalendarViewsProps> = ({ searchQuery }) => 
     setTempTimeStr(null);
   };
 
-  // Filter tasks by category and search query
+  // Filter tasks by category and search query, and exclude completed tasks from timeline
   const filteredTasks = tasks.filter((task) => {
+    if (task.completed) return false;
     const matchesCategory = selectedCategory === 'All' || task.category === selectedCategory;
     const matchesQuery = searchQuery.trim() === '' || 
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -2387,26 +2388,16 @@ const DayView: React.FC<DayViewProps> = ({
       <div className="flex-1 flex flex-col h-full bg-white overflow-hidden select-none">
       {/* Pending Task Viewer (GCAL Style) */}
       {(() => {
-        const allPendingTasks = tasks.filter((task) => !task.completed);
         return (
           <div className="bg-white border-b border-gray-150 flex flex-col flex-shrink-0 select-none">
             <div 
               onClick={() => setTasksOverlayOpen(true)}
-              className="flex items-center h-10 px-3 justify-between cursor-pointer hover:bg-gray-50/70 transition-colors"
+              className="flex items-center h-10 px-3 cursor-pointer hover:bg-gray-50/70 transition-colors"
             >
               <div className="flex items-center space-x-2">
                 <span className="text-xs font-bold text-gray-900 uppercase tracking-wider">
                   Pending Tasks
                 </span>
-                {allPendingTasks.length > 0 && (
-                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded-full font-mono text-[9px] font-extrabold">
-                    {allPendingTasks.length}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center space-x-1 text-xs text-blue-600 font-bold">
-                <span>Open Tasks List</span>
-                <ChevronRight size={13} className="stroke-[2.5px]" />
               </div>
             </div>
           </div>

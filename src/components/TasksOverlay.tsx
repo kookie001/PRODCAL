@@ -133,7 +133,7 @@ export const TasksOverlay: React.FC = () => {
   };
 
   const [gcalTaskQuery, setGcalTaskQuery] = useState('');
-  const [isCompletedExpanded, setIsCompletedExpanded] = useState(false);
+  const [isCompletedExpanded, setIsCompletedExpanded] = useState(true);
   const [gcalExpandedTaskIds, setGcalExpandedTaskIds] = useState<string[]>([]);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
@@ -208,6 +208,15 @@ export const TasksOverlay: React.FC = () => {
 
   // Search filter
   const searchFiltered = sortedPending.filter((task) => {
+    if (!gcalTaskQuery) return true;
+    const q = gcalTaskQuery.toLowerCase();
+    const matchTitle = task.title.toLowerCase().includes(q);
+    const matchSubtasks = task.subtasks && task.subtasks.some(s => s.title.toLowerCase().includes(q));
+    return matchTitle || matchSubtasks;
+  });
+
+  // Completed search filter
+  const completedFiltered = completedTasks.filter((task) => {
     if (!gcalTaskQuery) return true;
     const q = gcalTaskQuery.toLowerCase();
     const matchTitle = task.title.toLowerCase().includes(q);
@@ -420,14 +429,14 @@ export const TasksOverlay: React.FC = () => {
             )}
 
             {/* Collapsible Completed Section */}
-            {completedTasks.length > 0 && !isMultiSelectMode && (
+            {completedFiltered.length > 0 && !isMultiSelectMode && (
               <div className="pt-4 border-t border-gray-150">
                 <button
                   type="button"
                   onClick={() => setIsCompletedExpanded(!isCompletedExpanded)}
                   className="flex items-center space-x-2 w-full text-left text-xs font-extrabold text-gray-500 hover:text-gray-800 transition-colors cursor-pointer select-none px-1 py-1"
                 >
-                  <span>Completed Tasks ({completedTasks.length})</span>
+                  <span>Completed Tasks ({completedFiltered.length})</span>
                   <ChevronDown 
                     size={14} 
                     className="stroke-[3px] transition-transform duration-150"
@@ -437,7 +446,7 @@ export const TasksOverlay: React.FC = () => {
 
                 {isCompletedExpanded && (
                   <div className="mt-3 divide-y divide-gray-100 bg-gray-50/50 rounded-2xl p-2.5 border border-gray-100">
-                    {completedTasks.map((task) => {
+                    {completedFiltered.map((task) => {
                       const cat = CATEGORIES.find((c) => c.id === task.category) || CATEGORIES[0];
                       return (
                         <div key={task.id} className="flex items-center justify-between py-2.5 px-2">

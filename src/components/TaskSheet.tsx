@@ -537,8 +537,8 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
 
     let finalTime: string;
     if (activeMode === 'edit' && activeEditTask) {
-      // EDIT MODE: keep the existing time unless user changed it
-      finalTime = time.trim() || activeEditTask.time || getDefaultTime();
+      // EDIT MODE: keep the existing time unless user changed it (keep original, never getDefaultTime)
+      finalTime = time.trim() || activeEditTask.time || '';
     } else {
       // CREATE MODE: use selected time, or default to creation time
       finalTime = time.trim() || getDefaultTime();
@@ -674,6 +674,9 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
+                    if (title.trim()) {
+                      handleSaveSubmit(); // Enter on title saves the whole task
+                    }
                   }
                 }}
                 className="flex-1 bg-transparent text-[#202124] placeholder-gray-400 focus:outline-none py-1 truncate"
@@ -715,11 +718,6 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
           }}
           className="scroll-container border-t border-gray-100"
         >
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2 flex items-center space-x-1.5">
-            <Plus size={13} className="text-blue-500" />
-            <span>Subtasks ({subtasks.length}/50)</span>
-          </p>
-
           {/* Subtask list — dnd-kit sortable */}
           {subtasks.length > 0 && (
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

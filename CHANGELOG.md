@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-07-07]
+- **Task Title Enter-to-Save**: Changed the onKeyDown behavior on the Task Title input in the task sheet. Pressing 'Enter' while focused on the Title now saves the task immediately (identical to clicking the Save button) rather than jumping to/creating a subtask. Subtasks can now be added by clicking the "+ Add subtask" button, and pressing Enter in a subtask continues to add/focus the next subtask as before.
+- **Fixed Task Position & Time Edit Stability**: Fixed a bug where opening a task for editing or changing its title caused its timeline position/time to jump. The Task Sheet now correctly loads the existing task's time and date, and never calls `getDefaultTime` in edit mode, completely preventing any unintended timeline movement when opening, saving, or closing the edit sheet.
+- **Pending Tasks Bar Simplification**: Removed the pending task count circular number badge and the "Open Tasks List" text/chevron button from the Pending Tasks bar above the timeline. Access to the Pending Tasks list screen remains fully functional and intuitive by clicking anywhere on the "Pending Tasks" label bar.
+- **Timeline Filtering for Completed Tasks**: Configured the calendar and timeline view to immediately remove tasks once they are marked complete, keeping the daily and weekly schedule strictly focused on outstanding items.
+- **Completed Tasks List in Pending Overlay**: Enabled a dedicated, persistent "Completed Tasks" list in the Pending Tasks overlay screen that aggregates all completed tasks, styled with checked circles, strikethrough text, and muted colors. Tapping the completed circle immediately restores the task back onto the calendar/timeline.
+- **FAB Z-Index Stacking Correction**: Raised the floating "+" FAB container's z-index to 900 and positioned it directly at the root mobile viewport level. This prevents it from getting trapped in lower sibling stacking contexts, ensuring it is always clickable above all timeline items and task cards on every mobile/desktop screen while still layer-recessed below open modals or sheets.
+- **Header Simplification**: Simplified the main app header to show only the ☰ Hamburger menu button, today's date formatted as a short string (e.g. "July 7"), and a wide search input field bar with a clear button.
+- **Header Buttons Preserved**: Commented out and preserved the navigation buttons, calendar-jump button, and task count indicator badge under a clearly labeled disabled block (`{false && ...}`) for easy future re-enablement.
+- **Built-in Search**: Integrated the search input bar directly into the Header component, connected it directly to the existing search query state, which automatically filters the timeline tasks and subtasks.
+- **Subtasks Header Label Removed**: Removed the "+ SUBTASKS (0/50)" label row from the TaskSheet to free up more vertical space for subtask list rendering.
+- **Task Title Enter to Subtask Focus**: Configured the Task Title input field's `onKeyDown` so that pressing Enter automatically adds/focuses the first empty subtask row, establishing a fluid title-to-subtask creation workflow.
+
 ## [2026-07-06]
 - **Task Title in Header**: Replaced separate task title row and "New task" text with a single header row containing the V (close) button, the live task title input field, and the Save button, saving significant vertical space.
 - **Subtask Auto-Save & Enter creation**: Configured subtasks to save live on every keystroke. Pressing Enter inside a subtask row automatically creates a new empty subtask row and focuses it. Completely empty subtask rows are automatically filtered out when saving the task.
