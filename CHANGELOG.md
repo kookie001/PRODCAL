@@ -1,6 +1,7 @@
 # Changelog
 
 ## [2026-07-07]
+- **Collapse task card to title-only while dragging, re-expand on drop**: Updated the `DraggableTaskBlock` component to dynamically collapse its subtask list while dragging. This provides a neat and uncluttered visual representation of the task block during displacement, which then automatically re-expands upon dropping.
 - **Match timeline completion circle color to task title**: Updated the visible completion circle's border/fill color on the timeline task card to use the `fg` variable so it dynamically matches the title text color (dark blue on active blue cards and muted grey on completed cards), while keeping the checkmark visible.
 - **Adjusted completion circle size**: Updated the visible completion circle in both the timeline task cards and the pending task list to 16px diameter, with custom background colors (blue-tinted for timeline, white for pending) to better match their respective cards.
 - **Match pending list circle to timeline circle size**: Updated the visible completion circle in the Pending Tasks list (`TaskItemRow`) to exactly match the timeline task card's completion circle size (24px visible diameter, 2px border, same checkmark) while maintaining the 40px tap target.
