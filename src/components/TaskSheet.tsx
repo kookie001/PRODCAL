@@ -809,7 +809,13 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
 
           {showCalendar && (
             <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50" onClick={() => setShowCalendar(false)}>
-              <div onClick={(e) => e.stopPropagation()}><CalendarPicker value={date} onChange={(d) => { setDate(d); setShowCalendar(false); }} /></div>
+              <div onClick={(e) => e.stopPropagation()}>
+                <CalendarPicker 
+                  value={date} 
+                  onChange={(d) => setDate(d)} 
+                  onClose={() => setShowCalendar(false)} 
+                />
+              </div>
             </div>
           )}
           {showClock && (

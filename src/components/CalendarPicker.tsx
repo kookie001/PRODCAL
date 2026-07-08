@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { motion } from 'motion/react';
+import { ChevronLeft, ChevronRight, Pencil, Calendar } from 'lucide-react';
 
 interface CalendarPickerProps {
   value: string;
   onChange: (date: string) => void;
+  onClose?: () => void;
 }
 
 const parseLocalDate = (dateStr: string): Date => {
@@ -19,8 +20,52 @@ const parseLocalDate = (dateStr: string): Date => {
   return new Date();
 };
 
-export const CalendarPicker: React.FC<CalendarPickerProps> = ({ value, onChange }) => {
-  const dateObj = value ? parseLocalDate(value) : new Date();
+const toManualFormat = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    return `${parts[1]}/${parts[2]}/${parts[0]}`; // MM/DD/YYYY
+  }
+  return '';
+};
+
+const fromManualFormat = (manualStr: string): string | null => {
+  const trimmed = manualStr.trim();
+  const parts = trimmed.split('/');
+  if (parts.length === 3) {
+    const m = parts[0].padStart(2, '0');
+    const d = parts[1].padStart(2, '0');
+    const y = parts[2];
+    if (y.length === 4 && !isNaN(parseInt(y)) && !isNaN(parseInt(m)) && !isNaN(parseInt(d))) {
+      return `${y}-${m}-${d}`;
+    }
+  }
+  return null;
+};
+
+const formatHeaderDate = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2], 10);
+    const date = new Date(y, m, d);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+  return '';
+};
+
+export const CalendarPicker: React.FC<CalendarPickerProps> = ({ value, onChange, onClose }) => {
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+  const [tempDate, setTempDate] = useState(value || todayStr);
+  const [isManualMode, setIsManualMode] = useState(false);
+  const [inputText, setInputText] = useState(toManualFormat(value || todayStr));
+  const [isValidInput, setIsValidInput] = useState(true);
+
+  const dateObj = parseLocalDate(tempDate);
   const [currentMonth, setCurrentMonth] = useState(dateObj.getMonth());
   const [currentYear, setCurrentYear] = useState(dateObj.getFullYear());
 
@@ -32,16 +77,51 @@ export const CalendarPicker: React.FC<CalendarPickerProps> = ({ value, onChange 
 
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-  const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-
   const handleDateClick = (day: number) => {
-    // Ensure we handle the date as local to avoid timezone shifts
     const newDate = new Date(currentYear, currentMonth, day);
     const yyyy = newDate.getFullYear();
     const mm = String(newDate.getMonth() + 1).padStart(2, '0');
     const dd = String(newDate.getDate()).padStart(2, '0');
-    onChange(`${yyyy}-${mm}-${dd}`);
+    const formatted = `${yyyy}-${mm}-${dd}`;
+    setTempDate(formatted);
+    setInputText(toManualFormat(formatted));
+    setIsValidInput(true);
+  };
+
+  const handleInputChange = (val: string) => {
+    setInputText(val);
+    const parsed = fromManualFormat(val);
+    if (parsed) {
+      const date = parseLocalDate(parsed);
+      const parts = parsed.split('-');
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      const d = parseInt(parts[2], 10);
+      
+      // Simple validity range checks
+      if (y >= 1900 && y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31 && !isNaN(date.getTime())) {
+        setTempDate(parsed);
+        setCurrentMonth(date.getMonth());
+        setCurrentYear(date.getFullYear());
+        setIsValidInput(true);
+        return;
+      }
+    }
+    setIsValidInput(false);
+  };
+
+  const handleCancel = () => {
+    if (onClose) {
+      onClose();
+    }
+  };
+
+  const handleOK = () => {
+    if (isManualMode && !isValidInput) return;
+    onChange(tempDate);
+    if (onClose) {
+      onClose();
+    }
   };
 
   return (
@@ -49,46 +129,116 @@ export const CalendarPicker: React.FC<CalendarPickerProps> = ({ value, onChange 
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       exit={{ scale: 0.9, opacity: 0 }}
-      className="bg-white rounded-[28px] p-6 w-full max-w-sm mx-auto shadow-xl border border-[#E8EAED]"
+      className="bg-[#EDF2FA] rounded-[28px] p-6 w-full max-w-[328px] mx-auto shadow-2xl border border-[#D3E3FD]/30"
     >
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-[#1F1F1F]">
-          {months[currentMonth]} {currentYear}
-        </h2>
-        <div className="flex gap-2">
-          <button type="button" onClick={() => {
-            if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(currentYear - 1); }
-            else { setCurrentMonth(currentMonth - 1); }
-          }} className="p-2 rounded-full hover:bg-[#F2F2F2]"><ChevronLeft size={20} className="text-[#444746]" /></button>
-          <button type="button" onClick={() => {
-            if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear(currentYear + 1); }
-            else { setCurrentMonth(currentMonth + 1); }
-          }} className="p-2 rounded-full hover:bg-[#F2F2F2]"><ChevronRight size={20} className="text-[#444746]" /></button>
+      {/* HEADER SECTION (Select Date & Display with Pencil Icon) */}
+      <div className="flex flex-col mb-4">
+        <span className="text-xs font-semibold text-[#444746] uppercase tracking-wider mb-2">Select Date</span>
+        <div className="flex justify-between items-center">
+          <span className="text-3xl font-medium text-[#1F1F1F]">
+            {formatHeaderDate(tempDate)}
+          </span>
+          <button 
+            type="button" 
+            onClick={() => {
+              setIsManualMode(!isManualMode);
+            }} 
+            className="p-2 rounded-full hover:bg-black/5 text-[#444746] transition-colors"
+          >
+            {isManualMode ? <Calendar size={22} /> : <Pencil size={22} />}
+          </button>
         </div>
       </div>
-      
-      <div className="grid grid-cols-7 gap-1 text-center text-sm font-medium text-[#747775] mb-2">
-        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => <div key={d}>{d}</div>)}
+
+      {/* BODY CONTENT (Calendar Grid or Manual Input Field) */}
+      <div className="min-h-[260px] bg-white rounded-2xl p-4 shadow-inner border border-gray-100 flex flex-col justify-between">
+        {!isManualMode ? (
+          <>
+            {/* Month dropdown/navigation */}
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-sm font-semibold text-[#444746]">
+                {months[currentMonth]} {currentYear}
+              </h2>
+              <div className="flex gap-1">
+                <button type="button" onClick={() => {
+                  if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(currentYear - 1); }
+                  else { setCurrentMonth(currentMonth - 1); }
+                }} className="p-1.5 rounded-full hover:bg-[#F2F2F2]"><ChevronLeft size={18} className="text-[#444746]" /></button>
+                <button type="button" onClick={() => {
+                  if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear(currentYear + 1); }
+                  else { setCurrentMonth(currentMonth + 1); }
+                }} className="p-1.5 rounded-full hover:bg-[#F2F2F2]"><ChevronRight size={18} className="text-[#444746]" /></button>
+              </div>
+            </div>
+
+            {/* Weekdays */}
+            <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-[#747775] mb-2">
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, idx) => <div key={idx}>{d}</div>)}
+            </div>
+
+            {/* Days grid */}
+            <div className="grid grid-cols-7 gap-1 flex-1">
+              {blanks.map(b => <div key={`blank-${b}`} />)}
+              {days.map(day => {
+                const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const isSelected = tempDate === dateStr;
+                const isToday = todayStr === dateStr;
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => handleDateClick(day)}
+                    className={`w-8 h-8 flex items-center justify-center rounded-full text-xs transition-all mx-auto
+                      ${isSelected ? 'bg-[#1A73E8] text-white font-semibold shadow-sm' : isToday ? 'bg-[#D3E3FD] text-[#1A73E8] font-semibold' : 'text-[#1F1F1F] hover:bg-[#F2F2F2]'}`}
+                  >
+                    {day}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-col justify-center flex-1 py-4">
+            <div className="relative my-4">
+              <input
+                type="text"
+                placeholder="MM/DD/YYYY"
+                value={inputText}
+                onChange={(e) => handleInputChange(e.target.value)}
+                className={`w-full px-4 py-4 rounded-lg border-2 bg-transparent text-[#1F1F1F] text-base focus:outline-none placeholder-gray-400 font-normal transition-all
+                  ${isValidInput ? 'border-[#1A73E8]' : 'border-red-500 focus:border-red-500'}`}
+                autoFocus
+              />
+              <span className={`absolute -top-2.5 left-3 bg-white px-1.5 text-xs font-semibold transition-all
+                ${isValidInput ? 'text-[#1A73E8]' : 'text-red-500'}`}
+              >
+                Date
+              </span>
+            </div>
+            {!isValidInput && (
+              <span className="text-xs text-red-500 mt-1 pl-1">Please enter a valid date (MM/DD/YYYY)</span>
+            )}
+          </div>
+        )}
       </div>
-      
-      <div className="grid grid-cols-7 gap-1">
-        {blanks.map(b => <div key={`blank-${b}`} />)}
-        {days.map(day => {
-          const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-          const isSelected = value === dateStr;
-          const isToday = todayStr === dateStr;
-          return (
-            <button
-              key={day}
-              type="button"
-              onClick={() => handleDateClick(day)}
-              className={`w-10 h-10 flex items-center justify-center rounded-full text-sm transition-all
-                ${isSelected ? 'bg-[#1A73E8] text-white font-semibold' : isToday ? 'bg-[#D3E3FD] text-[#1A73E8] font-semibold' : 'text-[#1F1F1F] hover:bg-[#F2F2F2]'}`}
-            >
-              {day}
-            </button>
-          );
-        })}
+
+      {/* FOOTER ACTIONS (Cancel & OK) */}
+      <div className="flex justify-end gap-4 mt-4">
+        <button 
+          type="button" 
+          onClick={handleCancel}
+          className="px-4 py-2 text-sm font-semibold text-[#1A73E8] hover:bg-[#D3E3FD]/20 rounded-full transition-colors"
+        >
+          Cancel
+        </button>
+        <button 
+          type="button" 
+          onClick={handleOK}
+          disabled={isManualMode && !isValidInput}
+          className="px-4 py-2 text-sm font-semibold text-[#1A73E8] hover:bg-[#D3E3FD]/20 rounded-full transition-colors disabled:opacity-50 disabled:pointer-events-none"
+        >
+          OK
+        </button>
       </div>
     </motion.div>
   );
