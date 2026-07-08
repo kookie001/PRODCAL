@@ -1,6 +1,9 @@
 # Changelog
 
 ## [2026-07-07]
+- **Refactor stage 1**: Extracted pure timeline helper functions (`timeToMinutes`, `minutesToTime`, `layoutTasks`) to `src/utils/timelineHelpers.ts` and `useLongPress` hook to `src/hooks/useLongPress.ts`.
+- **Fix chevron/subtasks after drag (reset drag flag)**: Fixed a bug where subtasks would remain hidden after dragging an expanded task card. Subtasks now correctly reappear because the drag flag is now a state that unconditionally resets on drag end.
+- **Raise delete toast z-index**: Set the delete toast `z-index` to 950 and used `position: fixed` to ensure it always appears above all task cards and avoids being covered.
 - **Collapse task card to title-only while dragging, re-expand on drop**: Updated the `DraggableTaskBlock` component to dynamically collapse its subtask list while dragging. This provides a neat and uncluttered visual representation of the task block during displacement, which then automatically re-expands upon dropping.
 - **Match timeline completion circle color to task title**: Updated the visible completion circle's border/fill color on the timeline task card to use the `fg` variable so it dynamically matches the title text color (dark blue on active blue cards and muted grey on completed cards), while keeping the checkmark visible.
 - **Adjusted completion circle size**: Updated the visible completion circle in both the timeline task cards and the pending task list to 16px diameter, with custom background colors (blue-tinted for timeline, white for pending) to better match their respective cards.

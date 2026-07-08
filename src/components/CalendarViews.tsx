@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
+import { 
   format,
   startOfMonth,
   endOfMonth,
@@ -16,6 +16,8 @@ import {
   addMonths,
   subMonths,
 } from 'date-fns';
+import { timeToMinutes, minutesToTime, layoutTasks } from '../utils/timelineHelpers';
+import { useLongPress } from '../hooks/useLongPress';
 import { 
   ChevronDown, 
   ChevronUp, 
@@ -52,33 +54,6 @@ import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifi
 
 
 
-const useLongPress = (callback: (time: string) => void, delay = 600) => {
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
-  const movedRef = useRef(false);
-
-  const start = (time: string) => (e: React.TouchEvent) => {
-    movedRef.current = false;
-    timerRef.current = setTimeout(() => {
-      if (!movedRef.current) {
-        if (typeof navigator !== 'undefined' && navigator.vibrate) {
-          navigator.vibrate(30);
-        }
-        callback(time);
-      }
-    }, delay);
-  };
-
-  const cancel = () => {
-    clearTimeout(timerRef.current);
-  };
-
-  const move = () => {
-    movedRef.current = true;
-    clearTimeout(timerRef.current);
-  };
-
-  return { start, cancel, move };
-};
 
 interface CalendarViewsProps {
   searchQuery: string;
@@ -1414,18 +1389,6 @@ const WeekView: React.FC<WeekViewProps> = ({
   );
 };
 
-// Helper functions for time conversion
-const timeToMinutes = (time: string): number => {
-  if (!time) return 0;
-  const [h, m] = time.split(':').map(Number);
-  return h * 60 + (m || 0);
-};
-
-const minutesToTime = (minutes: number): string => {
-  const h = Math.floor(minutes / 60).toString().padStart(2, '0');
-  const m = (minutes % 60).toString().padStart(2, '0');
-  return `${h}:${m}`;
-};
 
 const SortableSubtaskRow = React.memo(({
   sub, index, taskId, fgSub, onToggle
@@ -1580,7 +1543,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
   const [isEditing, setIsEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(task.title)
   const [isDraggingSubtask, setIsDraggingSubtask] = useState(false)
-  const [isDragging, setIsDragging] = useState(false)
+  const [isActivelyDragging, setIsActivelyDragging] = useState(false)
   const lastTap = useRef<number>(0)
   const tapTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const tapCount = useRef(0)
@@ -1689,7 +1652,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
     }
     dragging.current = false
     moved.current = false
-    setIsDragging(false)
+    setIsActivelyDragging(false)
   }
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -1715,7 +1678,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       if (Math.abs(dy) > 8 || Math.abs(dx) > 8) {
         if (!moved.current) {
           moved.current = true
-          setIsDragging(true)
+          setIsActivelyDragging(true)
         }
       }
       if (moved.current) {
@@ -1740,7 +1703,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       }
       dragging.current = false
       moved.current = false
-      setIsDragging(false)
+      setIsActivelyDragging(false)
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('mouseup', onMouseUp)
     }
@@ -1760,7 +1723,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       if (Math.abs(dy) > 8 || Math.abs(dx) > 8) {
         if (!moved.current) {
           moved.current = true
-          setIsDragging(true)
+          setIsActivelyDragging(true)
         }
         e.preventDefault()
       }
@@ -1805,7 +1768,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         borderRadius: '12px',
         border: borderStyle,
         minHeight: '44px',
-        overflow: (expanded && !isDragging) ? 'visible' : 'hidden',
+        overflow: (expanded && !isActivelyDragging) ? 'visible' : 'hidden',
         touchAction: 'none',
         userSelect: 'none',
         WebkitUserSelect: 'none',
@@ -1814,7 +1777,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
-        zIndex: (expanded && !isDragging) ? 200 : (dragging.current || isDragging) ? 250 : (style?.zIndex || 1),
+        zIndex: (expanded && !isActivelyDragging) ? 200 : (dragging.current || isActivelyDragging) ? 250 : (style?.zIndex || 1),
       }}
     >
       {/* MAIN ROW — always visible */}
@@ -1848,7 +1811,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
               minWidth: '44px',
               marginLeft: '-14px',
               marginRight: '-14px',
-              background: 'transparent',
+              background: isActivelyDragging ? 'red' : 'green',
               border: 'none',
               padding: 0,
               display: 'flex',
@@ -2001,7 +1964,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       </div>
 
       {/* SUBTASKS — expand below */}
-      {expanded && !isDragging && (
+      {expanded && !isActivelyDragging && (
         <div 
           data-subtask-panel="true"
           onClick={(e) => e.stopPropagation()}
@@ -2079,68 +2042,6 @@ interface DayViewProps {
   setExpandedTaskId: (id: string | null) => void;
 }
 
-const layoutTasks = (tasksList: Task[]): Array<Task & { column: number; totalColumns: number }> => {
-  const sorted = [...tasksList].sort((a, b) => timeToMinutes(a.time || "00:00") - timeToMinutes(b.time || "00:00"));
-  
-  // Group tasks into overlapping groups (clusters) where contiguous tasks overlap
-  // A task overlaps with another if their start times are within 60 minutes of each other
-  const clusters: Task[][] = [];
-  sorted.forEach(task => {
-    if (clusters.length === 0) {
-      clusters.push([task]);
-    } else {
-      const lastCluster = clusters[clusters.length - 1];
-      const lastTask = lastCluster[lastCluster.length - 1];
-      const currentStart = timeToMinutes(task.time || "00:00");
-      const lastStart = timeToMinutes(lastTask.time || "00:00");
-      
-      // If the current task starts within 60 minutes of the last task, they belong to the same cluster
-      if (currentStart - lastStart < 60) {
-        lastCluster.push(task);
-      } else {
-        clusters.push([task]);
-      }
-    }
-  });
-
-  const result: Array<Task & { column: number; totalColumns: number }> = [];
-
-  clusters.forEach(cluster => {
-    // Within each cluster, assign columns.
-    // We want to find the smallest column number for each task such that it doesn't overlap with another task in the same column
-    const columns: Task[][] = [];
-    cluster.forEach(task => {
-      const taskStart = timeToMinutes(task.time || "00:00");
-      let placed = false;
-      for (let col = 0; col < columns.length; col++) {
-        const lastInCol = columns[col][columns[col].length - 1];
-        const lastEnd = timeToMinutes(lastInCol.time || "00:00") + 60; // 60 min default duration
-        if (taskStart >= lastEnd) {
-          columns[col].push(task);
-          placed = true;
-          break;
-        }
-      }
-      if (!placed) {
-        columns.push([task]);
-      }
-    });
-
-    // Now assign column and totalColumns for tasks in this cluster
-    const clusterTotalColumns = columns.length;
-    columns.forEach((col, colIndex) => {
-      col.forEach(task => {
-        result.push({
-          ...task,
-          column: colIndex,
-          totalColumns: clusterTotalColumns
-        });
-      });
-    });
-  });
-
-  return result;
-};
 
 const DayView: React.FC<DayViewProps> = ({
   activeDate,

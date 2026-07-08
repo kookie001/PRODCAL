@@ -218,7 +218,7 @@ export default function App() {
               animate={{ opacity: 1, y: 0, scale: 1, bottom: 16 }}
               exit={{ opacity: 0, y: 20, scale: 0.95 }}
               transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-              className="absolute left-4 right-4 bg-neutral-900 text-white rounded-xl shadow-xl px-4 py-3 flex items-center justify-between z-50 border border-neutral-800"
+              className="fixed bottom-20 left-4 right-4 bg-neutral-900 text-white rounded-xl shadow-xl px-4 py-3 flex items-center justify-between z-[950] border border-neutral-800"
             >
               <div className="flex flex-col text-left min-w-0 flex-1 mr-3">
                 <span className="text-[10px] uppercase font-bold text-neutral-400 tracking-wider">
