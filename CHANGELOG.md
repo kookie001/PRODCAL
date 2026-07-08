@@ -1,5 +1,8 @@
 # Changelog
 
+## [Unreleased]
+- Fix stuck drag flag breaking chevron after drag
+
 ## [2026-07-07]
 - **Refactor stage 1**: Extracted pure timeline helper functions (`timeToMinutes`, `minutesToTime`, `layoutTasks`) to `src/utils/timelineHelpers.ts` and `useLongPress` hook to `src/hooks/useLongPress.ts`.
 - **Fix chevron/subtasks after drag (reset drag flag)**: Fixed a bug where subtasks would remain hidden after dragging an expanded task card. Subtasks now correctly reappear because the drag flag is now a state that unconditionally resets on drag end.

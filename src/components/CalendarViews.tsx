@@ -1638,6 +1638,12 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
     }
   }
 
+  const resetDragState = useCallback(() => {
+    dragging.current = false
+    moved.current = false
+    setIsActivelyDragging(false)
+  }, [])
+
   const handleTouchEnd = () => {
     if (dragging.current && moved.current && blockRef.current) {
       const finalTop = parseFloat(blockRef.current.style.top || '0')
@@ -1650,9 +1656,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       const newTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
       onReschedule(task.id, newTime)
     }
-    dragging.current = false
-    moved.current = false
-    setIsActivelyDragging(false)
+    resetDragState()
   }
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -1701,9 +1705,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         const newTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
         onReschedule(task.id, newTime)
       }
-      dragging.current = false
-      moved.current = false
-      setIsActivelyDragging(false)
+      resetDragState()
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('mouseup', onMouseUp)
     }
@@ -1749,6 +1751,8 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         }
         handleTouchEnd()
       }}
+      onTouchCancel={resetDragState}
+      onPointerCancel={resetDragState}
       onMouseUp={(e) => {
         if (Date.now() - lastTouchTime.current < 500) return
         if (e.target === e.currentTarget) {
@@ -1798,12 +1802,12 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
               lastTouchTime.current = Date.now()
               e.stopPropagation()
               e.preventDefault()
-              if (!moved.current) setExpanded(p => !p)
+              setExpanded(p => !p)
             }}
             onMouseUp={(e) => {
               if (Date.now() - lastTouchTime.current < 500) return
               e.stopPropagation()
-              if (!moved.current) setExpanded(p => !p)
+              setExpanded(p => !p)
             }}
             style={{
               width: '44px',
@@ -1964,7 +1968,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       </div>
 
       {/* SUBTASKS — expand below */}
-      {expanded && !isActivelyDragging && (
+      {expanded && (
         <div 
           data-subtask-panel="true"
           onClick={(e) => e.stopPropagation()}
