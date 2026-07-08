@@ -1683,6 +1683,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         if (!moved.current) {
           moved.current = true
           setIsActivelyDragging(true)
+          setExpanded(false)
         }
       }
       if (moved.current) {
@@ -1726,6 +1727,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         if (!moved.current) {
           moved.current = true
           setIsActivelyDragging(true)
+          setExpanded(false)
         }
         e.preventDefault()
       }
@@ -1772,7 +1774,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         borderRadius: '12px',
         border: borderStyle,
         minHeight: '44px',
-        overflow: (expanded && !isActivelyDragging) ? 'visible' : 'hidden',
+        overflow: expanded ? 'visible' : 'hidden',
         touchAction: 'none',
         userSelect: 'none',
         WebkitUserSelect: 'none',
@@ -1781,7 +1783,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
-        zIndex: (expanded && !isActivelyDragging) ? 200 : (dragging.current || isActivelyDragging) ? 250 : (style?.zIndex || 1),
+        zIndex: expanded ? 200 : (dragging.current ? 250 : (style?.zIndex || 1)),
       }}
     >
       {/* MAIN ROW — always visible */}
@@ -1815,16 +1817,18 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
               minWidth: '44px',
               marginLeft: '-14px',
               marginRight: '-14px',
-              background: isActivelyDragging ? 'red' : 'green',
+              background: 'transparent',
               border: 'none',
               padding: 0,
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
               flexShrink: 0,
             }}
           >
+
             <div style={{
               width: '16px',
               height: '16px',

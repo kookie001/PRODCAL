@@ -490,33 +490,17 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
   };
 
   const getDefaultTime = (): string => {
-    const allTasks = useTaskStore.getState().tasks;
-    const targetDate = date || formatDate(new Date());
-    const sameDayTasks = allTasks.filter((t) => t.date === targetDate);
-
-    if (sameDayTasks.length === 0) {
-      // First task of the day — use current time snapped to 15 min
-      const now = new Date();
-      const m = Math.round(now.getMinutes() / 15) * 15;
-      const d = new Date(now);
-      if (m >= 60) {
-        d.setHours(d.getHours() + 1);
-        d.setMinutes(0);
-      } else {
-        d.setMinutes(m);
-      }
-      return formatTime(d);
+    // Default to current time snapped to 15 min
+    const now = new Date();
+    const m = Math.round(now.getMinutes() / 15) * 15;
+    const d = new Date(now);
+    if (m >= 60) {
+      d.setHours(d.getHours() + 1);
+      d.setMinutes(0);
+    } else {
+      d.setMinutes(m);
     }
-
-    // Find the latest task time on this day, place new one 60 min below
-    const latestMins = sameDayTasks.reduce((max, t) => {
-      const [h, mm] = (t.time || '00:00').split(':').map(Number);
-      return Math.max(max, h * 60 + mm);
-    }, 0);
-    const newMins = Math.min(latestMins + 60, 23 * 60 + 30);
-    const h = Math.floor(newMins / 60).toString().padStart(2, '0');
-    const m2 = (newMins % 60).toString().padStart(2, '0');
-    return `${h}:${m2}`;
+    return formatTime(d);
   };
 
   const handleSaveSubmit = (e?: React.FormEvent) => {
