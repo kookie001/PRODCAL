@@ -15,6 +15,8 @@ import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } 
 import { CSS } from '@dnd-kit/utilities';
 import { useTaskStore } from '../store';
 import { Task, CategoryType, CATEGORIES, Subtask } from '../types';
+import { CalendarPicker } from './CalendarPicker';
+import { ClockPicker } from './ClockPicker';
 
 interface SortableSubtaskProps {
   id: string;
@@ -330,6 +332,9 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
   const [category, setCategory] = useState<CategoryType>('Work');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
+  const [isAllDay, setIsAllDay] = useState(true);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [showClock, setShowClock] = useState(false);
   
   // Animation & UI states
   const [isOpen, setIsOpen] = useState(false);
@@ -405,6 +410,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
         setCategory(activeEditTask.category || 'Work');
         setDate(activeEditTask.date || '');
         setTime(activeEditTask.time || '');
+        setIsAllDay(!activeEditTask.time);
         setSubtasks((activeEditTask.subtasks || []).map(({ id, title }) => ({ id, title })));
       } else {
         // Create mode
@@ -419,6 +425,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
         setDate(`${yyyy}-${mm}-${dd}`);
 
         setTime(prefilledTime || '');
+        setIsAllDay(!prefilledTime);
         setSubtasks([]);
       }
 
@@ -519,13 +526,15 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
         };
       });
 
-    let finalTime: string;
-    if (activeMode === 'edit' && activeEditTask) {
-      // EDIT MODE: keep the existing time unless user changed it (keep original, never getDefaultTime)
-      finalTime = time.trim() || activeEditTask.time || '';
-    } else {
-      // CREATE MODE: use selected time, or default to creation time
-      finalTime = time.trim() || getDefaultTime();
+    let finalTime = '';
+    if (!isAllDay) {
+      if (activeMode === 'edit' && activeEditTask) {
+        // EDIT MODE: keep the existing time unless user changed it (keep original, never getDefaultTime)
+        finalTime = time.trim() || activeEditTask.time || getDefaultTime();
+      } else {
+        // CREATE MODE: use selected time, or default to creation time
+        finalTime = time.trim() || getDefaultTime();
+      }
     }
 
     const taskPayload = {
@@ -651,7 +660,6 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
               <input
                 ref={inputRef}
                 type="text"
-                required
                 placeholder="Task title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -675,7 +683,8 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
             </div>
 
             <button
-              type="submit"
+              type="button"
+              onClick={() => handleSaveSubmit()}
               disabled={!title.trim()}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors duration-150 cursor-pointer flex-shrink-0 ${
                 title.trim()
@@ -686,6 +695,18 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
               Save
             </button>
           </div>
+          
+          {/* Add subtask button moved here */}
+          {subtasks.length < 50 && (
+            <button
+              type="button"
+              onClick={handleAddEmptySubtask}
+              className="flex items-center space-x-2 py-2 text-sm text-[#1A73E8] font-medium hover:bg-blue-50/50 w-full text-left focus:outline-none mt-2"
+            >
+              <Plus size={18} />
+              <span>Add subtask</span>
+            </button>
+          )}
         </div>
 
         {/* SCROLLABLE: Subtasks area — this is the ONLY part that scrolls */}
@@ -725,146 +746,108 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
               </SortableContext>
             </DndContext>
           )}
-
-          {/* Add subtask button */}
-          {subtasks.length < 50 && (
-            <button
-              type="button"
-              onClick={handleAddEmptySubtask}
-              className="flex items-center space-x-2 py-1.5 pl-1 mt-2 text-sm text-gray-400 hover:text-gray-600 w-full text-left focus:outline-none"
-            >
-              <Plus size={14} className="text-gray-400 flex-shrink-0" />
-              <span>Add subtask...</span>
-            </button>
-          )}
         </div>
 
-        {!keyboardOpen && (
-          <>
-            {/* FIXED: Category selector — never moves */}
-            <div style={{ flexShrink: 0 }} className="px-6 py-2 space-y-1.5 border-t border-gray-100">
-              <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center space-x-1.5">
-                <Bookmark size={13} className="text-blue-500" />
-                <span>Category</span>
-              </label>
-              <div className="flex items-center space-x-1.5 overflow-x-auto scrollbar-none py-0.5">
-                {categories.map((cat) => {
-                  const isSelected = category === cat.id;
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => setCategory(cat.id)}
-                      className={`flex items-center px-3.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer select-none active:scale-95
-                        ${isSelected ? 'text-white' : ''}
-                      `}
-                      style={
-                        isSelected 
-                          ? { backgroundColor: cat.color.solid, borderColor: cat.color.solid }
-                          : { backgroundColor: 'transparent', borderColor: cat.color.solid + '50', color: cat.color.solid }
-                      }
-                    >
-                      {cat.name}
-                    </button>
-                  );
-                })}
-              </div>
+        {/* Date/time and Category section (permanently visible, beautifully spaced like GCal) */}
+        <div style={{ flexShrink: 0 }} className="px-6 py-4 border-t border-gray-100 bg-[#F8F9FA]">
+          {/* All-day switch row */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <Clock size={20} className="text-[#444746]" />
+              <span className="text-sm font-medium text-[#1F1F1F]">All-day</span>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                const nextVal = !isAllDay;
+                setIsAllDay(nextVal);
+                if (!nextVal && !time) {
+                  setTime(getDefaultTime());
+                }
+              }}
+              className={`w-[52px] h-8 rounded-full transition-colors duration-200 flex items-center relative cursor-pointer outline-none select-none ${
+                isAllDay ? 'bg-[#0B57D0]' : 'bg-[#E1E2E5]'
+              }`}
+              aria-label="Toggle All-day"
+            >
+              <motion.div 
+                className={`absolute rounded-full transition-colors duration-200 ${
+                  isAllDay ? 'bg-white shadow-[0_2px_5px_rgba(0,0,0,0.25)]' : 'bg-[#747775] shadow-[0_1px_3px_rgba(0,0,0,0.2)]'
+                }`}
+                animate={{ 
+                  left: isAllDay ? '24px' : '6px',
+                  width: isAllDay ? '24px' : '16px',
+                  height: isAllDay ? '24px' : '16px',
+                  top: isAllDay ? '4px' : '8px',
+                }}
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              />
+            </button>
+          </div>
+          
+          {/* Date & Time selection buttons */}
+          <div className="flex gap-3 mb-5">
+            <button 
+              type="button"
+              onClick={() => setShowCalendar(true)}
+              className="flex-1 px-4 py-3 rounded-xl border border-[#DADCE0] text-sm text-[#1F1F1F] bg-white text-left hover:border-[#1A73E8] transition-colors flex items-center justify-between"
+            >
+              <span>
+                {date ? new Date(date.split('-')[0], parseInt(date.split('-')[1]) - 1, date.split('-')[2]).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : 'Select date'}
+              </span>
+            </button>
+            {!isAllDay && (
+              <button 
+                type="button"
+                onClick={() => setShowClock(true)}
+                className="flex-1 px-4 py-3 rounded-xl border border-[#DADCE0] text-sm text-[#1F1F1F] bg-white text-left hover:border-[#1A73E8] transition-colors flex items-center justify-between"
+              >
+                <span>{time || 'Select time'}</span>
+              </button>
+            )}
+          </div>
 
-            {/* FIXED: Date/time row — never moves */}
-            <div style={{ flexShrink: 0 }} className="px-6 py-2">
-              <div className="border border-gray-200 rounded-2xl overflow-hidden bg-gray-50/30">
-                <button
-                  type="button"
-                  onClick={() => setIsDateTimeExpanded(!isDateTimeExpanded)}
-                  className="flex items-center justify-between w-full px-4 py-2.5 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50/80 transition-colors cursor-pointer select-none"
-                >
-                  <div className="flex items-center space-x-2">
-                    <Calendar size={16} className="text-blue-500" />
-                    <span>Date & Time</span>
-                    <span className="text-xs font-normal text-gray-400 ml-2">
-                      ({date || 'Today'}{time ? `, ${time}` : ', All-day'})
-                    </span>
-                  </div>
-                  <ChevronDown 
-                    size={16} 
-                    className={`text-gray-400 transition-transform duration-200 ${
-                      isDateTimeExpanded ? 'transform rotate-180' : ''
-                    }`}
-                  />
-                </button>
-
-                {isDateTimeExpanded && (
-                  <div className="px-4 pb-4 pt-2 border-t border-gray-150/50 bg-white grid grid-cols-2 gap-4 animate-fadeIn">
-                    <div className="space-y-2">
-                      <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center space-x-1.5">
-                        <Calendar size={13} className="text-blue-500" />
-                        <span>Date</span>
-                      </label>
-                      <input
-                        type="date"
-                        required
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                      />
-                    </div>
-                    <div className="space-y-2 flex flex-col">
-                      <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center space-x-1.5">
-                        <Clock size={13} className="text-blue-500" />
-                        <span>Time</span>
-                      </label>
-                      
-                      <div className="flex items-center space-x-2 mb-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setTime('')}
-                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer select-none
-                            ${!time 
-                              ? 'bg-blue-50 border-blue-200 text-blue-700' 
-                              : 'bg-transparent border-gray-200 text-gray-500 hover:bg-gray-50'
-                            }
-                          `}
-                        >
-                          All-Day
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!time) {
-                              const now = new Date();
-                              const hrs = String(now.getHours()).padStart(2, '0');
-                              const mins = String(Math.round(now.getMinutes() / 15) * 15 % 60).padStart(2, '0');
-                              setTime(`${hrs}:${mins}`);
-                            }
-                          }}
-                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer select-none
-                            ${time 
-                              ? 'bg-blue-600 border-blue-600 text-white' 
-                              : 'bg-transparent border-gray-200 text-gray-500 hover:bg-gray-50'
-                            }
-                          `}
-                        >
-                          Set Time
-                        </button>
-                      </div>
-
-                      {time ? (
-                        <div className="flex justify-center pt-1">
-                          <TimeWheelPicker value={time} onChange={setTime} />
-                        </div>
-                      ) : (
-                        <div className="h-[120px] flex items-center justify-center rounded-2xl bg-gray-50 border border-dashed border-gray-200">
-                          <span className="text-[11px] text-gray-400 italic font-medium">All day</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
+          {showCalendar && (
+            <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50" onClick={() => setShowCalendar(false)}>
+              <div onClick={(e) => e.stopPropagation()}><CalendarPicker value={date} onChange={(d) => { setDate(d); setShowCalendar(false); }} /></div>
             </div>
-          </>
-        )}
+          )}
+          {showClock && (
+            <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50" onClick={() => setShowClock(false)}>
+              <div onClick={(e) => e.stopPropagation()}><ClockPicker value={time} onChange={(t) => { setTime(t); setShowClock(false); }} /></div>
+            </div>
+          )}
+
+          {/* Category selector (immediately below Date/Time section, Material 3 style) */}
+          <div className="border-t border-[#DADCE0]/50 pt-4">
+            <label className="text-xs font-semibold uppercase tracking-wider text-[#444746] flex items-center space-x-1.5 mb-3">
+              <Bookmark size={14} className="text-[#1A73E8]" />
+              <span>Category</span>
+            </label>
+            <div className="flex items-center space-x-2 overflow-x-auto scrollbar-none py-1">
+              {categories.map((cat) => {
+                const isSelected = category === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setCategory(cat.id)}
+                    className={`flex items-center px-4 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer select-none active:scale-95
+                      ${isSelected ? 'text-white shadow-sm' : ''}
+                    `}
+                    style={
+                      isSelected 
+                        ? { backgroundColor: cat.color.solid, borderColor: cat.color.solid }
+                        : { backgroundColor: 'white', borderColor: cat.color.solid + '40', color: cat.color.solid }
+                    }
+                  >
+                    {cat.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
 
         {/* Bottom spacer for safe area */}
         <div style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)', flexShrink: 0 }} />
