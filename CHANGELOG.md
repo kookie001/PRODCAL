@@ -1,6 +1,8 @@
 # Changelog
 
 ## [2026-07-09]
+- Default All-day toggle to OFF on the new task creation sheet.
+- Pre-fill task time field with current time snapped to the nearest 15 minutes.
 - Restore fully interactive date and time picker buttons in task sheet (GCAL-style).
 - Hide all-day/date/category while typing subtasks, GCAL-style toggle.
 

@@ -429,8 +429,8 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
         const dd = String(selectedDateObj.getDate()).padStart(2, '0');
         setDate(`${yyyy}-${mm}-${dd}`);
 
-        setTime(prefilledTime || '');
-        setIsAllDay(!prefilledTime);
+        setTime(prefilledTime || formatTime(snapTo15(new Date())));
+        setIsAllDay(false);
         setSubtasks([]);
       }
 

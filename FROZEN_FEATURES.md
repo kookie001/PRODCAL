@@ -125,43 +125,12 @@ This file documents all currently functional features of the application, detail
 
 ---
 
-## 7. Task Creation Default Time Stacking
+## 7. Task Creation Default Time and All-Day Defaults
 - **File:** `src/components/TaskSheet.tsx`
-- **Exact Function:** `getDefaultTime`
-- **Exact Code:**
-  ```tsx
-  const getDefaultTime = (): string => {
-    const allTasks = useTaskStore.getState().tasks;
-    const targetDate = date || formatDate(new Date());
-    const sameDayTasks = allTasks.filter((t) => t.date === targetDate);
-
-    if (sameDayTasks.length === 0) {
-      // First task of the day — use current time snapped to 15 min
-      const now = new Date();
-      const m = Math.round(now.getMinutes() / 15) * 15;
-      const d = new Date(now);
-      if (m >= 60) {
-        d.setHours(d.getHours() + 1);
-        d.setMinutes(0);
-      } else {
-        d.setMinutes(m);
-      }
-      return formatTime(d);
-    }
-
-    // Find the latest task time on this day, place new one 60 min below
-    const latestMins = sameDayTasks.reduce((max, t) => {
-      const [h, mm] = (t.time || '00:00').split(':').map(Number);
-      return Math.max(max, h * 60 + mm);
-    }, 0);
-    const newMins = Math.min(latestMins + 60, 23 * 60 + 30);
-    const h = Math.floor(newMins / 60).toString().padStart(2, '0');
-    const m2 = (newMins % 60).toString().padStart(2, '0');
-    return `${h}:${m2}`;
-  };
-  ```
 - **Why it is load-bearing (WHY it exists):**
-  - When creating tasks without an explicit time, this ensures tasks are placed sequentially down the timeline 60 minutes apart (stacked vertically and at full width) rather than sitting side-by-side at the same time. The first task of the day still snaps to the nearest 15 minutes of the current time.
+  - **All-Day Default:** The "All-day" toggle is configured to default to **OFF** on task creation to ensure new tasks are mapped to a specific timeline slot instead of defaulting to the top of the day.
+  - **Pre-filled Snapped Time:** On task creation, the time field is automatically pre-filled with either the user's selected slot time (`prefilledTime`) or the current real-world time snapped to the nearest 15 minutes. This ensures that saving a new task without modification correctly positions it at the active time slot on the timeline.
+  - **Dynamic Conversion:** If the user toggle is turned **ON**, the task becomes an all-day task at the top of the daily view. If it remains **OFF**, the pre-filled snapped timestamp positions the task sequentially on the interactive daily timeline.
 
 ---
 

@@ -6,6 +6,16 @@
 
 ## Resolved Bugs
 
+- **BUG 5: Date/Time Pickers render blank or are clipped/not shown**
+  - *Description:* Clicking on the date or time inside the task creation page resulted in nothing showing up or appearing blank/invisible.
+  - *Root Cause:* Position absolute/fixed picker overlays were being clipped or hidden by container-level parent layouts, overflow rules, or translation transformations.
+  - *Resolution:* Wrapped both `<CalendarPicker />` and `<ClockPicker />` overlays in React's `createPortal(..., document.body)` so they render directly at the body root, bypassing any local clipping, scrolling, or container-transform issues.
+
+- **BUG 6: All-Day toggle defaults to ON, placing new tasks at the top instead of the current timeline slot**
+  - *Description:* New tasks were defaulted to "All-day" and placed at the top of the timeline by default.
+  - *Root Cause:* The `isAllDay` state was initialized to `!prefilledTime`. When creating a new task from the FAB, `prefilledTime` was empty, causing `isAllDay` to default to `true` (ON).
+  - *Resolution:* Initialized `isAllDay` to `false` by default on task creation, and pre-filled the `time` field with the current time snapped to the nearest 15 minutes if no other prefilled time is provided, ensuring tasks land on the current time slot on the timeline.
+
 - **BUG 1: Save button disappearing / covered by keyboard on Android**
   - *Description:* On Android, opening the virtual keyboard covered the input fields and action buttons (like the Save button) of the task creation/editing sheet.
   - *Root Cause:* The viewport height was treated as fixed, and standard virtual keyboard behaviors overlay the page rather than resizing it unless specified.
