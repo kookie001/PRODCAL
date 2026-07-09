@@ -1,6 +1,12 @@
 # Changelog
 
 ## [2026-07-09]
+- Fix long-press gesture reliability on touch devices by increasing movement tolerance threshold to 20px.
+- Suppress synthetic click/tap and edit-modal opening after completing a pending list task drag-and-drop gesture.
+- Sync header date display to show activeDate instead of current real-world date.
+- Add clickable "Go to Today" shortcut on the header date to instantly reset view back to today.
+- Add smooth horizontal swipe gesture navigation (swipe left for next day, right for previous day) to the DayView timeline background.
+- Ensure DayView swipe gestures do not interfere with vertical scrolling or task block/chevron/subtask events.
 - Fix chevron button getting permanently stuck after card drag-and-drop.
 - Register native `touchend`/`touchcancel` window event listeners during `handleTouchStart` to capture gestures that bypass React synthetic propagation.
 - Simplify chevron button toggle handler by removing unnecessary guard logic and double-trigger prevention checks.

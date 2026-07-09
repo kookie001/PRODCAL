@@ -1842,6 +1842,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         {/* LEFT: expand toggle — small, minimal */}
         {task.subtasks && task.subtasks.length > 0 && (
           <button
+            className="chevron-button"
             onTouchStart={(e) => {
               e.stopPropagation()
               e.preventDefault()
@@ -2125,6 +2126,7 @@ const DayView: React.FC<DayViewProps> = ({
   const isTodayDay = isToday(activeDate);
   const setTasksOverlayOpen = useTaskStore((state) => state.setTasksOverlayOpen);
   const isTasksOverlayOpen = useTaskStore((state) => state.isTasksOverlayOpen);
+  const setCurrentDate = useTaskStore((state) => state.setCurrentDate);
   const allTasks = useTaskStore((state) => state.tasks);
   const pendingCount = allTasks.filter((task) => !task.completed).length;
 
@@ -2338,6 +2340,143 @@ const DayView: React.FC<DayViewProps> = ({
     }
   }, []);
 
+  const slideContainerRef = useRef<HTMLDivElement>(null);
+  const activeDateRef = useRef(activeDate);
+  useEffect(() => {
+    activeDateRef.current = activeDate;
+  }, [activeDate]);
+
+  useEffect(() => {
+    const el = slideContainerRef.current;
+    if (!el) return;
+
+    let startX = 0;
+    let startY = 0;
+    let isSwipeActive = false;
+    let hasDeterminedDirection = false;
+    let isIgnored = false;
+
+    const isTaskElement = (element: HTMLElement | null): boolean => {
+      let curr = element;
+      while (curr && curr !== el && curr !== document.body) {
+        if (
+          curr.style.minHeight === '44px' || 
+          curr.style.minHeight === '48px' || 
+          curr.tagName === 'BUTTON' || 
+          curr.getAttribute('data-subtask-panel') === 'true' ||
+          curr.getAttribute('data-subtask-drag-handle') === 'true' ||
+          curr.classList.contains('chevron-button')
+        ) {
+          return true;
+        }
+        curr = curr.parentElement;
+      }
+      return false;
+    };
+
+    const handleTouchStartNative = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      if (isTaskElement(target)) {
+        isIgnored = true;
+        isSwipeActive = false;
+        hasDeterminedDirection = true;
+        return;
+      }
+
+      isIgnored = false;
+      const touch = e.touches[0];
+      startX = touch.clientX;
+      startY = touch.clientY;
+      isSwipeActive = false;
+      hasDeterminedDirection = false;
+      
+      el.style.transition = 'none';
+    };
+
+    const handleTouchMoveNative = (e: TouchEvent) => {
+      if (isIgnored) return;
+
+      const touch = e.touches[0];
+      const currentX = touch.clientX;
+      const currentY = touch.clientY;
+      const diffX = currentX - startX;
+      const diffY = currentY - startY;
+
+      if (!hasDeterminedDirection) {
+        if (Math.abs(diffX) > 8 || Math.abs(diffY) > 8) {
+          if (Math.abs(diffX) > Math.abs(diffY)) {
+            isSwipeActive = true;
+          } else {
+            isSwipeActive = false;
+          }
+          hasDeterminedDirection = true;
+        }
+      }
+
+      if (isSwipeActive) {
+        e.preventDefault();
+        el.style.transform = `translateX(${diffX}px)`;
+        el.style.opacity = `${Math.max(0.4, 1 - Math.abs(diffX) / (window.innerWidth * 1.2))}`;
+      }
+    };
+
+    const handleTouchEndNative = (e: TouchEvent) => {
+      if (isIgnored || !isSwipeActive) {
+        isIgnored = false;
+        isSwipeActive = false;
+        hasDeterminedDirection = false;
+        return;
+      }
+
+      const touch = e.changedTouches[0];
+      const diffX = touch.clientX - startX;
+      const threshold = 80;
+
+      if (Math.abs(diffX) > threshold) {
+        const direction = diffX < 0 ? 1 : -1;
+        
+        el.style.transition = 'transform 250ms cubic-bezier(0.1, 0.8, 0.2, 1), opacity 250ms ease';
+        el.style.transform = `translateX(${-direction * window.innerWidth}px)`;
+        el.style.opacity = '0';
+
+        setTimeout(() => {
+          const nextDate = direction === 1 ? addDays(activeDateRef.current, 1) : subDays(activeDateRef.current, 1);
+          setCurrentDate(nextDate);
+
+          el.style.transition = 'none';
+          el.style.transform = `translateX(${direction * window.innerWidth}px)`;
+          el.style.opacity = '0';
+
+          el.getBoundingClientRect();
+
+          el.style.transition = 'transform 250ms cubic-bezier(0.1, 0.8, 0.2, 1), opacity 250ms ease';
+          el.style.transform = 'translateX(0px)';
+          el.style.opacity = '1';
+        }, 250);
+      } else {
+        el.style.transition = 'transform 200ms ease, opacity 200ms ease';
+        el.style.transform = 'translateX(0px)';
+        el.style.opacity = '1';
+      }
+
+      isSwipeActive = false;
+      hasDeterminedDirection = false;
+      isIgnored = false;
+    };
+
+    el.addEventListener('touchstart', handleTouchStartNative, { passive: false });
+    el.addEventListener('touchmove', handleTouchMoveNative, { passive: false });
+    el.addEventListener('touchend', handleTouchEndNative);
+    el.addEventListener('touchcancel', handleTouchEndNative);
+
+    return () => {
+      el.removeEventListener('touchstart', handleTouchStartNative);
+      el.removeEventListener('touchmove', handleTouchMoveNative);
+      el.removeEventListener('touchend', handleTouchEndNative);
+      el.removeEventListener('touchcancel', handleTouchEndNative);
+    };
+  }, [setCurrentDate]);
+
   const longPress = useLongPress((timeStr) => {
     const [dateStr, hourStr] = timeStr.split('|');
     const d = new Date(dateStr + 'T00:00:00');
@@ -2354,7 +2493,10 @@ const DayView: React.FC<DayViewProps> = ({
     <div className="h-full w-full overflow-hidden bg-white">
 
 
-      <div className="flex-1 flex flex-col h-full bg-white overflow-hidden select-none">
+      <div 
+        ref={slideContainerRef}
+        className="flex-1 flex flex-col h-full bg-white overflow-hidden select-none"
+      >
       {/* Pending Task Viewer (GCAL Style) */}
       {(() => {
         return (
@@ -2387,6 +2529,7 @@ const DayView: React.FC<DayViewProps> = ({
 
       {/* Hourly timeline scale */}
       <div 
+        id="day-timeline-container"
         ref={scrollContainerRef}
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto text-gray-800"

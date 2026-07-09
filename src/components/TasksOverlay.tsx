@@ -35,6 +35,8 @@ interface TaskItemRowProps {
   catColor: { light: string; bgLight: string; borderLight: string; solid: string };
   isSubExpanded: boolean;
   onToggleSubExpanded: () => void;
+  onTouchStart?: (e: React.TouchEvent) => void;
+  isDraggingThis?: boolean;
 }
 
 const TaskItemRow = React.memo(({
@@ -43,7 +45,9 @@ const TaskItemRow = React.memo(({
   isSelected,
   onToggleSelect,
   updateTask,
-  setEditingTask
+  setEditingTask,
+  onTouchStart,
+  isDraggingThis
 }: TaskItemRowProps) => {
   const dateObj = task.date ? new Date(task.date + 'T00:00:00') : new Date();
 
@@ -58,7 +62,10 @@ const TaskItemRow = React.memo(({
   return (
     <div 
       onClick={handleRowClick}
-      className="flex items-center bg-white mx-3 my-1 px-4 py-3 rounded-xl border border-[#F1F3F4] min-h-[60px] cursor-pointer"
+      onTouchStart={onTouchStart}
+      className={`flex items-center bg-white mx-3 my-1 px-4 py-3 rounded-xl border border-[#F1F3F4] min-h-[60px] cursor-pointer select-none transition-all duration-150 ${
+        isDraggingThis ? 'opacity-35 border-dashed border-gray-400 bg-gray-100 scale-95' : ''
+      }`}
     >
       {isMultiSelectMode && (
         <div className="flex-shrink-0 mr-3 flex items-center justify-center">
@@ -138,13 +145,7 @@ export const TasksOverlay: React.FC = () => {
     return () => cancelAnimationFrame(timer);
   }, []);
 
-  const handleClose = () => {
-    setIsOpen(false);
-    setTimeout(() => {
-      setTasksOverlayOpen(false);
-    }, 280);
-  };
-
+  // Drag and Drop States for Pending Tasks
   const [gcalTaskQuery, setGcalTaskQuery] = useState('');
   const [isCompletedExpanded, setIsCompletedExpanded] = useState(true);
   const [gcalExpandedTaskIds, setGcalExpandedTaskIds] = useState<string[]>([]);
@@ -153,6 +154,139 @@ export const TasksOverlay: React.FC = () => {
   // Multi-Selection States
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+
+  const [draggedTask, setDraggedTask] = useState<Task | null>(null);
+  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
+  const longPressTimer = useRef<ReturnType<typeof setTimeout>>();
+  const touchStartPos = useRef({ x: 0, y: 0 });
+  const isDraggingFromList = useRef(false);
+  const preventClickRef = useRef(false);
+  const draggedTaskRef = useRef<Task | null>(null);
+
+  const setDraggedTaskWithRef = (task: Task | null) => {
+    setDraggedTask(task);
+    draggedTaskRef.current = task;
+  };
+
+  const handleListItemTouchStart = (task: Task, e: React.TouchEvent) => {
+    if (isMultiSelectMode || task.completed) return;
+
+    const touch = e.touches[0];
+    touchStartPos.current = { x: touch.clientX, y: touch.clientY };
+    preventClickRef.current = false;
+
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+    }
+
+    longPressTimer.current = setTimeout(() => {
+      isDraggingFromList.current = true;
+      setDraggedTaskWithRef(task);
+      setDragPosition({ x: touch.clientX, y: touch.clientY });
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(20);
+      }
+    }, 500);
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleGlobalTouchMove = (e: TouchEvent) => {
+      if (!isDraggingFromList.current) {
+        if (longPressTimer.current) {
+          const touch = e.touches[0];
+          const diffX = Math.abs(touch.clientX - touchStartPos.current.x);
+          const diffY = Math.abs(touch.clientY - touchStartPos.current.y);
+          if (diffX > 20 || diffY > 20) {
+            clearTimeout(longPressTimer.current);
+            longPressTimer.current = undefined;
+          }
+        }
+        return;
+      }
+
+      if (e.cancelable) {
+        e.preventDefault();
+      }
+      const touch = e.touches[0];
+      setDragPosition({ x: touch.clientX, y: touch.clientY });
+    };
+
+    const handleGlobalTouchEnd = (e: TouchEvent) => {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = undefined;
+
+      if (!isDraggingFromList.current || !draggedTaskRef.current) {
+        isDraggingFromList.current = false;
+        return;
+      }
+
+      // Suppress normal click/edit modal trigger since we just finished a drag gesture
+      preventClickRef.current = true;
+      setTimeout(() => {
+        preventClickRef.current = false;
+      }, 100);
+
+      const timelineEl = document.getElementById('day-timeline-container');
+      const rect = timelineEl?.getBoundingClientRect();
+
+      const touch = e.changedTouches[0];
+      const dropX = touch.clientX;
+      const dropY = touch.clientY;
+
+      if (
+        rect &&
+        dropX >= rect.left &&
+        dropX <= rect.right &&
+        dropY >= rect.top &&
+        dropY <= rect.bottom
+      ) {
+        const relativeY = dropY - rect.top + timelineEl.scrollTop;
+        const pixelsPerMinute = 1536 / 1440;
+        const minutes = Math.round((relativeY / pixelsPerMinute) / 15) * 15;
+        const h = Math.floor(minutes / 60).toString().padStart(2, '0');
+        const m = (minutes % 60).toString().padStart(2, '0');
+
+        const activeDateObj = new Date(useTaskStore.getState().currentDate);
+        const year = activeDateObj.getFullYear();
+        const month = String(activeDateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(activeDateObj.getDate()).padStart(2, '0');
+        const formattedDate = `${year}-${month}-${day}`;
+
+        updateTask(draggedTaskRef.current.id, {
+          date: formattedDate,
+          time: `${h}:${m}`
+        });
+
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          navigator.vibrate(10);
+        }
+
+        handleClose();
+      }
+
+      setDraggedTaskWithRef(null);
+      isDraggingFromList.current = false;
+    };
+
+    document.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
+    document.addEventListener('touchend', handleGlobalTouchEnd);
+    document.addEventListener('touchcancel', handleGlobalTouchEnd);
+
+    return () => {
+      document.removeEventListener('touchmove', handleGlobalTouchMove);
+      document.removeEventListener('touchend', handleGlobalTouchEnd);
+      document.removeEventListener('touchcancel', handleGlobalTouchEnd);
+    };
+  }, [isOpen, isMultiSelectMode]);
+
+  const handleClose = () => {
+    setIsOpen(false);
+    setTimeout(() => {
+      setTasksOverlayOpen(false);
+    }, 280);
+  };
 
   const allPendingTasks = tasks.filter((task) => !task.completed);
   const completedTasks = tasks.filter((task) => task.completed);
@@ -296,7 +430,7 @@ export const TasksOverlay: React.FC = () => {
 
   return (
     <div
-      className={`fixed inset-0 bg-white z-[100] flex flex-col overflow-hidden text-gray-800 tasks-overlay ${
+      className={`fixed inset-0 bg-transparent z-[100] flex flex-col overflow-hidden text-gray-800 tasks-overlay ${
         isOpen ? 'open' : ''
       } ${
         isFullScreen 
@@ -304,6 +438,7 @@ export const TasksOverlay: React.FC = () => {
           : 'md:max-w-[430px] md:mx-auto md:shadow-2xl md:border-x md:border-gray-200/50 md:rounded-t-3xl md:inset-y-4 md:h-[calc(100vh-32px)]'
       }`}
     >
+      <div className={`flex-1 flex flex-col h-full bg-white transition-opacity duration-200 ${draggedTask ? 'opacity-15 pointer-events-none' : ''}`}>
           {/* Header Area (Swaps with multi-selection actions when active) */}
           <div className="flex items-center justify-between h-14 px-4 border-b border-gray-100 flex-shrink-0 bg-white select-none">
             {isMultiSelectMode ? (
@@ -430,10 +565,15 @@ export const TasksOverlay: React.FC = () => {
                         addSubtask={addSubtask}
                         toggleSubtask={toggleSubtask}
                         deleteSubtask={deleteSubtask}
-                        setEditingTask={setEditingTask}
+                        setEditingTask={(t) => {
+                          if (preventClickRef.current) return;
+                          setEditingTask(t);
+                        }}
                         catColor={CATEGORIES[0].color}
                         isSubExpanded={false}
                         onToggleSubExpanded={() => {}}
+                        onTouchStart={(e) => handleListItemTouchStart(task, e)}
+                        isDraggingThis={draggedTask?.id === task.id}
                       />
                     );
                   })}
@@ -491,6 +631,26 @@ export const TasksOverlay: React.FC = () => {
               </div>
             )}
           </div>
+      </div>
+
+      {/* Floating Drag Preview */}
+      {draggedTask && (
+        <div 
+          style={{
+            position: 'fixed',
+            left: 0,
+            top: 0,
+            transform: `translate(${dragPosition.x - 100}px, ${dragPosition.y - 25}px) scale(1.05)`,
+            width: '200px',
+            pointerEvents: 'none',
+            zIndex: 9999,
+          }}
+          className="bg-[#1A73E8] text-white p-3 rounded-xl shadow-2xl border border-blue-500 font-medium text-sm flex items-center justify-between"
+        >
+          <span className="truncate flex-1">{draggedTask.title}</span>
+          <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full ml-2 select-none">Drag</span>
+        </div>
+      )}
     </div>
   );
 };

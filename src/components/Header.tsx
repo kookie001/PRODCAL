@@ -143,8 +143,12 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           {/* Today's date text (e.g. "July 7") without dropdown chevron */}
-          <span className="text-xl font-medium text-gray-900 select-none px-1 flex-shrink-0">
-            {format(new Date(), 'MMMM d')}
+          <span 
+            onClick={() => setCurrentDate(new Date())}
+            className="text-xl font-medium text-gray-900 select-none px-1 flex-shrink-0 cursor-pointer hover:text-blue-600 active:scale-95 transition-all duration-150"
+            title="Go to Today"
+          >
+            {format(activeDate, 'MMMM d')}
           </span>
         </div>
 
