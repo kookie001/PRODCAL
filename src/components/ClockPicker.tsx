@@ -216,14 +216,14 @@ export const ClockPicker: React.FC<ClockPickerProps> = ({ value, onChange, onClo
           </div>
 
           {/* AM / PM Pill Stack */}
-          <div className="flex flex-col gap-1.5 border border-[#C4C7C5] rounded-[20px] p-0.5 bg-white">
+          <div className="flex flex-col gap-2 shrink-0">
             <button
               type="button"
               onClick={() => setTempPeriod('AM')}
-              className={`px-4 py-1.5 rounded-[18px] text-xs font-semibold uppercase tracking-wider transition-all duration-200 ${
+              className={`w-[52px] h-[36px] flex items-center justify-center rounded-full text-xs font-semibold uppercase tracking-wider transition-all duration-200 border ${
                 tempPeriod === 'AM'
-                  ? 'bg-[#C2F0C2] text-[#006600] font-bold'
-                  : 'text-[#444746] hover:bg-black/5'
+                  ? 'bg-[#E6F4EA] text-[#137333] border-transparent font-bold'
+                  : 'bg-white text-[#5F6368] border-[#747775] hover:bg-black/5'
               }`}
             >
               AM
@@ -231,10 +231,10 @@ export const ClockPicker: React.FC<ClockPickerProps> = ({ value, onChange, onClo
             <button
               type="button"
               onClick={() => setTempPeriod('PM')}
-              className={`px-4 py-1.5 rounded-[18px] text-xs font-semibold uppercase tracking-wider transition-all duration-200 ${
+              className={`w-[52px] h-[36px] flex items-center justify-center rounded-full text-xs font-semibold uppercase tracking-wider transition-all duration-200 border ${
                 tempPeriod === 'PM'
-                  ? 'bg-[#C2F0C2] text-[#006600] font-bold'
-                  : 'text-[#444746] hover:bg-black/5'
+                  ? 'bg-[#E6F4EA] text-[#137333] border-transparent font-bold'
+                  : 'bg-white text-[#5F6368] border-[#747775] hover:bg-black/5'
               }`}
             >
               PM
@@ -250,7 +250,7 @@ export const ClockPicker: React.FC<ClockPickerProps> = ({ value, onChange, onClo
             ref={dialRef}
             onMouseDown={onMouseDown}
             onTouchStart={onTouchStart}
-            className="relative w-[256px] h-[256px] rounded-full bg-[#F1F3F4] cursor-pointer select-none overflow-hidden"
+            className="relative w-[256px] h-[256px] rounded-full bg-[#F1F3F4] cursor-pointer select-none overflow-hidden touch-none"
           >
             {/* The blue pointer/pendulum SVG */}
             <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">

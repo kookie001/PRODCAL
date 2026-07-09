@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, 
@@ -332,7 +333,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
   const [category, setCategory] = useState<CategoryType>('Work');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
-  const [isAllDay, setIsAllDay] = useState(true);
+  const [isAllDay, setIsAllDay] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [showClock, setShowClock] = useState(false);
   
@@ -361,6 +362,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const subtaskScrollRef = useRef<HTMLDivElement>(null);
+  const hasInitializedRef = useRef(false);
 
   const handleFocus = () => {
     setKeyboardOpen(true);
@@ -405,6 +407,9 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
   // Sync edit mode / prefilled defaults
   useEffect(() => {
     if (activeIsOpen) {
+      if (hasInitializedRef.current) return;
+      hasInitializedRef.current = true;
+
       if (activeMode === 'edit' && activeEditTask) {
         setTitle(activeEditTask.title || '');
         setCategory(activeEditTask.category || 'Work');
@@ -438,6 +443,8 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
           inputRef.current.setSelectionRange(len, len);
         }
       }, 150);
+    } else {
+      hasInitializedRef.current = false;
     }
   }, [activeIsOpen, activeMode, activeEditTask, currentDateStr, prefilledTime, prefilledTitle]);
 
@@ -750,124 +757,178 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
           )}
         </div>
 
-        {/* Date/time and Category section (Compact, moved out of scrollable area) */}
-        <div className="border-t border-gray-100 p-4 bg-white">
-            {/* All-day switch row */}
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center space-x-2">
-                <Clock size={16} className="text-[#444746]" />
-                <span className="text-xs font-medium text-[#1F1F1F]">All-day</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  const nextVal = !isAllDay;
-                  setIsAllDay(nextVal);
-                  if (!nextVal && !time) {
-                    setTime(getDefaultTime());
-                  }
+        {/* Date/time and Category section (Compact, moved out of scrollable area, always visible) */}
+        <div className="border-t border-gray-100 p-4 bg-white flex-shrink-0">
+          {/* All-day switch row (Google Calendar style) */}
+          <div 
+            onClick={() => {
+              if (document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur();
+              }
+              const nextVal = !isAllDay;
+              setIsAllDay(nextVal);
+              if (!nextVal && !time) {
+                setTime(getDefaultTime());
+              }
+            }}
+            style={{ minHeight: '44px', touchAction: 'manipulation' }}
+            className="flex items-center justify-between py-1 px-1 cursor-pointer select-none"
+          >
+            <div className="flex items-center space-x-3">
+              <Clock size={22} className="text-[#5F6368]" />
+              <span className="text-base font-normal text-[#202124]">All-day</span>
+            </div>
+            <div
+              style={{
+                width: '52px',
+                height: '32px',
+                borderRadius: '9999px',
+                backgroundColor: isAllDay ? '#1A73E8' : '#BDC1C6',
+                transition: 'background-color 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+                position: 'relative',
+                flexShrink: 0,
+              }}
+            >
+              <div
+                style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  backgroundColor: '#FFFFFF',
+                  position: 'absolute',
+                  top: '4px',
+                  left: '4px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                  transform: isAllDay ? 'translateX(20px)' : 'translateX(0)',
+                  transition: 'transform 200ms cubic-bezier(0.4, 0, 0.2, 1)',
                 }}
-                className={`w-[36px] h-5 rounded-full transition-colors duration-200 flex items-center relative cursor-pointer outline-none select-none ${
-                  isAllDay ? 'bg-[#0B57D0]' : 'bg-[#E1E2E5]'
-                }`}
-                aria-label="Toggle All-day"
-              >
-                <motion.div 
-                  className={`absolute rounded-full transition-colors duration-200 ${
-                    isAllDay ? 'bg-white shadow-[0_2px_5px_rgba(0,0,0,0.25)]' : 'bg-[#747775] shadow-[0_1px_3px_rgba(0,0,0,0.2)]'
-                  }`}
-                  animate={{ 
-                    left: isAllDay ? '18px' : '3px',
-                    width: isAllDay ? '16px' : '12px',
-                    height: isAllDay ? '16px' : '12px',
-                    top: isAllDay ? '2px' : '4px',
-                  }}
-                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                />
-              </button>
+              />
             </div>
-            
-            {/* Date & Time selection buttons (More compact) */}
-            <div className="flex gap-2 mb-3">
-              <button 
-                type="button"
-                onClick={() => setShowCalendar(true)}
-                className="flex-1 px-3 py-1.5 rounded-lg border border-[#DADCE0] text-[10px] text-[#1F1F1F] bg-white text-left hover:border-[#1A73E8] transition-colors flex items-center justify-between"
-              >
-                <span>
-                  {date ? new Date(date.split('-')[0], parseInt(date.split('-')[1]) - 1, date.split('-')[2]).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Date'}
-                </span>
-              </button>
-              {!isAllDay && (
-                <button 
-                  type="button"
-                  onClick={() => setShowClock(true)}
-                  className="flex-1 px-3 py-1.5 rounded-lg border border-[#DADCE0] text-[10px] text-[#1F1F1F] bg-white text-left hover:border-[#1A73E8] transition-colors flex items-center justify-between"
-                >
-                  <span>{time || 'Time'}</span>
-                </button>
-              )}
-            </div>
+          </div>
+          
+          {/* Date row (tappable, 44px min height) */}
+          <button
+            type="button"
+            onClick={() => {
+              if (document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur();
+              }
+              setShowCalendar(true);
+            }}
+            style={{ minHeight: '44px', touchAction: 'manipulation' }}
+            className={`w-full flex items-center space-x-3 py-1 px-1 cursor-pointer select-none rounded-lg hover:bg-gray-100/70 transition-colors text-left focus:outline-none ${
+              isAllDay ? 'mb-3' : 'mb-1'
+            }`}
+          >
+            <Calendar size={22} className="text-[#5F6368] flex-shrink-0" />
+            <span className="text-base font-normal text-[#202124]">
+              {date && typeof date === 'string' && date.includes('-') ? (() => {
+                const parts = date.split('-');
+                if (parts.length === 3) {
+                  const y = parseInt(parts[0], 10);
+                  const m = parseInt(parts[1], 10) - 1;
+                  const d = parseInt(parts[2], 10);
+                  if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+                    const dObj = new Date(y, m, d);
+                    if (!isNaN(dObj.getTime())) {
+                      return dObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                    }
+                  }
+                }
+                return 'Select Date';
+              })() : 'Select Date'}
+            </span>
+          </button>
 
-            {/* Category selector (Compact) */}
-            <div className="border-t border-[#DADCE0]/50 pt-2">
-              <label className="text-[9px] font-semibold uppercase tracking-wider text-[#444746] flex items-center space-x-1 mb-1">
-                <Bookmark size={10} className="text-[#1A73E8]" />
-                <span>Category</span>
-              </label>
-              <div className="flex items-center space-x-1 overflow-x-auto scrollbar-none py-0.5">
-                {categories.map((cat) => {
-                  const isSelected = category === cat.id;
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => setCategory(cat.id)}
-                      className={`flex items-center px-2 py-0.5 rounded-full text-[9px] font-semibold border transition-all cursor-pointer select-none active:scale-95
-                        ${isSelected ? 'text-white shadow-sm' : ''}
-                      `}
-                      style={
-                        isSelected 
-                          ? { backgroundColor: cat.color.solid, borderColor: cat.color.solid }
-                          : { backgroundColor: 'white', borderColor: cat.color.solid + '40', color: cat.color.solid }
-                      }
-                    >
-                      {cat.name}
-                    </button>
-                  );
-                })}
-              </div>
+          {/* Time row (tappable, only when All-day is OFF, 44px min height) */}
+          {!isAllDay && (
+            <button
+              type="button"
+              onClick={() => {
+                if (document.activeElement instanceof HTMLElement) {
+                  document.activeElement.blur();
+                }
+                setShowClock(true);
+              }}
+              style={{ minHeight: '44px', touchAction: 'manipulation' }}
+              className="w-full flex items-center space-x-3 py-1 px-1 cursor-pointer select-none rounded-lg hover:bg-gray-100/70 transition-colors text-left focus:outline-none mb-3"
+            >
+              <Clock size={22} className="text-[#5F6368] flex-shrink-0" />
+              <span className="text-base font-normal text-[#202124]">
+                {time && typeof time === 'string' && time.includes(':') ? (() => {
+                  const { hour, minute, period } = parse24h(time);
+                  if (hour && minute) {
+                    const hClean = String(Number(hour));
+                    if (!isNaN(Number(hClean))) {
+                      return `${hClean}:${minute} ${period}`;
+                    }
+                  }
+                  return 'Select Time';
+                })() : 'Select Time'}
+              </span>
+            </button>
+          )}
+
+          {/* Category selector (Compact) */}
+          <div className="border-t border-[#DADCE0]/50 pt-2">
+            <label className="text-[9px] font-semibold uppercase tracking-wider text-[#444746] flex items-center space-x-1 mb-1">
+              <Bookmark size={10} className="text-[#1A73E8]" />
+              <span>Category</span>
+            </label>
+            <div className="flex items-center space-x-1 overflow-x-auto scrollbar-none py-0.5">
+              {categories.map((cat) => {
+                const isSelected = category === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setCategory(cat.id)}
+                    className={`flex items-center px-2 py-0.5 rounded-full text-[9px] font-semibold border transition-all cursor-pointer select-none active:scale-95
+                      ${isSelected ? 'text-white shadow-sm' : ''}
+                    `}
+                    style={
+                      isSelected 
+                         ? { backgroundColor: cat.color.solid, borderColor: cat.color.solid }
+                         : { backgroundColor: 'white', borderColor: cat.color.solid + '40', color: cat.color.solid }
+                    }
+                  >
+                    {cat.name}
+                  </button>
+                );
+              })}
             </div>
+          </div>
         </div>
-
-        {/* Calendar and Clock pickers are still absolute positioned overlays so they don't move */}
-        {showCalendar && (
-          <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50" onClick={() => setShowCalendar(false)}>
-            <div onClick={(e) => e.stopPropagation()}>
-              <CalendarPicker 
-                value={date} 
-                onChange={(d) => setDate(d)} 
-                onClose={() => setShowCalendar(false)} 
-              />
-            </div>
-          </div>
-        )}
-        {showClock && (
-          <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50" onClick={() => setShowClock(false)}>
-            <div onClick={(e) => e.stopPropagation()}>
-              <ClockPicker 
-                value={time} 
-                onChange={(t) => { setTime(t); setShowClock(false); }} 
-                onClose={() => setShowClock(false)} 
-              />
-            </div>
-          </div>
-        )}
-
 
         {/* Bottom spacer for safe area */}
         <div style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)', flexShrink: 0 }} />
       </form>
+
+      {/* Calendar and Clock pickers are placed outside the form to prevent overflow clipping and transform-positioning bugs */}
+      {showCalendar && createPortal(
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50" onClick={() => setShowCalendar(false)}>
+          <div onClick={(e) => e.stopPropagation()}>
+            <CalendarPicker 
+              value={date} 
+              onChange={(d) => setDate(d)} 
+              onClose={() => setShowCalendar(false)} 
+            />
+          </div>
+        </div>,
+        document.body
+      )}
+      {showClock && createPortal(
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50" onClick={() => setShowClock(false)}>
+          <div onClick={(e) => e.stopPropagation()}>
+            <ClockPicker 
+              value={time} 
+              onChange={(t) => { setTime(t); setShowClock(false); }} 
+              onClose={() => setShowClock(false)} 
+            />
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

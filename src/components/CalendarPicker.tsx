@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { ChevronLeft, ChevronRight, Pencil, Calendar } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pencil, Calendar, ChevronDown } from 'lucide-react';
 
 interface CalendarPickerProps {
   value: string;
@@ -9,19 +9,24 @@ interface CalendarPickerProps {
 }
 
 const parseLocalDate = (dateStr: string): Date => {
-  if (!dateStr) return new Date();
+  if (!dateStr || typeof dateStr !== 'string') return new Date();
   const parts = dateStr.split('-');
   if (parts.length === 3) {
     const y = parseInt(parts[0], 10);
     const m = parseInt(parts[1], 10) - 1;
     const d = parseInt(parts[2], 10);
-    return new Date(y, m, d);
+    if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+      const date = new Date(y, m, d);
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
+    }
   }
   return new Date();
 };
 
 const toManualFormat = (dateStr: string): string => {
-  if (!dateStr) return '';
+  if (!dateStr || typeof dateStr !== 'string') return '';
   const parts = dateStr.split('-');
   if (parts.length === 3) {
     return `${parts[1]}/${parts[2]}/${parts[0]}`; // MM/DD/YYYY
@@ -30,6 +35,7 @@ const toManualFormat = (dateStr: string): string => {
 };
 
 const fromManualFormat = (manualStr: string): string | null => {
+  if (!manualStr || typeof manualStr !== 'string') return null;
   const trimmed = manualStr.trim();
   const parts = trimmed.split('/');
   if (parts.length === 3) {
@@ -44,14 +50,18 @@ const fromManualFormat = (manualStr: string): string | null => {
 };
 
 const formatHeaderDate = (dateStr: string): string => {
-  if (!dateStr) return '';
+  if (!dateStr || typeof dateStr !== 'string') return '';
   const parts = dateStr.split('-');
   if (parts.length === 3) {
     const y = parseInt(parts[0], 10);
     const m = parseInt(parts[1], 10) - 1;
     const d = parseInt(parts[2], 10);
-    const date = new Date(y, m, d);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+      const date = new Date(y, m, d);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      }
+    }
   }
   return '';
 };
@@ -64,6 +74,7 @@ export const CalendarPicker: React.FC<CalendarPickerProps> = ({ value, onChange,
   const [isManualMode, setIsManualMode] = useState(false);
   const [inputText, setInputText] = useState(toManualFormat(value || todayStr));
   const [isValidInput, setIsValidInput] = useState(true);
+  const [showMonthYearSelector, setShowMonthYearSelector] = useState(false);
 
   const dateObj = parseLocalDate(tempDate);
   const [currentMonth, setCurrentMonth] = useState(dateObj.getMonth());
@@ -142,6 +153,7 @@ export const CalendarPicker: React.FC<CalendarPickerProps> = ({ value, onChange,
             type="button" 
             onClick={() => {
               setIsManualMode(!isManualMode);
+              setShowMonthYearSelector(false);
             }} 
             className="p-2 rounded-full hover:bg-black/5 text-[#444746] transition-colors"
           >
@@ -150,53 +162,102 @@ export const CalendarPicker: React.FC<CalendarPickerProps> = ({ value, onChange,
         </div>
       </div>
 
-      {/* BODY CONTENT (Calendar Grid or Manual Input Field) */}
+      {/* BODY CONTENT (Calendar Grid or Manual Input Field or Month Selector) */}
       <div className="min-h-[260px] bg-white rounded-2xl p-4 shadow-inner border border-gray-100 flex flex-col justify-between">
         {!isManualMode ? (
-          <>
-            {/* Month dropdown/navigation */}
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-sm font-semibold text-[#444746]">
-                {months[currentMonth]} {currentYear}
-              </h2>
-              <div className="flex gap-1">
-                <button type="button" onClick={() => {
-                  if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(currentYear - 1); }
-                  else { setCurrentMonth(currentMonth - 1); }
-                }} className="p-1.5 rounded-full hover:bg-[#F2F2F2]"><ChevronLeft size={18} className="text-[#444746]" /></button>
-                <button type="button" onClick={() => {
-                  if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear(currentYear + 1); }
-                  else { setCurrentMonth(currentMonth + 1); }
-                }} className="p-1.5 rounded-full hover:bg-[#F2F2F2]"><ChevronRight size={18} className="text-[#444746]" /></button>
+          showMonthYearSelector ? (
+            <div className="flex flex-col h-full justify-between flex-1">
+              {/* Year Selector */}
+              <div className="flex justify-between items-center mb-4 border-b pb-2 border-gray-100">
+                <button 
+                  type="button" 
+                  onClick={() => setCurrentYear(currentYear - 1)} 
+                  className="p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+                >
+                  <ChevronLeft size={18} className="text-[#444746]" />
+                </button>
+                <span className="text-base font-semibold text-[#1F1F1F]">{currentYear}</span>
+                <button 
+                  type="button" 
+                  onClick={() => setCurrentYear(currentYear + 1)} 
+                  className="p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+                >
+                  <ChevronRight size={18} className="text-[#444746]" />
+                </button>
+              </div>
+              
+              {/* Months Grid */}
+              <div className="grid grid-cols-3 gap-2 flex-1 items-center py-2">
+                {months.map((m, idx) => {
+                  const isCurrent = idx === currentMonth;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => {
+                        setCurrentMonth(idx);
+                        setShowMonthYearSelector(false);
+                      }}
+                      className={`py-2 text-sm font-semibold rounded-full transition-all text-center
+                        ${isCurrent ? 'bg-[#1A73E8] text-white' : 'text-[#444746] hover:bg-[#F2F2F2]'}`}
+                    >
+                      {m.slice(0, 3)}
+                    </button>
+                  );
+                })}
               </div>
             </div>
+          ) : (
+            <>
+              {/* Month dropdown/navigation */}
+              <div className="flex justify-between items-center mb-4">
+                <button 
+                  type="button" 
+                  onClick={() => setShowMonthYearSelector(true)}
+                  className="flex items-center gap-1 text-sm font-semibold text-[#444746] hover:bg-black/5 px-2 py-1 rounded-lg transition-colors cursor-pointer"
+                >
+                  <span>{months[currentMonth]} {currentYear}</span>
+                  <ChevronDown size={16} className="text-[#444746]" />
+                </button>
+                <div className="flex gap-1">
+                  <button type="button" onClick={() => {
+                    if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(currentYear - 1); }
+                    else { setCurrentMonth(currentMonth - 1); }
+                  }} className="p-1.5 rounded-full hover:bg-[#F2F2F2] transition-colors"><ChevronLeft size={18} className="text-[#444746]" /></button>
+                  <button type="button" onClick={() => {
+                    if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear(currentYear + 1); }
+                    else { setCurrentMonth(currentMonth + 1); }
+                  }} className="p-1.5 rounded-full hover:bg-[#F2F2F2] transition-colors"><ChevronRight size={18} className="text-[#444746]" /></button>
+                </div>
+              </div>
 
-            {/* Weekdays */}
-            <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-[#747775] mb-2">
-              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, idx) => <div key={idx}>{d}</div>)}
-            </div>
+              {/* Weekdays */}
+              <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-[#747775] mb-2">
+                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, idx) => <div key={idx}>{d}</div>)}
+              </div>
 
-            {/* Days grid */}
-            <div className="grid grid-cols-7 gap-1 flex-1">
-              {blanks.map(b => <div key={`blank-${b}`} />)}
-              {days.map(day => {
-                const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                const isSelected = tempDate === dateStr;
-                const isToday = todayStr === dateStr;
-                return (
-                  <button
-                    key={day}
-                    type="button"
-                    onClick={() => handleDateClick(day)}
-                    className={`w-8 h-8 flex items-center justify-center rounded-full text-xs transition-all mx-auto
-                      ${isSelected ? 'bg-[#1A73E8] text-white font-semibold shadow-sm' : isToday ? 'bg-[#D3E3FD] text-[#1A73E8] font-semibold' : 'text-[#1F1F1F] hover:bg-[#F2F2F2]'}`}
-                  >
-                    {day}
-                  </button>
-                );
-              })}
-            </div>
-          </>
+              {/* Days grid */}
+              <div className="grid grid-cols-7 gap-y-2 gap-x-1 flex-1">
+                {blanks.map(b => <div key={`blank-${b}`} />)}
+                {days.map(day => {
+                  const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                  const isSelected = tempDate === dateStr;
+                  const isToday = todayStr === dateStr;
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() => handleDateClick(day)}
+                      className={`w-8 h-8 flex items-center justify-center rounded-full text-xs transition-all mx-auto
+                        ${isSelected ? 'bg-[#1A73E8] text-white font-semibold shadow-sm' : isToday ? 'bg-[#D3E3FD] text-[#1A73E8] font-semibold' : 'text-[#1F1F1F] hover:bg-[#F2F2F2]'}`}
+                    >
+                      {day}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )
         ) : (
           <div className="flex flex-col justify-center flex-1 py-4">
             <div className="relative my-4">

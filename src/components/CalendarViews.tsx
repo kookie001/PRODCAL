@@ -1539,6 +1539,7 @@ interface DraggableTaskBlockProps {
 }
 
 const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, onReschedule, onEditOpen }) => {
+  const addDebug = (msg: string) => {};
   const [expanded, setExpanded] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(task.title)
@@ -1581,8 +1582,10 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
     if (moved.current) return;
     tapCount.current += 1;
     clearTimeout(tapTimer.current);
+    addDebug(`tap=${tapCount.current} title=${isTitle}`);
     if (tapCount.current >= 3) {
       tapCount.current = 0;
+      addDebug(`DELETE ${task.title}`);
       if (navigator.vibrate) {
         navigator.vibrate([30, 40, 30]);
       }
@@ -1591,6 +1594,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
     }
     tapTimer.current = setTimeout(() => {
       if (tapCount.current === 1 && isTitle) {
+        addDebug(`EDIT ${task.title}`);
         onEditOpen(task);
       }
       tapCount.current = 0;
@@ -1768,8 +1772,8 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       }}
       transition={{ duration: 0.2, type: 'spring', stiffness: 300, damping: 20 }}
       style={{
-        ...style,
         position: 'absolute',
+        ...style,
         backgroundColor: bg,
         borderRadius: '12px',
         border: borderStyle,
@@ -1802,14 +1806,16 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
           <button
             onTouchEnd={(e) => {
               lastTouchTime.current = Date.now()
-              e.stopPropagation()
+              e.stopPropagation()   // stops the card tap counter from seeing this
               e.preventDefault()
-              setExpanded(p => !p)
+              if (!moved.current) {
+                setExpanded(prev => !prev)
+              }
             }}
             onMouseUp={(e) => {
               if (Date.now() - lastTouchTime.current < 500) return
               e.stopPropagation()
-              setExpanded(p => !p)
+              if (!moved.current) setExpanded(prev => !prev)
             }}
             style={{
               width: '44px',
@@ -1938,11 +1944,11 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: '40px',
-            height: '40px',
-            minWidth: '40px',
+            width: '44px',
+            height: '44px',
+            minWidth: '44px',
             padding: 0,
-            margin: '-12px',
+            margin: '-14px',
             background: 'transparent',
             border: 'none',
             cursor: 'pointer',
@@ -2704,190 +2710,21 @@ const DayView: React.FC<DayViewProps> = ({
 
           {/* Non-timed tasks list */}
           <div className="absolute top-2 left-4 right-4 flex flex-col space-y-1.5">
-            {dayTasks.filter(t => !t.time).map((task) => {
-              const cat = CATEGORIES.find((c) => c.id === task.category) || CATEGORIES[0];
-              const isExpanded = expandedTaskId === task.id;
-              const hasSubtasks = task.subtasks && task.subtasks.length > 0;
-
-              const deleteTask = useTaskStore.getState().deleteTask;
-              const setEditingTask = useTaskStore.getState().setEditingTask;
-
-              return (
-                <div
-                  key={task.id}
-                  className="relative overflow-hidden rounded-xl"
-                  style={{ minHeight: '44px' }}
-                >
-                  {/* Swipe background */}
-                  <div className="absolute inset-0 bg-rose-600 rounded-xl flex items-center justify-between px-4 text-white z-0 pointer-events-none">
-                    <Trash2 size={16} className="animate-pulse" />
-                    <Trash2 size={16} className="animate-pulse" />
-                  </div>
-
-                  {/* Draggable container */}
-                  <motion.div
-                    drag="x"
-                    dragDirectionLock
-                    dragConstraints={{ left: 0, right: 0 }}
-                    dragElastic={{ left: 0.95, right: 0.95 }}
-                    onDragEnd={(event, info) => {
-                      const threshold = 100;
-                      if (Math.abs(info.offset.x) > threshold) {
-                        deleteTask(task.id);
-                      }
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (isExpanded) {
-                        setExpandedTaskId(null);
-                      } else {
-                        setExpandedTaskId(task.id);
-                      }
-                    }}
-                    className={`p-3 rounded-xl border text-sm cursor-pointer shadow-xs transition-all duration-200 flex flex-col pl-5 relative z-10
-                      ${isExpanded ? 'z-50 ring-1 ring-blue-400 border-blue-400 shadow-sm' : 'hover:scale-[1.01] hover:shadow-xs'}
-                      ${task.completed
-                        ? 'bg-gray-50 text-gray-400 border-gray-200'
-                        : `${cat.color.bgLight} ${cat.color.light} ${cat.color.borderLight}`
-                      }
-                    `}
-                    style={{ touchAction: 'pan-y' }}
-                  >
-                    {/* Ripple effect */}
-                    <Ripple color="rgba(0, 0, 0, 0.05)" />
-
-                    {/* Accent left stripe */}
-                    <div 
-                      className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl transition-colors" 
-                      style={{ backgroundColor: task.completed ? '#cbd5e1' : cat.color.solid }}
-                    />
-
-                    {/* Title and Checkbox row */}
-                    <div className="flex items-center justify-between min-w-0 relative z-10">
-                      <div className="flex items-center min-w-0 flex-1">
-                        <button
-                          type="button"
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateTask(task.id, { completed: !task.completed });
-                          }}
-                          className="p-0.5 rounded-full text-gray-500 hover:text-gray-800 transition-colors flex-shrink-0 mr-2 cursor-pointer"
-                        >
-                          <span 
-                            className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all
-                              ${task.completed 
-                                ? 'bg-blue-600 border-blue-600 text-white' 
-                                : 'bg-transparent border-gray-400 hover:border-gray-600'
-                              }
-                            `}
-                            style={task.completed ? { backgroundColor: cat.color.solid, borderColor: cat.color.solid } : { borderColor: cat.color.solid }}
-                          >
-                            {task.completed && <Check size={10} className="stroke-[3px] text-white" />}
-                          </span>
-                        </button>
-                        <span className={`font-bold truncate flex-1 relative inline-block ${task.completed ? 'text-gray-400 font-normal' : ''}`}>
-                          <span>All-Day Task: {task.title}</span>
-                          <motion.span
-                            initial={{ width: 0 }}
-                            animate={{ width: task.completed ? '100%' : 0 }}
-                            transition={{ duration: 0.25, ease: 'easeOut' }}
-                            className="absolute left-0 top-1/2 h-[1.5px] bg-gray-400"
-                            style={{ transform: 'translateY(-50%)' }}
-                          />
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Expanded state details */}
-                    {isExpanded && (
-                      <div className="mt-2 pt-2 border-t border-black/5 flex flex-col space-y-2 text-xs relative z-10">
-                        <div className="flex items-center space-x-1.5 text-gray-500 font-medium">
-                          <CalendarDays size={13} />
-                          <span>{task.date} (All Day)</span>
-                        </div>
-
-                        <div className="flex items-center space-x-2 pt-0.5">
-                          <button
-                            type="button"
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingTask(task);
-                              setFABOpen(true);
-                            }}
-                            className="flex items-center space-x-1 px-3 py-1 rounded bg-black/5 hover:bg-black/10 text-gray-700 font-semibold select-none cursor-pointer transition-colors"
-                          >
-                            <Edit3 size={12} />
-                            <span>Edit</span>
-                          </button>
-                          <button
-                            type="button"
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteTask(task.id);
-                            }}
-                            className="flex items-center space-x-1 px-3 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold select-none cursor-pointer transition-colors"
-                          >
-                            <Trash2 size={12} />
-                            <span>Delete</span>
-                          </button>
-                        </div>
-
-                        {/* Subtasks inside expanded all-day task */}
-                        {hasSubtasks && (
-                          <div className="mt-2 space-y-1 pt-2 border-t border-black/5">
-                            {task.subtasks.map((sub, idx) => {
-                              const isDragging = draggedSubTaskId === task.id && draggedSubId === sub.id;
-                              return (
-                                <div 
-                                  key={sub.id} 
-                                  className={`flex items-center space-x-2 py-0.5 transition-shadow select-none relative
-                                    ${isDragging ? 'z-50 opacity-70 scale-[1.02]' : ''}
-                                  `}
-                                  style={isDragging ? { transform: `translateY(${subDraggedOffset}px)`, position: 'relative' } : undefined}
-                                >
-                                  {/* Grab Handle */}
-                                  <span
-                                    onPointerDown={(e) => handleSubPointerDown(task.id, sub.id, e)}
-                                    onPointerMove={(e) => handleSubPointerMove(task.id, sub.id, e)}
-                                    onPointerUp={(e) => handleSubPointerUp(task.id, sub.id, e)}
-                                    className="text-gray-400 hover:text-gray-800 cursor-grab active:cursor-grabbing px-1 touch-none select-none flex items-center justify-center w-5 h-5 hover:bg-gray-100 rounded font-bold"
-                                  >
-                                    ≡
-                                  </span>
-
-                                  <button
-                                    type="button"
-                                    onPointerDown={(e) => e.stopPropagation()}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toggleSubtask(task.id, sub.id);
-                                    }}
-                                    className="p-0.5 text-gray-500 hover:text-gray-800 rounded flex-shrink-0 cursor-pointer"
-                                  >
-                                    <span 
-                                      className={`w-2 h-2 rounded-full flex items-center justify-center border border-current flex-shrink-0 transition-all
-                                        ${sub.completed ? 'bg-blue-600 border-blue-600' : 'bg-transparent border-gray-400'}
-                                      `}
-                                      style={!sub.completed ? { color: cat.color.solid, borderColor: cat.color.solid } : undefined}
-                                    />
-                                  </button>
-                                  <span className={`truncate text-xs flex-1 ${sub.completed ? 'line-through opacity-50' : 'font-medium text-gray-700'}`}>
-                                    {sub.title}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </motion.div>
-                </div>
-              );
-            })}
+            {dayTasks.filter(t => !t.time).map((task) => (
+              <DraggableTaskBlock
+                key={task.id}
+                task={task}
+                pixelsPerMinute={64 / 60}
+                onReschedule={handleReschedule}
+                onEditOpen={openEditSheet}
+                style={{
+                  position: 'relative',
+                  width: '100%',
+                  left: 'auto',
+                  top: 'auto',
+                }}
+              />
+            ))}
           </div>
         </div>
 
