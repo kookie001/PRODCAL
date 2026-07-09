@@ -1627,10 +1627,21 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
   const fgSub = completed ? '#9CA3AF' : '#2563EB'
   const borderStyle = completed ? '1px solid #E5E7EB' : '1px solid #BFDBFE'
 
+  const resetDragState = useCallback(() => {
+    dragging.current = false
+    moved.current = false
+    setIsActivelyDragging(false)
+    setIsDraggingSubtask(false)
+  }, [])
+
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (isDraggingSubtask) return
+    if (isDraggingSubtask) {
+      resetDragState()
+      return
+    }
     const target = e.target as HTMLElement
     if (target.closest('button') || target.closest('[data-subtask-drag-handle]') || target.closest('[data-subtask-panel]')) {
+      resetDragState()
       return
     }
     touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, time: Date.now() }
@@ -1640,13 +1651,34 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
     if (blockRef.current) {
       currentTop.current = parseFloat(blockRef.current.style.top || '0')
     }
-  }
 
-  const resetDragState = useCallback(() => {
-    dragging.current = false
-    moved.current = false
-    setIsActivelyDragging(false)
-  }, [])
+    const onTouchEndNative = () => {
+      lastTouchTime.current = Date.now()
+      if (dragging.current && moved.current && blockRef.current) {
+        const finalTop = parseFloat(blockRef.current.style.top || '0')
+        const pixelsPerMinute = 64 / 60
+        const minutes = finalTop / pixelsPerMinute
+        const snappedMinutes = Math.round(minutes / 15) * 15
+        const clampedMins = Math.max(0, Math.min(1425, snappedMinutes))
+        const h = Math.floor(clampedMins / 60)
+        const m = clampedMins % 60
+        const newTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+        onReschedule(task.id, newTime)
+      }
+      resetDragState()
+      window.removeEventListener('touchend', onTouchEndNative)
+      window.removeEventListener('touchcancel', onTouchCancelNative)
+    }
+
+    const onTouchCancelNative = () => {
+      resetDragState()
+      window.removeEventListener('touchend', onTouchEndNative)
+      window.removeEventListener('touchcancel', onTouchCancelNative)
+    }
+
+    window.addEventListener('touchend', onTouchEndNative)
+    window.addEventListener('touchcancel', onTouchCancelNative)
+  }
 
   const handleTouchEnd = () => {
     if (dragging.current && moved.current && blockRef.current) {
@@ -1664,10 +1696,17 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
   }
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (isDraggingSubtask) return
-    if (e.button !== 0) return
+    if (isDraggingSubtask) {
+      resetDragState()
+      return
+    }
+    if (e.button !== 0) {
+      resetDragState()
+      return
+    }
     const target = e.target as HTMLElement
     if (target.closest('button') || target.closest('[data-subtask-drag-handle]') || target.closest('[data-subtask-panel]')) {
+      resetDragState()
       return
     }
     touchStart.current = { x: e.clientX, y: e.clientY, time: Date.now() }
@@ -1687,7 +1726,6 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         if (!moved.current) {
           moved.current = true
           setIsActivelyDragging(true)
-          setExpanded(false)
         }
       }
       if (moved.current) {
@@ -1731,7 +1769,6 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         if (!moved.current) {
           moved.current = true
           setIsActivelyDragging(true)
-          setExpanded(false)
         }
         e.preventDefault()
       }
@@ -1764,6 +1801,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         if (e.target === e.currentTarget) {
           handleUnifiedTap(false)
         }
+        resetDragState()
       }}
       onMouseDown={handleMouseDown}
       whileHover={{
@@ -1778,7 +1816,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         borderRadius: '12px',
         border: borderStyle,
         minHeight: '44px',
-        overflow: expanded ? 'visible' : 'hidden',
+        overflow: (expanded && !isActivelyDragging) ? 'visible' : 'hidden',
         touchAction: 'none',
         userSelect: 'none',
         WebkitUserSelect: 'none',
@@ -1787,7 +1825,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
-        zIndex: expanded ? 200 : (dragging.current ? 250 : (style?.zIndex || 1)),
+        zIndex: (expanded && !isActivelyDragging) ? 200 : (dragging.current ? 250 : (style?.zIndex || 1)),
       }}
     >
       {/* MAIN ROW — always visible */}
@@ -1804,18 +1842,23 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         {/* LEFT: expand toggle — small, minimal */}
         {task.subtasks && task.subtasks.length > 0 && (
           <button
-            onTouchEnd={(e) => {
-              lastTouchTime.current = Date.now()
-              e.stopPropagation()   // stops the card tap counter from seeing this
+            onTouchStart={(e) => {
+              e.stopPropagation()
               e.preventDefault()
-              if (!moved.current) {
-                setExpanded(prev => !prev)
-              }
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+            }}
+            onTouchEnd={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              setExpanded(prev => !prev)
             }}
             onMouseUp={(e) => {
-              if (Date.now() - lastTouchTime.current < 500) return
               e.stopPropagation()
-              if (!moved.current) setExpanded(prev => !prev)
+              e.preventDefault()
+              setExpanded(prev => !prev)
             }}
             style={{
               width: '44px',
@@ -1844,7 +1887,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
               alignItems: 'center',
               justifyContent: 'center',
               transition: 'transform 180ms ease',
-              transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+              transform: (expanded && !isActivelyDragging) ? 'rotate(90deg)' : 'rotate(0deg)',
             }}>
               <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
                 <path d="M2 3L4 5L6 3" stroke={fg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -1978,7 +2021,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       </div>
 
       {/* SUBTASKS — expand below */}
-      {expanded && (
+      {(expanded && !isActivelyDragging) && (
         <div 
           data-subtask-panel="true"
           onClick={(e) => e.stopPropagation()}

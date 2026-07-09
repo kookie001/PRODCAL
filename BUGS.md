@@ -6,6 +6,17 @@
 
 ## Resolved Bugs
 
+- **BUG 7: Chevron button / subtask visibility broken after dragging a task card**
+  - *Description:* Tapping the chevron button after dragging a task card did nothing or failed to show/hide subtasks.
+  - *Root Cause:*
+    1. During a drag, the auto-collapse logic previously called `setExpanded(false)`, permanently destroying the expanded state. (Fixed in previous commit).
+    2. React synthetic `onTouchEnd` events on the task block card do not fire if the touch originates on child text nodes (like `<p>` of task title) that stop propagation inside their own touch handlers (e.g., to prevent double tap/clicking). Because propagation was stopped, `resetDragState` was skipped, leaving `dragging.current`, `moved.current`, and `isActivelyDragging` permanently stuck as `true` after a drop. This in turn blocked subtask rendering and locked the container zIndex at 250.
+  - *Resolution:*
+    1. Removed permanent `setExpanded(false)` from dragging code. Instead, made collapse-during-drag a visual-only state check (`expanded && !isActivelyDragging` inside render). This preserves the `expanded` state so subtasks automatically reappear when the drag ends.
+    2. Implemented native window `touchend` and `touchcancel` event listeners registered dynamically inside `handleTouchStart` to guarantee cleanup of drag/touch states even when child components stop propagation.
+    3. Expanded `resetDragState` to clean up `dragging.current`, `moved.current`, `isActivelyDragging`, and `isDraggingSubtask` unconditionally.
+    4. Simplified the chevron's handlers to be purely unguarded toggles that propagate stop/prevent defaults cleanly.
+
 - **BUG 5: Date/Time Pickers render blank or are clipped/not shown**
   - *Description:* Clicking on the date or time inside the task creation page resulted in nothing showing up or appearing blank/invisible.
   - *Root Cause:* Position absolute/fixed picker overlays were being clipped or hidden by container-level parent layouts, overflow rules, or translation transformations.
