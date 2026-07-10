@@ -1,6 +1,8 @@
 # Changelog
 
 ## [2026-07-09]
+- Make Add Subtask and More Options buttons compact and inline-flex inside TaskSheet to save vertical space.
+- Add collapsible More Options section for all-day/date/category, default collapsed.
 - Fix long-press gesture reliability on touch devices by increasing movement tolerance threshold to 20px.
 - Suppress synthetic click/tap and edit-modal opening after completing a pending list task drag-and-drop gesture.
 - Sync header date display to show activeDate instead of current real-world date.
