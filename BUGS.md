@@ -6,6 +6,41 @@
 
 ## Resolved Bugs
 
+- **BUG 16: Selected AM/PM time picker buttons are low contrast and hard to see**
+  - *Description:* The selected AM or PM button in the ClockPicker had low contrast (only a faint tint), making it difficult to instantly identify which state was active.
+  - *Root Cause:* The style was relying on a light background color without a distinct border highlight or high-contrast foreground color.
+  - *Resolution:* Configured the selected AM/PM state to use a bold solid black border (`2px solid #000000`), a distinct light green background (`#E6F4EA`), and highly readable dark green text (`#137333`) while preserving muted defaults for the unselected states.
+
+- **BUG 15: Pending/My Tasks list shows today's tasks and fails to rollover incomplete tasks automatically**
+  - *Description:* Today's tasks were showing up in both the timeline and the Pending list, which cluttered the list. Additionally, when the date rolled over to the next day at midnight, today's incomplete tasks did not move to the pending list without a manual page refresh.
+  - *Root Cause:* The pending list filter was checking `!task.completed` without excluding today's tasks. The list did not listen to visibility changes or use a background timer to recompute "today" dynamically.
+  - *Resolution:* Filtered out today's tasks using `task.date !== todayStr` where `todayStr` is a synchronized React state of the current date in `'yyyy-MM-dd'` format. Implemented dynamic today-date recomputation on mount, on app visibility/focus regain, and on a 30-second periodic background interval. Yesterday's incomplete tasks now rollover to the Pending/My Tasks list instantly and automatically at midnight.
+
+- **BUG 12: Android back button closes the app instead of closing the task sheet**
+  - *Description:* Pressing the physical Android back button while the task create/edit sheet was open closed the entire app instead of closing only the sheet.
+  - *Root Cause:* Programmatic `.click()` triggers on the backdrop element failed or was bypassed, causing the back button popstate interceptor to fall through.
+  - *Resolution:* Promoted the task sheet open check to the highest priority, and directly close the sheet using real Zustand store state actions (`setFABOpen(false)`, etc.) instead of DOM click hacks, preventing fall-through completely.
+
+- **BUG 13: Chevron button appears on task cards with no subtasks**
+  - *Description:* The expand/collapse chevron button rendered on all task cards, even when the task had zero subtasks or only completed subtasks (leaving an empty dropdown/gap).
+  - *Root Cause:* The chevron button rendering was guarded only by `task.subtasks.length > 0` instead of checking for active/incomplete subtasks.
+  - *Resolution:* Updated the guard condition to `task.subtasks.filter(s => !s.completed).length > 0`. Tasks with no incomplete subtasks now show absolutely no chevron or empty gap, and their titles cleanly fill the card.
+
+- **BUG 14: Search filters the timeline in-place instead of showing navigatable results**
+  - *Description:* Typing in the search bar filtered tasks in-place on the timeline, hiding non-matching entries.
+  - *Root Cause:* The search bar was coupled directly to the timeline filter instead of generating a navigatable list of results.
+  - *Resolution:* Removed search query filtering from the timeline completely. Built a floating search results dropdown under the header search bar which searches across all dates. Tapping a result navigates directly to that task's date, sets the Day view active, and scrolls the timeline smoothly to the task's hour.
+
+- **BUG 10: Header search input does not filter tasks in real-time**
+  - *Description:* Typing in the header search bar did not filter the tasks displayed on the Day view timeline or the Pending/My Tasks list.
+  - *Root Cause:* The header search input was not fully wired to a common, synchronized search state that is consumed by both the timeline views (`CalendarViews.tsx`) and the tasks list overlay drawer (`TasksOverlay.tsx`).
+  - *Resolution:* Linked the header input's search query to a unified `searchQuery` state in `App.tsx` and passed it down to both `CalendarViews` and `TasksOverlay`. Both views now filter tasks in real-time (case-insensitive title and subtask match) as the user types, and added a small clear (×) button to the search input.
+
+- **BUG 11: Android back button closes the entire app instead of closing open overlays or pickers**
+  - *Description:* Pressing the physical Android back button while the task sheet, a date/time picker, the sidebar drawer, or the My Tasks overlay was open would close the entire app.
+  - *Root Cause:* The event handler in `App.tsx` did not prevent default or push state when overlays were open. It lacked a structured, priority-based state checking mechanism to close the open overlay instead of falling through to app exit.
+  - *Resolution:* Implemented a clean, priority-ordered popstate back-button interceptor using refs to avoid stale react closures. The interceptor programmatically clicks the close/backdrop elements of active pickers, the task sheet, the sidebar, the Pending/My Tasks list, and clears active search queries. The app is only allowed to exit (with a double-tap 2s timeout toast) when no overlays or pickers are open.
+
 - **BUG 8: Task completion circle overlaps title/chevron or is too sensitive**
   - *Description:* Tapping near the completion circle could accidentally trigger details modal/edit view or expand/collapse chevrons, or tap nearby space to toggle task completion.
   - *Root Cause:* The completion `<button>` element previously had a broad hit box with either negative margins or excessive padding.

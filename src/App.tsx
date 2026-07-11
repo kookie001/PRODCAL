@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, ListTodo, Clock, CalendarDays, Grid, Search, ArrowLeft, X, Menu, Calendar, Settings } from 'lucide-react';
 
@@ -38,6 +38,18 @@ export default function App() {
     setToastMsg(msg);
   };
 
+  // Refs to avoid stale closures in event listeners
+  const isSidebarOpenRef = useRef(isSidebarOpen);
+  const searchQueryRef = useRef(searchQuery);
+
+  useEffect(() => {
+    isSidebarOpenRef.current = isSidebarOpen;
+  }, [isSidebarOpen]);
+
+  useEffect(() => {
+    searchQueryRef.current = searchQuery;
+  }, [searchQuery]);
+
   useEffect(() => {
     if (toastMsg) {
       const timer = setTimeout(() => setToastMsg(''), 2000);
@@ -50,12 +62,65 @@ export default function App() {
     let lastBackPress = 0;
 
     const handleBackButton = (e: PopStateEvent) => {
-      if (useTaskStore.getState().isTaskSheetOpen) {
-        return; // sheet handles its own back
-      }
-      if (useTaskStore.getState().isFABOpen) {
+      // 1. Check if task sheet (FAB) is open — highest priority
+      const isFABOpen = useTaskStore.getState().isFABOpen;
+      const isTaskSheetOpen = useTaskStore.getState().isTaskSheetOpen;
+      if (isFABOpen || isTaskSheetOpen) {
+        // Check if calendar picker is open inside the TaskSheet
+        const calendarPickerOverlay = document.getElementById('calendar-picker-overlay');
+        if (calendarPickerOverlay) {
+          calendarPickerOverlay.click();
+          e.preventDefault();
+          window.history.pushState(null, '', window.location.href);
+          return;
+        }
+
+        // Check if clock picker is open inside the TaskSheet
+        const clockPickerOverlay = document.getElementById('clock-picker-overlay');
+        if (clockPickerOverlay) {
+          clockPickerOverlay.click();
+          e.preventDefault();
+          window.history.pushState(null, '', window.location.href);
+          return;
+        }
+
+        // Otherwise directly close the task sheet using real state functions
+        useTaskStore.getState().setFABOpen(false);
+        useTaskStore.getState().setTaskSheetOpen(false);
+        useTaskStore.getState().setEditingTask(null);
+        useTaskStore.getState().setPrefilledTime('');
+        useTaskStore.getState().setPrefilledTitle('');
+        
+        e.preventDefault();
+        window.history.pushState(null, '', window.location.href);
         return;
       }
+
+      // 2. Check if drawer/sidebar is open
+      if (isSidebarOpenRef.current) {
+        setIsSidebarOpen(false);
+        e.preventDefault();
+        window.history.pushState(null, '', window.location.href);
+        return;
+      }
+
+      // 3. Check if Pending/My Tasks list overlay is open
+      if (useTaskStore.getState().isTasksOverlayOpen) {
+        useTaskStore.getState().setTasksOverlayOpen(false);
+        e.preventDefault();
+        window.history.pushState(null, '', window.location.href);
+        return;
+      }
+
+      // 4. Check if search is active/query not empty
+      if (searchQueryRef.current.trim() !== '') {
+        setSearchQuery('');
+        e.preventDefault();
+        window.history.pushState(null, '', window.location.href);
+        return;
+      }
+
+      // 5. On main timeline with nothing open -> allow app exit (press back again to exit)
       const now = Date.now();
       if (now - lastBackPress < 2000) {
         // Second press within 2 seconds — allow exit
@@ -258,7 +323,12 @@ export default function App() {
 
         {/* Global Google Calendar style Tasks list overlay */}
         <AnimatePresence>
-          {isTasksOverlayOpen && <TasksOverlay />}
+          {isTasksOverlayOpen && (
+            <TasksOverlay 
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+            />
+          )}
         </AnimatePresence>
 
         {/* Toast Notification */}

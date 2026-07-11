@@ -130,7 +130,12 @@ const TaskItemRow = React.memo(({
   );
 });
 
-export const TasksOverlay: React.FC = () => {
+interface TasksOverlayProps {
+  searchQuery?: string;
+  setSearchQuery?: (query: string) => void;
+}
+
+export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSearchQuery }) => {
   const isTasksOverlayOpen = useTaskStore((state) => state.isTasksOverlayOpen);
   const setTasksOverlayOpen = useTaskStore((state) => state.setTasksOverlayOpen);
   const tasks = useTaskStore((state) => state.tasks);
@@ -150,10 +155,38 @@ export const TasksOverlay: React.FC = () => {
   }, []);
 
   // Drag and Drop States for Pending Tasks
-  const [gcalTaskQuery, setGcalTaskQuery] = useState('');
+  const [localGcalTaskQuery, setLocalGcalTaskQuery] = useState('');
+  const gcalTaskQuery = searchQuery !== undefined ? searchQuery : localGcalTaskQuery;
+  const setGcalTaskQuery = setSearchQuery !== undefined ? setSearchQuery : setLocalGcalTaskQuery;
+
   const [isCompletedExpanded, setIsCompletedExpanded] = useState(true);
   const [gcalExpandedTaskIds, setGcalExpandedTaskIds] = useState<string[]>([]);
   const [isFullScreen, setIsFullScreen] = useState(false);
+
+  const [todayStr, setTodayStr] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+
+  useEffect(() => {
+    const updateToday = () => {
+      setTodayStr(format(new Date(), 'yyyy-MM-dd'));
+    };
+
+    updateToday(); // Recompute on mount
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        updateToday();
+      }
+    };
+    
+    // Also a periodic check every 30 seconds
+    const interval = setInterval(updateToday, 30000);
+
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      clearInterval(interval);
+    };
+  }, []);
 
   // Multi-Selection States
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
@@ -292,17 +325,17 @@ export const TasksOverlay: React.FC = () => {
     }, 280);
   };
 
-  const allPendingTasks = tasks.filter((task) => !task.completed);
+  const allPendingTasks = tasks.filter((task) => !task.completed && task.date !== todayStr);
   const completedTasks = tasks.filter((task) => task.completed);
   const sortedPending = [...allPendingTasks].sort((a, b) => a.date.localeCompare(b.date));
 
   const getTaskDateLabel = (dateStr: string) => {
     if (!dateStr) return 'No Date';
     try {
+      if (dateStr === todayStr) return 'Today';
       const parsed = parseISO(dateStr);
-      if (isToday(parsed)) return 'Today';
-      const tomorrow = addDays(new Date(), 1);
-      if (format(tomorrow, 'yyyy-MM-dd') === dateStr) return 'Tomorrow';
+      const tomorrowStr = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+      if (tomorrowStr === dateStr) return 'Tomorrow';
       return format(parsed, 'MMM d');
     } catch {
       return dateStr;
@@ -323,7 +356,6 @@ export const TasksOverlay: React.FC = () => {
     }
     try {
       const parsed = parseISO(dateStr);
-      const todayStr = format(new Date(), 'yyyy-MM-dd');
       const tomorrowStr = format(addDays(new Date(), 1), 'yyyy-MM-dd');
 
       const isTodayDate = dateStr === todayStr;
@@ -502,6 +534,7 @@ export const TasksOverlay: React.FC = () => {
               <>
                 <div className="flex items-center space-x-3">
                   <button
+                    id="tasks-overlay-close-btn"
                     type="button"
                     onClick={handleClose}
                     className="p-2.5 hover:bg-gray-100 active:bg-gray-200/70 rounded-full text-gray-600 transition-all cursor-pointer flex items-center justify-center active:scale-95 touch-manipulation"

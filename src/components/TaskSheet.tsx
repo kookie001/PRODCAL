@@ -585,6 +585,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
     <div style={{ zIndex: 2000 }} className="fixed inset-0 flex items-end justify-center select-none">
       {/* Backdrop */}
       <div
+        id="task-sheet-backdrop"
         style={{ zIndex: 1999 }}
         className={`absolute inset-0 bg-black/40 cursor-default transition-opacity duration-280 ${
           isOpen ? 'opacity-100' : 'opacity-0'
@@ -928,7 +929,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
 
       {/* Calendar and Clock pickers are placed outside the form to prevent overflow clipping and transform-positioning bugs */}
       {showCalendar && createPortal(
-        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50" onClick={() => setShowCalendar(false)}>
+        <div id="calendar-picker-overlay" className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50" onClick={() => setShowCalendar(false)}>
           <div onClick={(e) => e.stopPropagation()}>
             <CalendarPicker 
               value={date} 
@@ -940,7 +941,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
         document.body
       )}
       {showClock && createPortal(
-        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50" onClick={() => setShowClock(false)}>
+        <div id="clock-picker-overlay" className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50" onClick={() => setShowClock(false)}>
           <div onClick={(e) => e.stopPropagation()}>
             <ClockPicker 
               value={time} 

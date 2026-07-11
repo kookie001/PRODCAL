@@ -220,22 +220,24 @@ export const ClockPicker: React.FC<ClockPickerProps> = ({ value, onChange, onClo
             <button
               type="button"
               onClick={() => setTempPeriod('AM')}
-              className={`w-[52px] h-[36px] flex items-center justify-center rounded-full text-xs font-semibold uppercase tracking-wider transition-all duration-200 border ${
+              className="w-[52px] h-[36px] flex items-center justify-center rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer"
+              style={
                 tempPeriod === 'AM'
-                  ? 'bg-[#E6F4EA] text-[#137333] border-transparent font-bold'
-                  : 'bg-white text-[#5F6368] border-[#747775] hover:bg-black/5'
-              }`}
+                  ? { border: '2px solid #000000', backgroundColor: '#E6F4EA', color: '#137333' }
+                  : { border: '1px solid #DADCE0', backgroundColor: '#FFFFFF', color: '#5F6368' }
+              }
             >
               AM
             </button>
             <button
               type="button"
               onClick={() => setTempPeriod('PM')}
-              className={`w-[52px] h-[36px] flex items-center justify-center rounded-full text-xs font-semibold uppercase tracking-wider transition-all duration-200 border ${
+              className="w-[52px] h-[36px] flex items-center justify-center rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer"
+              style={
                 tempPeriod === 'PM'
-                  ? 'bg-[#E6F4EA] text-[#137333] border-transparent font-bold'
-                  : 'bg-white text-[#5F6368] border-[#747775] hover:bg-black/5'
-              }`}
+                  ? { border: '2px solid #000000', backgroundColor: '#E6F4EA', color: '#137333' }
+                  : { border: '1px solid #DADCE0', backgroundColor: '#FFFFFF', color: '#5F6368' }
+              }
             >
               PM
             </button>

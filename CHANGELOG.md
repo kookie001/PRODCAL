@@ -1,6 +1,15 @@
 # Changelog
 
 ## [2026-07-11]
+- Highlight selected AM/PM buttons in the ClockPicker with a solid black border (`2px solid #000000`), a light green background (`#E6F4EA`), and dark green text (`#137333`) for maximum contrast and readability, while keeping unselected buttons muted.
+- Fix pending task count badge across CalendarViews and Header to exclude today's tasks, matching the filter logic of the Pending list.
+- Pending/My Tasks list excludes today's tasks and displays only past-day or future-day incomplete tasks, keeping today's focus entirely on the main timeline.
+- Automatically rollover yesterday's incomplete tasks to the pending list at midnight using a synchronized React date state that updates on app focus, mount, and a periodic background timer.
+- Fix back button on task sheet: Directly check the sheet's open state as the highest priority and close it using real Zustand store state actions instead of programmatic click tricks.
+- Render chevron button in DraggableTaskBlock ONLY when there is at least one incomplete subtask (no chevron and no empty gap on subtask-free tasks).
+- Refactor search into a results dropdown: Typing in the search bar displays a dropdown list of matching tasks across all dates, and tapping a result navigates to the task's date and scrolls the timeline to its time.
+- Make the header search bar fully functional in real-time for filtering tasks in the active Day view timeline and the Pending/My Tasks list (case-insensitive, matches title and subtasks).
+- Implement a smart priority-based physical Android back-button popstate interceptor that closes open pickers, the task sheet, the sidebar, the Pending/My Tasks overlay, and clears active search before exiting the app.
 - Restrict completion circle touch target area to a precise 26px (matching a ~18px visible circle), with 0 margin, and keep touchAction 'manipulation' for instant, single-tap response on Android.
 - Prevent task completion circle events from propagating and prevent default behavior on pointer down, touch start, mouse down, touch end, and mouse up to isolate interaction entirely to the circle graphic.
 - Route completed subtasks from incomplete tasks into the Completed Tasks & Subtasks section of the TasksOverlay, displaying them in a muted strikethrough style with their parent task name as context, while keeping original subtask data intact.

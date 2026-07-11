@@ -144,14 +144,11 @@ export const CalendarViews: React.FC<CalendarViewsProps> = ({ searchQuery }) => 
     setTempTimeStr(null);
   };
 
-  // Filter tasks by category and search query, and exclude completed tasks from timeline
+  // Filter tasks by category and exclude completed tasks from timeline (do NOT filter by search query anymore!)
   const filteredTasks = tasks.filter((task) => {
     if (task.completed) return false;
     const matchesCategory = selectedCategory === 'All' || task.category === selectedCategory;
-    const matchesQuery = searchQuery.trim() === '' || 
-      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.subtasks.some((sub) => sub.title.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesCategory && matchesQuery;
+    return matchesCategory;
   });
 
   const openPopover = (date: Date, hour: number) => {
@@ -1840,7 +1837,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       }}>
 
         {/* LEFT: expand toggle — small, minimal */}
-        {task.subtasks && task.subtasks.length > 0 && (
+        {task.subtasks && task.subtasks.filter(s => !s.completed).length > 0 && (
           <button
             className="chevron-button"
             onTouchStart={(e) => {
@@ -2142,7 +2139,8 @@ const DayView: React.FC<DayViewProps> = ({
   const isTasksOverlayOpen = useTaskStore((state) => state.isTasksOverlayOpen);
   const setCurrentDate = useTaskStore((state) => state.setCurrentDate);
   const allTasks = useTaskStore((state) => state.tasks);
-  const pendingCount = allTasks.filter((task) => !task.completed).length;
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const pendingCount = allTasks.filter((task) => !task.completed && task.date !== todayStr).length;
 
   const reorderSubtasks = useTaskStore((state) => state.reorderSubtasks);
   const toggleSubtask = useTaskStore((state) => state.toggleSubtask);

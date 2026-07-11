@@ -47,10 +47,20 @@ export const Header: React.FC<HeaderProps> = ({
   const [isMiniCalendarOpen, setIsMiniCalendarOpen] = useState(false);
 
   const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
-  const pendingToday = useMemo(() => tasks.filter((task) => task.date === todayStr && !task.completed), [tasks, todayStr]);
-  const pendingOverdue = useMemo(() => tasks.filter((task) => task.date < todayStr && !task.completed), [tasks, todayStr]);
+  const pendingCount = useMemo(() => tasks.filter((task) => !task.completed && task.date !== todayStr).length, [tasks, todayStr]);
 
   const calendarDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Filter tasks across all dates for the search results list
+  const matchedTasks = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const query = searchQuery.toLowerCase().trim();
+    return tasks.filter((task) => {
+      const matchTitle = task.title.toLowerCase().includes(query);
+      const matchSubtasks = task.subtasks && task.subtasks.some((sub) => sub.title.toLowerCase().includes(query));
+      return matchTitle || matchSubtasks;
+    });
+  }, [tasks, searchQuery]);
 
   // Close dropdowns on day change
   useEffect(() => {
@@ -171,6 +181,53 @@ export const Header: React.FC<HeaderProps> = ({
               <X size={14} />
             </button>
           )}
+
+          {/* Search dropdown results */}
+          {searchQuery.trim() !== '' && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-xl z-[1000] overflow-hidden max-h-72 overflow-y-auto">
+              {matchedTasks.length === 0 ? (
+                <div className="px-4 py-4 text-center text-xs text-gray-400 font-medium">
+                  No matching tasks found
+                </div>
+              ) : (
+                <div className="py-1">
+                  {matchedTasks.map((task) => (
+                    <button
+                      key={task.id}
+                      onClick={() => {
+                        const [yr, mo, dy] = task.date.split('-').map(Number);
+                        const dateObj = new Date(yr, mo - 1, dy);
+                        setCurrentDate(dateObj);
+                        setSelectedView('day');
+                        if (task.time) {
+                          setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent('scroll-to-task', { detail: { time: task.time } }));
+                          }, 150);
+                        }
+                        setSearchQuery('');
+                      }}
+                      className="w-full text-left px-4 py-2.5 hover:bg-blue-50 border-b border-gray-100 last:border-none flex flex-col transition-colors cursor-pointer"
+                    >
+                      <span className="text-xs font-semibold text-gray-800 truncate">
+                        {task.title}
+                      </span>
+                      <div className="flex items-center space-x-2 text-[10px] text-gray-400 mt-0.5">
+                        <span className="capitalize px-1.5 py-0.5 bg-gray-100 rounded-full text-[9px] font-bold text-gray-500">{task.category}</span>
+                        <span>•</span>
+                        <span>{task.date}</span>
+                        {task.time && (
+                          <>
+                            <span>•</span>
+                            <span>{task.time}</span>
+                          </>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* HIDDEN 2026-07-07 — removed from header per request, keep for future re-enable */}
@@ -234,9 +291,9 @@ export const Header: React.FC<HeaderProps> = ({
                 title="View pending tasks"
               >
                 <ListTodo size={18} />
-                {(pendingToday.length + pendingOverdue.length) > 0 && (
+                {pendingCount > 0 && (
                   <span className="absolute top-1 right-1 bg-red-500 text-white rounded-full text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center scale-90">
-                    {pendingToday.length + pendingOverdue.length}
+                    {pendingCount}
                   </span>
                 )}
               </button>
