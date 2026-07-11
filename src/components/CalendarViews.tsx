@@ -1970,29 +1970,37 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
 
         {/* RIGHT: task completion circle — small, right aligned */}
         <button
-          onPointerDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => {
+            e.stopPropagation()
+            e.preventDefault()
+          }}
+          onTouchStart={(e) => {
+            e.stopPropagation()
+            e.preventDefault()
+          }}
+          onMouseDown={(e) => {
+            e.stopPropagation()
+            e.preventDefault()
+          }}
           onTouchEnd={(e) => {
-            lastTouchTime.current = Date.now()
             e.stopPropagation()
             e.preventDefault()
             toggleTaskComplete(task.id)
           }}
           onMouseUp={(e) => {
-            if (Date.now() - lastTouchTime.current < 500) return
             e.stopPropagation()
+            e.preventDefault()
             toggleTaskComplete(task.id)
           }}
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: '44px',
-            height: '44px',
-            minWidth: '44px',
+            width: '26px',
+            height: '26px',
+            minWidth: '26px',
             padding: 0,
-            margin: '-14px',
+            margin: 0,
             background: 'transparent',
             border: 'none',
             cursor: 'pointer',
@@ -2002,9 +2010,9 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
           }}
         >
           <span style={{
-            width: '16px',
-            height: '16px',
-            minWidth: '16px',
+            width: '18px',
+            height: '18px',
+            minWidth: '18px',
             borderRadius: '50%',
             border: `2px solid ${fg}`,
             background: completed ? fg : 'transparent',
@@ -2037,7 +2045,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
             overflow: 'hidden',  // CRITICAL — clips subtask to stay inside card
           }}
         >
-          {(task.subtasks || []).length === 0 && (
+          {((task.subtasks || []).filter((sub: any) => !sub.completed)).length === 0 && (
             <span style={{ fontSize: '10px', color: fgSub }}>No subtasks</span>
           )}
           <DndContext
@@ -2052,19 +2060,25 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
             modifiers={[restrictToVerticalAxis, restrictToParentElement]}
           >
             <SortableContext
-              items={(task.subtasks || []).map((sub: any, i: number) => sub.id || `subtask-${i}`)}
+              items={(task.subtasks || [])
+                .map((sub: any, i: number) => ({ id: sub.id || `subtask-${i}`, completed: sub.completed }))
+                .filter(item => !item.completed)
+                .map(item => item.id)}
               strategy={verticalListSortingStrategy}
             >
-              {(task.subtasks || []).map((sub: any, i: number) => (
-                <SortableSubtaskRow
-                  key={sub.id || `subtask-${i}`}
-                  sub={sub}
-                  index={i}
-                  taskId={task.id}
-                  fgSub={fgSub}
-                  onToggle={(idx) => toggleSubtaskComplete(task.id, idx)}
-                />
-              ))}
+              {(task.subtasks || [])
+                .map((sub: any, originalIndex: number) => ({ sub, originalIndex }))
+                .filter(({ sub }) => !sub.completed)
+                .map(({ sub, originalIndex }) => (
+                  <SortableSubtaskRow
+                    key={sub.id || `subtask-${originalIndex}`}
+                    sub={sub}
+                    index={originalIndex}
+                    taskId={task.id}
+                    fgSub={fgSub}
+                    onToggle={(idx) => toggleSubtaskComplete(task.id, idx)}
+                  />
+                ))}
             </SortableContext>
           </DndContext>
         </div>
@@ -2921,14 +2935,17 @@ const DayView: React.FC<DayViewProps> = ({
           return laidOut.map((task) => {
             const cat = CATEGORIES.find((c) => c.id === task.category) || CATEGORIES[0];
             const isExpanded = !!expandedTasks[task.id];
-            const MAX_COLUMNS = 2;
-            const effectiveColumns = Math.min(task.totalColumns, MAX_COLUMNS);
-            const blockWidth = `calc((100% - 56px) / ${effectiveColumns} - 6px)`;
-            const blockLeft = `calc(56px + (100% - 56px) / ${effectiveColumns} * ${task.column % MAX_COLUMNS} + 3px)`;
+            
+            // Overlapping tasks now stack vertically at full width rather than dividing side-by-side
+            const blockWidth = "calc(100% - 56px - 12px)";
+            const blockLeft = "calc(56px + 6px)";
 
             const [taskHour, taskMin] = (task.time || "00:00").split(':').map(Number);
             const totalMins = (taskHour * 60) + (taskMin || 0);
             const topOffset = totalMins * (64 / 60);
+
+            // Stack offset: 52px per stack level (column)
+            const stackOffsetHeight = task.column * 52;
 
             return (
               <DraggableTaskBlock
@@ -2941,6 +2958,7 @@ const DayView: React.FC<DayViewProps> = ({
                   width: blockWidth,
                   left: blockLeft,
                   top: `${topOffset}px`,
+                  marginTop: `${stackOffsetHeight}px`,
                 }}
               />
             );

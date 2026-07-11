@@ -59,11 +59,15 @@ const TaskItemRow = React.memo(({
     }
   };
 
+  const isCompleted = task.completed;
+  const cardBgClass = isCompleted ? 'bg-[#E8EAFD]' : 'bg-[#1A73E8]';
+  const cardBorderClass = isCompleted ? 'border-[#DADCE0]' : 'border-[#1A73E8]';
+
   return (
     <div 
       onClick={handleRowClick}
       onTouchStart={onTouchStart}
-      className={`flex items-center bg-white mx-3 my-1 px-4 py-3 rounded-xl border border-[#F1F3F4] min-h-[60px] cursor-pointer select-none transition-all duration-150 ${
+      className={`flex items-center mx-3 my-1 px-4 py-3 rounded-xl border min-h-[60px] cursor-pointer select-none transition-all duration-150 ${cardBgClass} ${cardBorderClass} ${
         isDraggingThis ? 'opacity-35 border-dashed border-gray-400 bg-gray-100 scale-95' : ''
       }`}
     >
@@ -84,16 +88,16 @@ const TaskItemRow = React.memo(({
 
       {/* Left: date — compact */}
       <div className="flex flex-col items-center w-10 mr-3 shrink-0 select-none">
-        <span className="text-[10px] text-[#5F6368] uppercase">{format(dateObj, 'EEE')}</span>
-        <span className="text-lg font-medium text-[#202124] leading-none">{format(dateObj, 'd')}</span>
-        <span className="text-[10px] text-[#5F6368]">{format(dateObj, 'MMM')}</span>
+        <span className={`text-[10px] uppercase font-bold ${isCompleted ? 'text-[#5F6368]' : 'text-blue-100/90'}`}>{format(dateObj, 'EEE')}</span>
+        <span className={`text-lg font-extrabold leading-none ${isCompleted ? 'text-[#5F6368]' : 'text-white'}`}>{format(dateObj, 'd')}</span>
+        <span className={`text-[10px] font-bold ${isCompleted ? 'text-[#5F6368]' : 'text-blue-100/90'}`}>{format(dateObj, 'MMM')}</span>
       </div>
 
       {/* Divider */}
-      <div className="w-px h-8 bg-[#E0E0E0] mr-3 shrink-0" />
+      <div className={`w-px h-8 mr-3 shrink-0 ${isCompleted ? 'bg-[#DADCE0]' : 'bg-white/25'}`} />
 
       {/* Title — large and readable */}
-      <p className={`flex-1 text-[17px] font-medium truncate min-w-0 ${task.completed ? 'line-through text-[#BDC1C6]' : 'text-[#202124]'}`}>
+      <p className={`flex-1 text-[17px] font-semibold truncate min-w-0 ${isCompleted ? 'line-through text-[#5F6368]' : 'text-white'}`}>
         {task.title}
       </p>
 
@@ -110,14 +114,14 @@ const TaskItemRow = React.memo(({
           height: '16px',
           minWidth: '16px',
           borderRadius: '50%',
-          border: task.completed ? '2px solid #1A73E8' : '2px solid #DADCE0',
-          background: task.completed ? '#1A73E8' : '#FFFFFF',
+          border: isCompleted ? '2px solid #1A73E8' : '2px solid rgba(255, 255, 255, 0.85)',
+          background: isCompleted ? '#1A73E8' : 'transparent',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           transition: 'all 100ms ease',
         }}>
-          {task.completed && (
+          {isCompleted && (
             <Check size={10} className="text-white" style={{ strokeWidth: 3 }} />
           )}
         </span>
@@ -371,6 +375,22 @@ export const TasksOverlay: React.FC = () => {
     return matchTitle || matchSubtasks;
   });
 
+  // Completed subtasks search filter
+  const completedSubtasksFiltered = tasks
+    .filter((task) => !task.completed)
+    .flatMap((task) => 
+      (task.subtasks || [])
+        .filter((sub) => sub.completed)
+        .map((sub) => ({ sub, parent: task }))
+    )
+    .filter(({ sub, parent }) => {
+      if (!gcalTaskQuery) return true;
+      const q = gcalTaskQuery.toLowerCase();
+      const matchSubtaskTitle = sub.title.toLowerCase().includes(q);
+      const matchParentTitle = parent.title.toLowerCase().includes(q);
+      return matchSubtaskTitle || matchParentTitle;
+    });
+
   const hasAnyPending = searchFiltered.length > 0;
 
   // Multi-select helpers
@@ -582,21 +602,21 @@ export const TasksOverlay: React.FC = () => {
             )}
 
             {/* Collapsible Completed Section */}
-            {completedFiltered.length > 0 && !isMultiSelectMode && (
+            {(completedFiltered.length > 0 || completedSubtasksFiltered.length > 0) && !isMultiSelectMode && (
               <div className="pt-4 border-t border-gray-150">
                 <button
                   type="button"
                   onClick={() => setIsCompletedExpanded(!isCompletedExpanded)}
                   className="flex items-center space-x-2 w-full text-left text-xs font-extrabold text-gray-500 hover:text-gray-800 transition-colors cursor-pointer select-none px-1 py-1"
                 >
-                  <span>Completed Tasks ({completedFiltered.length})</span>
+                  <span>Completed Tasks & Subtasks ({completedFiltered.length + completedSubtasksFiltered.length})</span>
                   <ChevronDown 
                     size={14} 
                     className="stroke-[3px] transition-transform duration-150"
                     style={{ transform: isCompletedExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
                   />
                 </button>
-
+ 
                 {isCompletedExpanded && (
                   <div className="mt-3 divide-y divide-gray-100 bg-gray-50/50 rounded-2xl p-2.5 border border-gray-100">
                     {completedFiltered.map((task) => {
@@ -619,6 +639,35 @@ export const TasksOverlay: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => deleteTask(task.id)}
+                            className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-colors cursor-pointer ml-2 flex items-center justify-center"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      );
+                    })}
+
+                    {completedSubtasksFiltered.map(({ sub, parent }) => {
+                      const cat = CATEGORIES.find((c) => c.id === parent.category) || CATEGORIES[0];
+                      return (
+                        <div key={`subtask-comp-${parent.id}-${sub.id}`} className="flex items-center justify-between py-2.5 px-2 border-t border-gray-100/50">
+                          <div className="flex items-center space-x-3 min-w-0 flex-1">
+                            <button
+                              type="button"
+                              onClick={() => toggleSubtask(parent.id, sub.id)}
+                              className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer text-white active:scale-90"
+                              style={{ backgroundColor: cat.color.solid }}
+                            >
+                              <Check size={11} className="stroke-[3.5px]" />
+                            </button>
+                            <span className="text-xs text-gray-400 font-bold truncate flex-1 relative inline-block">
+                              <span className="line-through text-gray-400">{sub.title}</span>
+                              <span className="text-[10px] text-gray-400 font-normal ml-1.5 opacity-75">({parent.title})</span>
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => deleteSubtask(parent.id, sub.id)}
                             className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-colors cursor-pointer ml-2 flex items-center justify-center"
                           >
                             <Trash2 size={13} />

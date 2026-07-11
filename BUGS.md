@@ -6,6 +6,16 @@
 
 ## Resolved Bugs
 
+- **BUG 8: Task completion circle overlaps title/chevron or is too sensitive**
+  - *Description:* Tapping near the completion circle could accidentally trigger details modal/edit view or expand/collapse chevrons, or tap nearby space to toggle task completion.
+  - *Root Cause:* The completion `<button>` element previously had a broad hit box with either negative margins or excessive padding.
+  - *Resolution:* Resized the button layout footprint to a precise `26px` with `margin: 0` tight around the `18px` visible circle (26px tap target for a ~18px visible circle). Added `e.preventDefault()` to pointer/touch/mouse start handlers, along with `e.stopPropagation()`, ensuring that clicking anywhere outside the small circle does nothing.
+
+- **BUG 9: Completed subtasks vanish without being displayed anywhere else**
+  - *Description:* Completed subtasks disappeared from the task card's subtasks list, but did not appear anywhere else, making them invisible and impossible to view or revert.
+  - *Root Cause:* The subtask list in the card filtered out completed items, but the Completed tasks list only filter task level items.
+  - *Resolution:* Retained the filtration on the task card while routing completed subtasks into the exact same "Completed" tasks section within the `TasksOverlay`. Displayed completed subtasks with standard muted strikethrough styling and parent task names for context, supporting toggling back to incomplete and deletion.
+
 - **BUG 7: Chevron button / subtask visibility broken after dragging a task card**
   - *Description:* Tapping the chevron button after dragging a task card did nothing or failed to show/hide subtasks.
   - *Root Cause:*

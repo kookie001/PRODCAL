@@ -1,6 +1,14 @@
 # Changelog
 
+## [2026-07-11]
+- Restrict completion circle touch target area to a precise 26px (matching a ~18px visible circle), with 0 margin, and keep touchAction 'manipulation' for instant, single-tap response on Android.
+- Prevent task completion circle events from propagating and prevent default behavior on pointer down, touch start, mouse down, touch end, and mouse up to isolate interaction entirely to the circle graphic.
+- Route completed subtasks from incomplete tasks into the Completed Tasks & Subtasks section of the TasksOverlay, displaying them in a muted strikethrough style with their parent task name as context, while keeping original subtask data intact.
+- Hide completed subtasks from the visible subtask list in expanded task views.
+
 ## [2026-07-09]
+- Stack overlapping timeline tasks vertically instead of side-by-side columns.
+- Match pending list card colors only, keeping original size, layout, spacing, and border-radius intact.
 - Make Add Subtask and More Options buttons compact and inline-flex inside TaskSheet to save vertical space.
 - Add collapsible More Options section for all-day/date/category, default collapsed.
 - Fix long-press gesture reliability on touch devices by increasing movement tolerance threshold to 20px.
