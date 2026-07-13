@@ -1,6 +1,8 @@
 # Changelog
 
 ## [2026-07-11]
+- Compact pending list card's date display to a single line format ("d MMMM") on the left and style the card to look exactly like the timeline task card (matching background color, borders, border-radius, font size/weight, and compact padding/height), while leaving all native layout structures and handlers untouched.
+- Match pending list card visual styles (background colors, borders, border-radius, font sizing, and margins/compact padding) to the main timeline task card, keeping the layout structure and drag/click/toggle handlers intact.
 - Highlight selected AM/PM buttons in the ClockPicker with a solid black border (`2px solid #000000`), a light green background (`#E6F4EA`), and dark green text (`#137333`) for maximum contrast and readability, while keeping unselected buttons muted.
 - Fix pending task count badge across CalendarViews and Header to exclude today's tasks, matching the filter logic of the Pending list.
 - Pending/My Tasks list excludes today's tasks and displays only past-day or future-day incomplete tasks, keeping today's focus entirely on the main timeline.

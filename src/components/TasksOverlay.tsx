@@ -60,16 +60,20 @@ const TaskItemRow = React.memo(({
   };
 
   const isCompleted = task.completed;
-  const cardBgClass = isCompleted ? 'bg-[#E8EAFD]' : 'bg-[#1A73E8]';
-  const cardBorderClass = isCompleted ? 'border-[#DADCE0]' : 'border-[#1A73E8]';
 
   return (
     <div 
       onClick={handleRowClick}
       onTouchStart={onTouchStart}
-      className={`flex items-center mx-3 my-1 px-4 py-3 rounded-xl border min-h-[60px] cursor-pointer select-none transition-all duration-150 ${cardBgClass} ${cardBorderClass} ${
+      className={`flex items-center mx-3 my-1 px-2.5 rounded-[12px] cursor-pointer select-none transition-all duration-150 ${
         isDraggingThis ? 'opacity-35 border-dashed border-gray-400 bg-gray-100 scale-95' : ''
       }`}
+      style={{
+        backgroundColor: isCompleted ? '#F3F4F6' : '#EBF5FF',
+        border: isCompleted ? '1px solid #E5E7EB' : '1px solid #BFDBFE',
+        borderRadius: '12px',
+        minHeight: '44px',
+      }}
     >
       {isMultiSelectMode && (
         <div className="flex-shrink-0 mr-3 flex items-center justify-center">
@@ -87,17 +91,17 @@ const TaskItemRow = React.memo(({
       )}
 
       {/* Left: date — compact */}
-      <div className="flex flex-col items-center w-10 mr-3 shrink-0 select-none">
-        <span className={`text-[10px] uppercase font-bold ${isCompleted ? 'text-[#5F6368]' : 'text-blue-100/90'}`}>{format(dateObj, 'EEE')}</span>
-        <span className={`text-lg font-extrabold leading-none ${isCompleted ? 'text-[#5F6368]' : 'text-white'}`}>{format(dateObj, 'd')}</span>
-        <span className={`text-[10px] font-bold ${isCompleted ? 'text-[#5F6368]' : 'text-blue-100/90'}`}>{format(dateObj, 'MMM')}</span>
+      <div className="shrink-0 mr-3 select-none flex items-center">
+        <span className="text-xs font-bold whitespace-nowrap" style={{ color: isCompleted ? '#9CA3AF' : '#1E40AF' }}>
+          {format(dateObj, 'd MMMM')}
+        </span>
       </div>
 
       {/* Divider */}
-      <div className={`w-px h-8 mr-3 shrink-0 ${isCompleted ? 'bg-[#DADCE0]' : 'bg-white/25'}`} />
+      <div className="w-px h-5 mr-3 shrink-0" style={{ backgroundColor: isCompleted ? '#E5E7EB' : '#BFDBFE' }} />
 
-      {/* Title — large and readable */}
-      <p className={`flex-1 text-[17px] font-semibold truncate min-w-0 ${isCompleted ? 'line-through text-[#5F6368]' : 'text-white'}`}>
+      {/* Title — compact & matching timeline task font size/weight */}
+      <p className="flex-1 text-sm font-semibold truncate min-w-0" style={{ textDecoration: isCompleted ? 'line-through' : 'none', color: isCompleted ? '#9CA3AF' : '#1E40AF' }}>
         {task.title}
       </p>
 
@@ -107,15 +111,15 @@ const TaskItemRow = React.memo(({
           e.stopPropagation();
           updateTask(task.id, { completed: !task.completed });
         }}
-        className="ml-3 w-10 h-10 rounded-full flex items-center justify-center shrink-0 active:scale-95 transition-transform duration-100 cursor-pointer"
+        className="ml-3 w-8 h-8 rounded-full flex items-center justify-center shrink-0 active:scale-95 transition-transform duration-100 cursor-pointer"
       >
         <span style={{
-          width: '16px',
-          height: '16px',
-          minWidth: '16px',
+          width: '18px',
+          height: '18px',
+          minWidth: '18px',
           borderRadius: '50%',
-          border: isCompleted ? '2px solid #1A73E8' : '2px solid rgba(255, 255, 255, 0.85)',
-          background: isCompleted ? '#1A73E8' : 'transparent',
+          border: isCompleted ? '2px solid #9CA3AF' : '2px solid #1E40AF',
+          background: isCompleted ? '#9CA3AF' : 'transparent',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
