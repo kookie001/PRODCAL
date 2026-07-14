@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   format,
   startOfMonth,
@@ -76,7 +76,7 @@ export const CalendarViews: React.FC<CalendarViewsProps> = ({ searchQuery }) => 
   const [popoverDate, setPopoverDate] = useState<Date>(new Date());
   const [popoverHour, setPopoverHour] = useState<number>(9);
 
-  const activeDate = new Date(currentDateStr);
+  const activeDate = useMemo(() => new Date(currentDateStr), [currentDateStr]);
 
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
 
@@ -90,13 +90,13 @@ export const CalendarViews: React.FC<CalendarViewsProps> = ({ searchQuery }) => 
     }
   });
 
-  const toggleTaskCollapse = (taskId: string) => {
+  const toggleTaskCollapse = useCallback((taskId: string) => {
     setCollapsedTasks((prev) => {
       const next = { ...prev, [taskId]: !prev[taskId] };
       localStorage.setItem('gcal-timeline-collapsed-tasks', JSON.stringify(next));
       return next;
     });
-  };
+  }, []);
 
   // Drag states for timeline task pointer dragging
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
@@ -107,7 +107,7 @@ export const CalendarViews: React.FC<CalendarViewsProps> = ({ searchQuery }) => 
 
   const updateTask = useTaskStore((state) => state.updateTask);
 
-  const handleTaskDragStart = (taskId: string, initialTop: number, clientY: number) => {
+  const handleTaskDragStart = useCallback((taskId: string, initialTop: number, clientY: number) => {
     setDraggedTaskId(taskId);
     setDragStartTop(initialTop);
     setPointerStartY(clientY);
@@ -117,9 +117,9 @@ export const CalendarViews: React.FC<CalendarViewsProps> = ({ searchQuery }) => 
     if (task && task.time) {
       setTempTimeStr(task.time);
     }
-  };
+  }, [tasks]);
 
-  const handleTaskDragMove = (clientY: number) => {
+  const handleTaskDragMove = useCallback((clientY: number) => {
     if (!draggedTaskId) return;
     const diffY = clientY - pointerStartY;
     setDragCurrentOffset(diffY);
@@ -132,9 +132,9 @@ export const CalendarViews: React.FC<CalendarViewsProps> = ({ searchQuery }) => 
     const m = clampedMins % 60;
     const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     setTempTimeStr(timeStr);
-  };
+  }, [draggedTaskId, pointerStartY, dragStartTop]);
 
-  const handleTaskDragEnd = () => {
+  const handleTaskDragEnd = useCallback(() => {
     if (!draggedTaskId) return;
     if (tempTimeStr) {
       updateTask(draggedTaskId, { time: tempTimeStr });
@@ -142,25 +142,27 @@ export const CalendarViews: React.FC<CalendarViewsProps> = ({ searchQuery }) => 
     setDraggedTaskId(null);
     setDragCurrentOffset(0);
     setTempTimeStr(null);
-  };
+  }, [draggedTaskId, tempTimeStr, updateTask]);
 
   // Filter tasks by category and exclude completed tasks from timeline (do NOT filter by search query anymore!)
-  const filteredTasks = tasks.filter((task) => {
-    if (task.completed) return false;
-    const matchesCategory = selectedCategory === 'All' || task.category === selectedCategory;
-    return matchesCategory;
-  });
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      if (task.completed) return false;
+      const matchesCategory = selectedCategory === 'All' || task.category === selectedCategory;
+      return matchesCategory;
+    });
+  }, [tasks, selectedCategory]);
 
-  const openPopover = (date: Date, hour: number) => {
+  const openPopover = useCallback((date: Date, hour: number) => {
     setPopoverDate(date);
     setPopoverHour(hour);
     setIsPopoverOpen(true);
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       navigator.vibrate(10);
     }
-  };
+  }, []);
 
-  const handlePopoverSave = (title: string, category: CategoryType) => {
+  const handlePopoverSave = useCallback((title: string, category: CategoryType) => {
     const formattedHour = popoverHour.toString().padStart(2, '0') + ':00';
     const formattedDateStr = format(popoverDate, 'yyyy-MM-dd');
     addTask({
@@ -172,9 +174,9 @@ export const CalendarViews: React.FC<CalendarViewsProps> = ({ searchQuery }) => 
       subtasks: [],
     });
     setIsPopoverOpen(false);
-  };
+  }, [popoverHour, popoverDate, addTask]);
 
-  const handlePopoverMoreOptions = (title: string, category: CategoryType) => {
+  const handlePopoverMoreOptions = useCallback((title: string, category: CategoryType) => {
     const formattedHour = popoverHour.toString().padStart(2, '0') + ':00';
     
     // Set prefilled values in the form
@@ -185,7 +187,7 @@ export const CalendarViews: React.FC<CalendarViewsProps> = ({ searchQuery }) => 
 
     setFABOpen(true);
     setIsPopoverOpen(false);
-  };
+  }, [popoverHour, popoverDate, setCurrentDate, setPrefilledTime, setFABOpen]);
 
   // Render the appropriate view
   const renderView = () => {
@@ -295,6 +297,15 @@ interface ViewProps {
   openPopover: (date: Date, hour: number) => void;
 }
 
+const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+
+const NON_TIMED_TASK_STYLE: React.CSSProperties = {
+  position: 'relative',
+  width: '100%',
+  left: 'auto',
+  top: 'auto',
+};
+
 const MonthView: React.FC<ViewProps> = ({
   activeDate,
   tasks,
@@ -310,23 +321,48 @@ const MonthView: React.FC<ViewProps> = ({
     setHeaderCollapsed(false);
   }, []);
 
-  const monthStart = startOfMonth(activeDate);
-  const monthEnd = endOfMonth(monthStart);
-  const startDate = startOfWeek(monthStart, { weekStartsOn: 0 }); // Sunday
-  const endDate = endOfWeek(monthEnd, { weekStartsOn: 0 });
+  const days = useMemo(() => {
+    const monthStart = startOfMonth(activeDate);
+    const monthEnd = endOfMonth(monthStart);
+    const startDate = startOfWeek(monthStart, { weekStartsOn: 0 }); // Sunday
+    const endDate = endOfWeek(monthEnd, { weekStartsOn: 0 });
+    return eachDayOfInterval({ start: startDate, end: endDate });
+  }, [activeDate]);
 
-  const days = eachDayOfInterval({ start: startDate, end: endDate });
-  const weekDays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-
-  const handleCellClick = (day: Date) => {
+  const handleCellClick = useCallback((day: Date) => {
     setCurrentDate(day);
     openPopover(day, 9);
-  };
+  }, [setCurrentDate, openPopover]);
 
-  const selectedDayTasks = tasks.filter((task) => {
-    const taskDate = new Date(task.date + 'T00:00:00');
-    return isSameDay(taskDate, activeDate);
-  });
+  const selectedDayTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      const taskDate = new Date(task.date + 'T00:00:00');
+      return isSameDay(taskDate, activeDate);
+    });
+  }, [tasks, activeDate]);
+
+  // Pre-sort and group tasks by formatted date string to avoid doing it inside the loops
+  const tasksByDate = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    tasks.forEach((task) => {
+      const dateStr = task.date;
+      if (!map.has(dateStr)) {
+        map.set(dateStr, []);
+      }
+      map.get(dateStr)!.push(task);
+    });
+
+    for (const [_, dayTasks] of map.entries()) {
+      dayTasks.sort((a, b) => {
+        if (a.time && b.time) return a.time.localeCompare(b.time);
+        if (a.time) return -1;
+        if (b.time) return 1;
+        return a.title.localeCompare(b.title);
+      });
+    }
+
+    return map;
+  }, [tasks]);
 
   return (
     <div className="h-full w-full overflow-hidden bg-white">
@@ -335,7 +371,7 @@ const MonthView: React.FC<ViewProps> = ({
             <div className="flex-1 flex flex-col min-h-0">
         {/* Week headers */}
         <div className="grid grid-cols-7 border-b border-gray-100 text-center text-[10px] font-bold text-gray-400 py-1 flex-shrink-0 bg-gray-50/20">
-          {weekDays.map((day) => (
+          {WEEKDAYS.map((day) => (
             <div key={day} className="py-1">
               {day}
             </div>
@@ -349,19 +385,8 @@ const MonthView: React.FC<ViewProps> = ({
             const isTodayDay = isToday(day);
             const isSelectedDay = isSameDay(day, activeDate);
             
-            // Filter tasks belonging to this day
-            const dayTasks = tasks.filter((task) => {
-              const taskDate = new Date(task.date + 'T00:00:00');
-              return isSameDay(taskDate, day);
-            });
-
-            // Sort tasks by time first, then alphabetically
-            const sortedDayTasks = [...dayTasks].sort((a, b) => {
-              if (a.time && b.time) return a.time.localeCompare(b.time);
-              if (a.time) return -1;
-              if (b.time) return 1;
-              return a.title.localeCompare(b.title);
-            });
+            const dateStr = format(day, 'yyyy-MM-dd');
+            const sortedDayTasks = tasksByDate.get(dateStr) || [];
 
             const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
@@ -565,10 +590,25 @@ const WeekView: React.FC<WeekViewProps> = ({
   setExpandedTaskId,
   isThreeDay = false,
 }) => {
-  const days = isThreeDay
-    ? [activeDate, addDays(activeDate, 1), addDays(activeDate, 2)]
-    : Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(activeDate), i));
-  const hours = Array.from({ length: 24 }, (_, i) => i);
+  const days = useMemo(() => {
+    return isThreeDay
+      ? [activeDate, addDays(activeDate, 1), addDays(activeDate, 2)]
+      : Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(activeDate), i));
+  }, [activeDate, isThreeDay]);
+
+  const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
+
+  const tasksByDate = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    tasks.forEach((task) => {
+      const dateStr = task.date;
+      if (!map.has(dateStr)) {
+        map.set(dateStr, []);
+      }
+      map.get(dateStr)!.push(task);
+    });
+    return map;
+  }, [tasks]);
 
   const reorderSubtasks = useTaskStore((state) => state.reorderSubtasks);
   const toggleSubtask = useTaskStore((state) => state.toggleSubtask);
@@ -840,11 +880,9 @@ const WeekView: React.FC<WeekViewProps> = ({
           {days.map((day, colIdx) => {
             const isTodayDay = isToday(day);
             
-            // Filter tasks for this specific day
-            const dayTasks = tasks.filter((task) => {
-              const taskDate = new Date(task.date + 'T00:00:00');
-              return isSameDay(taskDate, day);
-            });
+            const dateStr = format(day, 'yyyy-MM-dd');
+            const dayTasks = tasksByDate.get(dateStr) || [];
+            const nonTimedDayTasks = dayTasks.filter(t => !t.time);
 
             return (
               <div key={day.toString()} className="relative h-full flex flex-col">
@@ -1191,7 +1229,7 @@ const WeekView: React.FC<WeekViewProps> = ({
                 })}
                 {/* Non-timed tasks section at the very top */}
                 <div className="absolute top-1 left-1 right-1 flex flex-col space-y-1">
-                  {dayTasks.filter(t => !t.time).map((task) => {
+                  {nonTimedDayTasks.map((task) => {
                     const cat = CATEGORIES.find((c) => c.id === task.category) || CATEGORIES[0];
                     const isExpanded = expandedTaskId === task.id;
                     const hasSubtasks = task.subtasks && task.subtasks.length > 0;
@@ -2133,14 +2171,17 @@ const DayView: React.FC<DayViewProps> = ({
 }) => {
 
 
-  const hours = Array.from({ length: 24 }, (_, i) => i);
+  const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
   const isTodayDay = isToday(activeDate);
   const setTasksOverlayOpen = useTaskStore((state) => state.setTasksOverlayOpen);
   const isTasksOverlayOpen = useTaskStore((state) => state.isTasksOverlayOpen);
   const setCurrentDate = useTaskStore((state) => state.setCurrentDate);
   const allTasks = useTaskStore((state) => state.tasks);
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const pendingCount = allTasks.filter((task) => !task.completed && task.date !== todayStr).length;
+  
+  const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+  const pendingCount = useMemo(() => {
+    return allTasks.filter((task) => !task.completed && task.date !== todayStr).length;
+  }, [allTasks, todayStr]);
 
   const reorderSubtasks = useTaskStore((state) => state.reorderSubtasks);
   const toggleSubtask = useTaskStore((state) => state.toggleSubtask);
@@ -2496,10 +2537,24 @@ const DayView: React.FC<DayViewProps> = ({
     openPopover(d, h);
   });
 
-  const dayTasks = tasks.filter((task) => {
-    const taskDate = new Date(task.date + 'T00:00:00');
-    return isSameDay(taskDate, activeDate);
-  });
+  const dayTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      const taskDate = new Date(task.date + 'T00:00:00');
+      return isSameDay(taskDate, activeDate);
+    });
+  }, [tasks, activeDate]);
+
+  const nonTimedDayTasks = useMemo(() => {
+    return dayTasks.filter(t => !t.time);
+  }, [dayTasks]);
+
+  const timedDayTasks = useMemo(() => {
+    return dayTasks.filter(t => !!t.time);
+  }, [dayTasks]);
+
+  const laidOutTimedTasks = useMemo(() => {
+    return layoutTasks(timedDayTasks);
+  }, [timedDayTasks]);
 
   return (
     <div className="h-full w-full overflow-hidden bg-white">
@@ -2908,19 +2963,14 @@ const DayView: React.FC<DayViewProps> = ({
 
           {/* Non-timed tasks list */}
           <div className="absolute top-2 left-4 right-4 flex flex-col space-y-1.5">
-            {dayTasks.filter(t => !t.time).map((task) => (
+            {nonTimedDayTasks.map((task) => (
               <DraggableTaskBlock
                 key={task.id}
                 task={task}
                 pixelsPerMinute={64 / 60}
                 onReschedule={handleReschedule}
                 onEditOpen={openEditSheet}
-                style={{
-                  position: 'relative',
-                  width: '100%',
-                  left: 'auto',
-                  top: 'auto',
-                }}
+                style={NON_TIMED_TASK_STYLE}
               />
             ))}
           </div>
@@ -2928,9 +2978,7 @@ const DayView: React.FC<DayViewProps> = ({
 
         {/* Timed Tasks placement */}
         {!isTasksOverlayOpen && (() => {
-          const timedTasks = dayTasks.filter((t) => !!t.time);
-          const laidOut = layoutTasks(timedTasks);
-          return laidOut.map((task) => {
+          return laidOutTimedTasks.map((task) => {
             const cat = CATEGORIES.find((c) => c.id === task.category) || CATEGORIES[0];
             const isExpanded = !!expandedTasks[task.id];
             
@@ -3098,6 +3146,15 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({
 
   // Build full list of days from Jan 1st 2025 to Dec 31st 2027
   const scheduleItems = React.useMemo(() => {
+    const tasksByDateMap = new Map<string, Task[]>();
+    tasks.forEach((t) => {
+      const dStr = t.date;
+      if (!tasksByDateMap.has(dStr)) {
+        tasksByDateMap.set(dStr, []);
+      }
+      tasksByDateMap.get(dStr)!.push(t);
+    });
+
     const items: any[] = [];
     const curr = new Date(2025, 0, 1);
     const end = new Date(2027, 11, 31);
@@ -3109,7 +3166,7 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({
 
     while (curr <= end) {
       const dateStr = format(curr, 'yyyy-MM-dd');
-      const dayTasks = tasks.filter((t) => t.date === dateStr);
+      const dayTasks = tasksByDateMap.get(dateStr) || [];
       const holiday = getIndianHoliday(dateStr);
       const isTodayDay = dateStr === todayStr;
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Settings, Grid, ListTodo, Square, Columns3, Calendar, CalendarDays } from 'lucide-react';
+import { Plus, Settings, Grid, ListTodo, Square, Columns3, Calendar, CalendarDays, Trash2 } from 'lucide-react';
 import { useTaskStore } from '../store';
 import { MiniCalendar } from './MiniCalendar';
 import { CATEGORIES, ViewType } from '../types';
@@ -195,8 +195,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             </div>
           </div>
 
-          {/* 3. Settings Link at bottom */}
-          <div className="p-4 bg-white mt-auto border-t border-gray-150 flex-shrink-0">
+          {/* 3. Settings & Bin Link at bottom */}
+          <div className="p-4 bg-white mt-auto border-t border-gray-150 flex-shrink-0 space-y-1">
+            <button
+              onClick={() => {
+                useTaskStore.getState().setBinOpen(true);
+                onClose();
+              }}
+              className="w-full flex items-center space-x-3 px-4 py-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 rounded-xl transition-all cursor-pointer"
+            >
+              <Trash2 size={16} className="text-gray-500" />
+              <span>Bin</span>
+            </button>
+
             <button
               onClick={() => {
                 alert('Google Calendar Settings');

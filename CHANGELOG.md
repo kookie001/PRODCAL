@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-07-13]
+- Actually reduce subtask row gap in pending card by lowering the completion checkbox button wrapper height from 28px to 18px.
+- Performance: memoize timeline layout, task cards, and filtered lists.
+- Align pending card titles by adding a fixed-width chevron slot on every card, rendering a rotating chevron only on cards with incomplete subtasks while keeping empty slots on cards without subtasks to guarantee perfect vertical alignment of all titles.
+- Pending card: tap-to-expand subtasks (remove chevron), preserve long-press-drag and reorder.
+  - Removed the chevron button entirely from the pending card body for a cleaner look.
+  - A single tap anywhere on the card body toggles expansion of subtasks (for cards with incomplete subtasks), or opens the task edit modal (for cards with no subtasks).
+  - Subtasks inside the expanded card can be dragged up/down to reorder, using a nested dnd-kit context with touch/pointer sensors and absolute event isolation on completion circles.
+- Add a chevron (expand/collapse) button + subtask display to each pending list card in the Pending/My Tasks overlay (matching the main timeline task card behavior).
+- Ensure the chevron shows only when the task has at least one incomplete subtask, and expands/collapses the card to list subtasks beneath it with their own completion circles.
+- Prevent any interaction conflict: the chevron button and subtask circles use stopPropagation/preventDefault to completely isolate their taps from the card's long-press-to-drag gesture.
+- Display scheduled/created task times in a clean, muted 12-hour AM/PM format ("h:mm A") below the compact date on the left side of each pending task list card, only rendering when a valid time exists.
+
 ## [2026-07-11]
 - Compact pending list card's date display to a single line format ("d MMMM") on the left and style the card to look exactly like the timeline task card (matching background color, borders, border-radius, font size/weight, and compact padding/height), while leaving all native layout structures and handlers untouched.
 - Match pending list card visual styles (background colors, borders, border-radius, font sizing, and margins/compact padding) to the main timeline task card, keeping the layout structure and drag/click/toggle handlers intact.

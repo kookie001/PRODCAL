@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Task, CategoryType, ViewType, Subtask, CategoryConfig, CATEGORIES } from './types';
+import { Task, DeletedTask, CategoryType, ViewType, Subtask, CategoryConfig, CATEGORIES } from './types';
 
 const GOOGLE_COLORS = [
   { light: 'text-purple-700', bgLight: 'bg-purple-50', borderLight: 'border-purple-200', solid: '#8E24AA' },
@@ -32,6 +32,8 @@ interface TaskState {
   isTasksOverlayOpen: boolean; // Global state for full-screen GCAL Tasks view
   isBottomBarVisible: boolean; // For scroll hiding bottom bar
   isTaskSheetOpen: boolean; // True when the task create/edit sheet is open
+  deletedTasks: DeletedTask[]; // Persisted deleted tasks in Bin
+  isBinOpen: boolean; // For full-screen Bin view
 }
 
 interface TaskActions {
@@ -56,6 +58,10 @@ interface TaskActions {
   setTasksOverlayOpen: (open: boolean) => void;
   setBottomBarVisible: (visible: boolean) => void;
   setTaskSheetOpen: (open: boolean) => void;
+  setBinOpen: (open: boolean) => void;
+  restoreTask: (id: string) => void;
+  deleteTaskForever: (id: string) => void;
+  purgeOldDeletedTasks: () => void;
   
   // Subtask helpers
   toggleSubtask: (taskId: string, subtaskId: string) => void;
@@ -256,6 +262,8 @@ export const useTaskStore = create<TaskState & TaskActions>()(
       isTasksOverlayOpen: false,
       isBottomBarVisible: true,
       isTaskSheetOpen: false,
+      deletedTasks: [],
+      isBinOpen: false,
 
       // Actions
       addTask: (taskData) => set((state) => {
@@ -291,8 +299,12 @@ export const useTaskStore = create<TaskState & TaskActions>()(
 
       deleteTask: (id) => set((state) => {
         const taskToDelete = state.tasks.find((task) => task.id === id);
+        const updatedDeletedTasks = taskToDelete
+          ? [{ ...taskToDelete, deletedAt: new Date().toISOString() }, ...state.deletedTasks]
+          : state.deletedTasks;
         return {
           tasks: state.tasks.filter((task) => task.id !== id),
+          deletedTasks: updatedDeletedTasks,
           lastDeletedTask: taskToDelete || null,
           selectedTaskForDetails: state.selectedTaskForDetails?.id === id ? null : state.selectedTaskForDetails,
           editingTask: state.editingTask?.id === id ? null : state.editingTask
@@ -347,8 +359,10 @@ export const useTaskStore = create<TaskState & TaskActions>()(
         if (!state.lastDeletedTask) return {};
         const alreadyExists = state.tasks.some((t) => t.id === state.lastDeletedTask?.id);
         const updatedTasks = alreadyExists ? state.tasks : [...state.tasks, state.lastDeletedTask];
+        const updatedDeletedTasks = state.deletedTasks.filter((t) => t.id !== state.lastDeletedTask?.id);
         return {
           tasks: updatedTasks,
+          deletedTasks: updatedDeletedTasks,
           lastDeletedTask: null
         };
       }),
@@ -358,6 +372,33 @@ export const useTaskStore = create<TaskState & TaskActions>()(
       setBottomBarVisible: (visible) => set({ isBottomBarVisible: visible }),
 
       setTaskSheetOpen: (open) => set({ isTaskSheetOpen: open }),
+
+      setBinOpen: (open) => set({ isBinOpen: open }),
+
+      restoreTask: (id) => set((state) => {
+        const taskToRestore = state.deletedTasks.find((t) => t.id === id);
+        if (!taskToRestore) return {};
+        const { deletedAt, ...restoredTask } = taskToRestore;
+        const alreadyExists = state.tasks.some((t) => t.id === id);
+        const updatedTasks = alreadyExists ? state.tasks : [restoredTask, ...state.tasks];
+        return {
+          tasks: updatedTasks,
+          deletedTasks: state.deletedTasks.filter((t) => t.id !== id)
+        };
+      }),
+
+      deleteTaskForever: (id) => set((state) => ({
+        deletedTasks: state.deletedTasks.filter((t) => t.id !== id)
+      })),
+
+      purgeOldDeletedTasks: () => set((state) => {
+        const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        const filtered = state.deletedTasks.filter((t) => {
+          const deletedTime = new Date(t.deletedAt).getTime();
+          return deletedTime >= thirtyDaysAgo;
+        });
+        return { deletedTasks: filtered };
+      }),
 
       // Subtask specific methods
       toggleSubtask: (taskId, subtaskId) => set((state) => {
@@ -485,12 +526,13 @@ export const useTaskStore = create<TaskState & TaskActions>()(
     }),
     {
       name: 'google-calendar-tasks-store',
-      // Only persist tasks, theme, view, and categories
+      // Only persist tasks, theme, view, categories, and deletedTasks
       partialize: (state) => ({
         tasks: state.tasks,
         theme: state.theme,
         selectedView: state.selectedView,
         categories: state.categories,
+        deletedTasks: state.deletedTasks,
       }),
     }
   )

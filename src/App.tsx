@@ -11,6 +11,7 @@ import { TaskSheet } from './components/TaskSheet';
 import { TaskDetailsModal } from './components/TaskDetailsModal';
 import { Ripple } from './components/Ripple';
 import { TasksOverlay } from './components/TasksOverlay';
+import { BinOverlay } from './components/BinOverlay';
 
 export default function App() {
   const theme = useTaskStore((state) => state.theme);
@@ -22,6 +23,7 @@ export default function App() {
   const selectedTaskForDetails = useTaskStore((state) => state.selectedTaskForDetails);
   const isTasksOverlayOpen = useTaskStore((state) => state.isTasksOverlayOpen);
   const isBottomBarVisible = useTaskStore((state) => state.isBottomBarVisible);
+  const isBinOpen = useTaskStore((state) => state.isBinOpen);
   
   const lastDeletedTask = useTaskStore((state) => state.lastDeletedTask);
   const setLastDeletedTask = useTaskStore((state) => state.setLastDeletedTask);
@@ -112,6 +114,14 @@ export default function App() {
         return;
       }
 
+      // 3.5 Check if Bin overlay is open
+      if (useTaskStore.getState().isBinOpen) {
+        useTaskStore.getState().setBinOpen(false);
+        e.preventDefault();
+        window.history.pushState(null, '', window.location.href);
+        return;
+      }
+
       // 4. Check if search is active/query not empty
       if (searchQueryRef.current.trim() !== '') {
         setSearchQuery('');
@@ -151,9 +161,10 @@ export default function App() {
     }
   }, [lastDeletedTask, setLastDeletedTask]);
 
-  // Force light mode on mount and prevent any dark mode classing
+  // Force light mode on mount, prevent any dark mode classing, and purge old deleted tasks
   useEffect(() => {
     document.documentElement.classList.remove('dark');
+    useTaskStore.getState().purgeOldDeletedTasks();
   }, []);
 
   const handleToggleSidebar = () => {
@@ -329,6 +340,11 @@ export default function App() {
               setSearchQuery={setSearchQuery}
             />
           )}
+        </AnimatePresence>
+
+        {/* Trash/Bin overlay */}
+        <AnimatePresence>
+          {isBinOpen && <BinOverlay />}
         </AnimatePresence>
 
         {/* Toast Notification */}

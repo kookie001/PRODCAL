@@ -17,6 +17,10 @@ export interface Task {
   createdAt: string;
 }
 
+export interface DeletedTask extends Task {
+  deletedAt: string;
+}
+
 export type ViewType = 'month' | 'week' | 'day' | 'schedule' | '3day';
 
 export interface CategoryConfig {

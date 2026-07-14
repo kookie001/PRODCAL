@@ -6,6 +6,21 @@
 
 ## Resolved Bugs
 
+- **BUG 19: Vertical spacing/gap between subtask rows in the expanded pending list card is too large**
+  - *Description:* When a pending task card is tapped to expand its subtasks, the vertical gap between subtask rows is too large.
+  - *Root Cause:* The subtask circle check button wrapper was hardcoded with a height of `28px` inside a flex layout container with additional padding, forcing the row to be extremely tall.
+  - *Resolution:* Reduced the wrapper button height to `18px` inside `SortableSubtaskItem`, decreasing the entire row's vertical height and letting the subtasks sit tightly closer together (~4-6px spacing).
+
+- **BUG 18: Gesture conflict on pending card body between tap-to-expand, long-press-drag, and subtask reordering**
+  - *Description:* Introducing card body tap-to-expand alongside touch long-press-to-drag and subtask drag-reordering creates potential touch overlap and bubbling issues.
+  - *Root Cause:* Touch move, drag-and-drop sensors, and taps bubble up and can trigger parent elements or trigger false drags.
+  - *Resolution:* Removed the chevron button entirely. Implemented a dual-state click handler on the card body: if a task has incomplete subtasks, short tap toggles expansion; if no subtasks are present, short tap opens the edit modal. Long press is handled cleanly by the existing timer and `preventClickRef` guard which blocks click events upon touch drag completion. Subtask dragging is isolated within its own nested dnd-kit context with touch/pointer sensors using a custom delay configuration, and all subtask and parent completion checkboxes are completely insulated with `stopPropagation()` on touchstart, mousedown, and click.
+
+- **BUG 17: Usability conflict between pending card's long-press-to-drag and new chevron/subtask click handlers**
+  - *Description:* Introducing a chevron expand button and subtask completion circles on the pending card could cause clicks or touches on these child elements to inadvertently trigger the card's long-press drag-to-timeline timer, or trigger details-modal clicks.
+  - *Root Cause:* Touch/mouse events on child buttons bubble up to the main row container's `onTouchStart` and `onClick` handlers.
+  - *Resolution:* Implemented absolute event isolation on the chevron button and subtask circles. Added both `e.stopPropagation()` and `e.preventDefault()` on `onTouchStart`, `onTouchEnd`, `onMouseDown`, `onMouseUp`, and `onClick` handlers for these elements. Furthermore, restructured the card container to place subtasks in a sibling panel beneath the main clickable card row, ensuring that long-press-drag listeners are strictly bound to the card row, completely insulating subtask interactions.
+
 - **BUG 16: Selected AM/PM time picker buttons are low contrast and hard to see**
   - *Description:* The selected AM or PM button in the ClockPicker had low contrast (only a faint tint), making it difficult to instantly identify which state was active.
   - *Root Cause:* The style was relying on a light background color without a distinct border highlight or high-contrast foreground color.

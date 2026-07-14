@@ -46,6 +46,15 @@ export const Header: React.FC<HeaderProps> = ({
   const activeDate = new Date(currentDateStr);
   const [isMiniCalendarOpen, setIsMiniCalendarOpen] = useState(false);
 
+  const isTodayActive = useMemo(() => {
+    const today = new Date();
+    return (
+      activeDate.getDate() === today.getDate() &&
+      activeDate.getMonth() === today.getMonth() &&
+      activeDate.getFullYear() === today.getFullYear()
+    );
+  }, [activeDate]);
+
   const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
   const pendingCount = useMemo(() => tasks.filter((task) => !task.completed && task.date !== todayStr).length, [tasks, todayStr]);
 
@@ -152,14 +161,24 @@ export const Header: React.FC<HeaderProps> = ({
             <Menu size={20} />
           </button>
 
-          {/* Today's date text (e.g. "July 7") without dropdown chevron */}
-          <span 
-            onClick={() => setCurrentDate(new Date())}
-            className="text-xl font-medium text-gray-900 select-none px-1 flex-shrink-0 cursor-pointer hover:text-blue-600 active:scale-95 transition-all duration-150"
-            title="Go to Today"
-          >
-            {format(activeDate, 'MMMM d')}
-          </span>
+          {/* Today's date text with highlight for today */}
+          {isTodayActive ? (
+            <span 
+              onClick={() => setCurrentDate(new Date())}
+              className="text-xs sm:text-sm font-semibold bg-[#1A73E8] text-white select-none px-3 py-1.5 rounded-full flex-shrink-0 cursor-pointer shadow-xs hover:bg-blue-700 active:scale-95 transition-all duration-150 flex items-center"
+              title="Today"
+            >
+              {format(activeDate, 'EEE, MMMM d')}
+            </span>
+          ) : (
+            <span 
+              onClick={() => setCurrentDate(new Date())}
+              className="text-xl font-medium text-gray-900 select-none px-1 flex-shrink-0 cursor-pointer hover:text-blue-600 active:scale-95 transition-all duration-150"
+              title="Go to Today"
+            >
+              {format(activeDate, 'MMMM d')}
+            </span>
+          )}
         </div>
 
         {/* Center/Right Side: Actual wide search bar taking remaining width */}
