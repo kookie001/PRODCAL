@@ -161,7 +161,7 @@ export const Header: React.FC<HeaderProps> = ({
             <Menu size={20} />
           </button>
 
-          {/* Today's date text with highlight for today */}
+          {/* Today's date text with highlight for today, and plain tile style for other days */}
           {isTodayActive ? (
             <span 
               onClick={() => setCurrentDate(new Date())}
@@ -173,10 +173,10 @@ export const Header: React.FC<HeaderProps> = ({
           ) : (
             <span 
               onClick={() => setCurrentDate(new Date())}
-              className="text-xl font-medium text-gray-900 select-none px-1 flex-shrink-0 cursor-pointer hover:text-blue-600 active:scale-95 transition-all duration-150"
+              className="text-xs sm:text-sm font-semibold bg-gray-50 border border-gray-200 text-gray-800 select-none px-3 py-1.5 rounded-full flex-shrink-0 cursor-pointer shadow-xs hover:bg-gray-100 hover:text-blue-600 active:scale-95 transition-all duration-150 flex items-center"
               title="Go to Today"
             >
-              {format(activeDate, 'MMMM d')}
+              {format(activeDate, 'EEE, MMMM d')}
             </span>
           )}
         </div>

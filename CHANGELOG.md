@@ -1,6 +1,14 @@
 # Changelog
 
+## [2026-07-14]
+- Fix pencil and completion circle both non-functional on timeline card by removing conflicting `onPointerDown` handlers that were cancelling all touch and mouse end events, and styling them with robust non-overlapping tap targets (28px) placed side-by-side.
+- Add a small pencil (edit) icon to the LEFT of the completion circle on the timeline task card. Tapping this pencil promotes the current task title to the top/first element of the subtask list, blanks the main task title, and opens the TaskSheet in edit mode with the pre-populated blank title and updated subtasks list, allowing the user to type a new title and save while preserving date, time, category, and existing subtasks.
+- Add timeline task card drag-to-category: dragging a card vertically to reschedule still works exactly as before, but dragging it up and dropping it over any of the category tabs (Work, Personal, Health, Other) assigns that category to the task with a subtle haptic vibration and real-time hover highlight feedback.
+- Show consistent "Day, Month Date" format tile on every day in the header, highlighting today with a blue background and white text, and displaying other active days as a clean, bordered non-colored tile.
+- Fix oversized subtask row height and gaps in the pending task card by overriding the global button min-height and min-width rules with `minHeight: 'auto'` and `minWidth: 'auto'` on the subtask completion circle buttons, and setting subtask container spacing to `space-y-1`.
+
 ## [2026-07-13]
+- Tighten subtask row vertical spacing by applying explicit `lineHeight` to subtask text and drag handles, and reducing row padding to `1px 4px`.
 - Actually reduce subtask row gap in pending card by lowering the completion checkbox button wrapper height from 28px to 18px.
 - Performance: memoize timeline layout, task cards, and filtered lists.
 - Align pending card titles by adding a fixed-width chevron slot on every card, rendering a rotating chevron only on cards with incomplete subtasks while keeping empty slots on cards without subtasks to guarantee perfect vertical alignment of all titles.

@@ -78,6 +78,7 @@ export const CategoryTabBar: React.FC = () => {
         {/* All filter pill */}
         <button
           onClick={() => setSelectedCategory('All')}
+          data-category-tab="All"
           className={`h-full px-2.5 text-xs font-semibold tracking-wide transition-colors cursor-pointer select-none flex items-center justify-center relative
             ${selectedCategory === 'All'
               ? 'active-tab text-[#1A73E8]'
@@ -95,6 +96,7 @@ export const CategoryTabBar: React.FC = () => {
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
+              data-category-tab={cat.id}
               className={`flex items-center space-x-1.5 h-full px-2.5 text-xs font-semibold tracking-wide transition-colors cursor-pointer select-none
                 ${isActive
                   ? 'active-tab text-[#1A73E8]'

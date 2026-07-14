@@ -28,6 +28,7 @@ import {
   CalendarDays,
   GripVertical,
   Edit3,
+  Pencil,
   Trash2,
   Check,
   AlertCircle,
@@ -1662,12 +1663,54 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
   const fgSub = completed ? '#9CA3AF' : '#2563EB'
   const borderStyle = completed ? '1px solid #E5E7EB' : '1px solid #BFDBFE'
 
+  const lastPointerPos = useRef({ x: 0, y: 0 })
+
+  const getTabAtCoords = useCallback((x: number, y: number) => {
+    const tabs = document.querySelectorAll('[data-category-tab]');
+    for (const tab of Array.from(tabs)) {
+      const rect = tab.getBoundingClientRect();
+      if (
+        x >= rect.left &&
+        x <= rect.right &&
+        y >= rect.top &&
+        y <= rect.bottom
+      ) {
+        return tab.getAttribute('data-category-tab');
+      }
+    }
+    return null;
+  }, []);
+
+  const updateTabHighlights = useCallback((activeTabId: string | null) => {
+    const tabs = document.querySelectorAll('[data-category-tab]');
+    tabs.forEach(tab => {
+      const isOver = tab.getAttribute('data-category-tab') === activeTabId;
+      if (isOver && activeTabId !== 'All') {
+        (tab as HTMLElement).style.backgroundColor = 'rgba(26, 115, 232, 0.15)';
+        (tab as HTMLElement).style.transform = 'scale(1.05)';
+        (tab as HTMLElement).style.transition = 'all 150ms ease';
+      } else {
+        (tab as HTMLElement).style.backgroundColor = '';
+        (tab as HTMLElement).style.transform = '';
+      }
+    });
+  }, []);
+
+  const clearTabHighlights = useCallback(() => {
+    const tabs = document.querySelectorAll('[data-category-tab]');
+    tabs.forEach(tab => {
+      (tab as HTMLElement).style.backgroundColor = '';
+      (tab as HTMLElement).style.transform = '';
+    });
+  }, []);
+
   const resetDragState = useCallback(() => {
     dragging.current = false
     moved.current = false
     setIsActivelyDragging(false)
     setIsDraggingSubtask(false)
-  }, [])
+    clearTabHighlights()
+  }, [clearTabHighlights])
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (isDraggingSubtask) {
@@ -1690,16 +1733,28 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
     const onTouchEndNative = () => {
       lastTouchTime.current = Date.now()
       if (dragging.current && moved.current && blockRef.current) {
-        const finalTop = parseFloat(blockRef.current.style.top || '0')
-        const pixelsPerMinute = 64 / 60
-        const minutes = finalTop / pixelsPerMinute
-        const snappedMinutes = Math.round(minutes / 15) * 15
-        const clampedMins = Math.max(0, Math.min(1425, snappedMinutes))
-        const h = Math.floor(clampedMins / 60)
-        const m = clampedMins % 60
-        const newTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-        onReschedule(task.id, newTime)
+        const droppedCat = getTabAtCoords(lastPointerPos.current.x, lastPointerPos.current.y)
+        if (droppedCat && droppedCat !== 'All') {
+          updateTask(task.id, { category: droppedCat as CategoryType })
+          if (navigator.vibrate) {
+            navigator.vibrate(10)
+          }
+          if (blockRef.current) {
+            blockRef.current.style.top = style?.top?.toString() || ''
+          }
+        } else {
+          const finalTop = parseFloat(blockRef.current.style.top || '0')
+          const pixelsPerMinute = 64 / 60
+          const minutes = finalTop / pixelsPerMinute
+          const snappedMinutes = Math.round(minutes / 15) * 15
+          const clampedMins = Math.max(0, Math.min(1425, snappedMinutes))
+          const h = Math.floor(clampedMins / 60)
+          const m = clampedMins % 60
+          const newTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+          onReschedule(task.id, newTime)
+        }
       }
+      clearTabHighlights()
       resetDragState()
       window.removeEventListener('touchend', onTouchEndNative)
       window.removeEventListener('touchcancel', onTouchCancelNative)
@@ -1717,16 +1772,28 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
 
   const handleTouchEnd = () => {
     if (dragging.current && moved.current && blockRef.current) {
-      const finalTop = parseFloat(blockRef.current.style.top || '0')
-      const pixelsPerMinute = 64 / 60
-      const minutes = finalTop / pixelsPerMinute
-      const snappedMinutes = Math.round(minutes / 15) * 15
-      const clampedMins = Math.max(0, Math.min(1425, snappedMinutes))
-      const h = Math.floor(clampedMins / 60)
-      const m = clampedMins % 60
-      const newTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-      onReschedule(task.id, newTime)
+      const droppedCat = getTabAtCoords(lastPointerPos.current.x, lastPointerPos.current.y)
+      if (droppedCat && droppedCat !== 'All') {
+        updateTask(task.id, { category: droppedCat as CategoryType })
+        if (navigator.vibrate) {
+          navigator.vibrate(10)
+        }
+        if (blockRef.current) {
+          blockRef.current.style.top = style?.top?.toString() || ''
+        }
+      } else {
+        const finalTop = parseFloat(blockRef.current.style.top || '0')
+        const pixelsPerMinute = 64 / 60
+        const minutes = finalTop / pixelsPerMinute
+        const snappedMinutes = Math.round(minutes / 15) * 15
+        const clampedMins = Math.max(0, Math.min(1425, snappedMinutes))
+        const h = Math.floor(clampedMins / 60)
+        const m = clampedMins % 60
+        const newTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+        onReschedule(task.id, newTime)
+      }
     }
+    clearTabHighlights()
     resetDragState()
   }
 
@@ -1768,21 +1835,38 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         if (blockRef.current) {
           blockRef.current.style.top = `${newTop}px`
         }
+        const clientX = moveEvent.clientX
+        const clientY = moveEvent.clientY
+        lastPointerPos.current = { x: clientX, y: clientY }
+        const activeTabId = getTabAtCoords(clientX, clientY)
+        updateTabHighlights(activeTabId)
       }
     };
 
     const onMouseUp = () => {
       if (dragging.current && moved.current && blockRef.current) {
-        const finalTop = parseFloat(blockRef.current.style.top || '0')
-        const pixelsPerMinute = 64 / 60
-        const minutes = finalTop / pixelsPerMinute
-        const snappedMinutes = Math.round(minutes / 15) * 15
-        const clampedMins = Math.max(0, Math.min(1425, snappedMinutes))
-        const h = Math.floor(clampedMins / 60)
-        const m = clampedMins % 60
-        const newTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-        onReschedule(task.id, newTime)
+        const droppedCat = getTabAtCoords(lastPointerPos.current.x, lastPointerPos.current.y)
+        if (droppedCat && droppedCat !== 'All') {
+          updateTask(task.id, { category: droppedCat as CategoryType })
+          if (navigator.vibrate) {
+            navigator.vibrate(10)
+          }
+          if (blockRef.current) {
+            blockRef.current.style.top = style?.top?.toString() || ''
+          }
+        } else {
+          const finalTop = parseFloat(blockRef.current.style.top || '0')
+          const pixelsPerMinute = 64 / 60
+          const minutes = finalTop / pixelsPerMinute
+          const snappedMinutes = Math.round(minutes / 15) * 15
+          const clampedMins = Math.max(0, Math.min(1425, snappedMinutes))
+          const h = Math.floor(clampedMins / 60)
+          const m = clampedMins % 60
+          const newTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+          onReschedule(task.id, newTime)
+        }
       }
+      clearTabHighlights()
       resetDragState()
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('mouseup', onMouseUp)
@@ -1812,11 +1896,16 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         if (blockRef.current) {
           blockRef.current.style.top = `${newTop}px`
         }
+        const clientX = e.touches[0].clientX
+        const clientY = e.touches[0].clientY
+        lastPointerPos.current = { x: clientX, y: clientY }
+        const activeTabId = getTabAtCoords(clientX, clientY)
+        updateTabHighlights(activeTabId)
       }
     }
     el.addEventListener('touchmove', onMove, { passive: false })
     return () => el.removeEventListener('touchmove', onMove)
-  }, [isDraggingSubtask])
+  }, [isDraggingSubtask, getTabAtCoords, updateTabHighlights])
 
   return (
     <motion.div
@@ -2003,19 +2092,79 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
           </p>
         )}
 
-        {/* RIGHT: task completion circle — small, right aligned */}
+        {/* SMALL PENCIL (EDIT) ICON BUTTON */}
         <button
-          onPointerDown={(e) => {
-            e.stopPropagation()
-            e.preventDefault()
-          }}
           onTouchStart={(e) => {
             e.stopPropagation()
-            e.preventDefault()
           }}
           onMouseDown={(e) => {
             e.stopPropagation()
+          }}
+          onTouchEnd={(e) => {
+            e.stopPropagation()
             e.preventDefault()
+            const oldTitle = task.title
+            const newSubId = `sub-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`
+            const newSub: Subtask = {
+              id: newSubId,
+              title: oldTitle,
+              completed: false,
+            }
+            const updatedSubtasks = [newSub, ...(task.subtasks || [])]
+            const updatedTask: Task = {
+              ...task,
+              title: '',
+              subtasks: updatedSubtasks,
+            }
+            onEditOpen(updatedTask)
+          }}
+          onMouseUp={(e) => {
+            e.stopPropagation()
+            e.preventDefault()
+            const oldTitle = task.title
+            const newSubId = `sub-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`
+            const newSub: Subtask = {
+              id: newSubId,
+              title: oldTitle,
+              completed: false,
+            }
+            const updatedSubtasks = [newSub, ...(task.subtasks || [])]
+            const updatedTask: Task = {
+              ...task,
+              title: '',
+              subtasks: updatedSubtasks,
+            }
+            onEditOpen(updatedTask)
+          }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '28px',
+            height: '28px',
+            minWidth: '28px',
+            padding: 0,
+            margin: 0,
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            flexShrink: 0,
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            opacity: 0.6,
+          }}
+          className="hover:opacity-100 transition-opacity"
+        >
+          <Pencil size={14} style={{ color: fg }} />
+        </button>
+
+        {/* RIGHT: task completion circle — small, right aligned */}
+        <button
+          onTouchStart={(e) => {
+            e.stopPropagation()
+          }}
+          onMouseDown={(e) => {
+            e.stopPropagation()
           }}
           onTouchEnd={(e) => {
             e.stopPropagation()
@@ -2031,9 +2180,9 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: '26px',
-            height: '26px',
-            minWidth: '26px',
+            width: '28px',
+            height: '28px',
+            minWidth: '28px',
             padding: 0,
             margin: 0,
             background: 'transparent',

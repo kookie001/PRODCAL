@@ -106,7 +106,7 @@ const SortableSubtaskItem = React.memo<SortableSubtaskItemProps>(({
     >
       {/* ≡ Drag handle/indicator on the left */}
       <div style={{ width: '12px', display: 'flex', justifyContent: 'center' }}>
-        <span style={{ fontSize: '12px', color: `${fgSub}99`, fontWeight: 'bold' }}>≡</span>
+        <span style={{ fontSize: '12px', lineHeight: '1', color: `${fgSub}99`, fontWeight: 'bold' }}>≡</span>
       </div>
 
       {/* Subtask text */}
@@ -114,6 +114,7 @@ const SortableSubtaskItem = React.memo<SortableSubtaskItemProps>(({
         style={{
           flex: 1,
           fontSize: '11px',
+          lineHeight: '1.2',
           color: sub.completed ? `${fgSub}66` : fgSub,
           textDecoration: sub.completed ? 'line-through' : 'none',
           overflow: 'hidden',
@@ -153,6 +154,8 @@ const SortableSubtaskItem = React.memo<SortableSubtaskItemProps>(({
           justifyContent: 'center',
           width: '28px',
           height: '18px',
+          minWidth: 'auto',
+          minHeight: 'auto',
           padding: 0,
           background: 'transparent',
           border: 'none',
@@ -394,7 +397,7 @@ const TaskItemRow = React.memo(({
                 items={incompleteSubtaskIds}
                 strategy={verticalListSortingStrategy}
               >
-                <div className="space-y-0.5">
+                <div className="space-y-1">
                   {incompleteSubtasks.map((sub: any, index: number) => {
                     const fgSub = isCompleted ? '#9CA3AF' : '#2563EB';
                     return (
