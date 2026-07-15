@@ -6,6 +6,11 @@
 
 ## Resolved Bugs
 
+- **BUG 20: Chevron button and subtasks visibility broken/stuck after dragging a timeline task card**
+  - *Description:* Tapping the chevron button after dragging a task card and dropping it (normal reschedule or drag-to-category) does nothing, and the subtasks are not shown.
+  - *Root Cause:* When a drag gesture is ended and the task's time or category is updated in the store, React's batching of state updates causes the component to re-render in response to parent prop changes *before* the asynchronous local state update `setIsActivelyDragging(false)` is fully processed. Because `isActivelyDragging` is still evaluated as `true` during the initial re-render, the card renders in its active dragging state (collapsing subtasks and locking the chevron).
+  - *Resolution:* Linked the visual rendering of the active drag state to the synchronous `dragging.current` ref by creating `isCurrentlyDragging = isActivelyDragging && dragging.current`. Since `dragging.current` is reset to `false` completely synchronously in `resetDragState` immediately when the touch/mouse gesture terminates, `isCurrentlyDragging` is guaranteed to be `false` in any and all subsequent render cycles, instantly and robustly re-enabling the expand/collapse chevron button and displaying subtasks cleanly.
+
 - **BUG 19: Vertical spacing/gap between subtask rows in the expanded pending list card is too large**
   - *Description:* When a pending task card is tapped to expand its subtasks, the vertical gap between subtask rows is too large.
   - *Root Cause:* The subtask circle check button wrapper was hardcoded with a height of `28px` inside a flex layout container with additional padding, forcing the row to be extremely tall.

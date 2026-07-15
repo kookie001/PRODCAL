@@ -620,7 +620,7 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
   }, [setIsOpen, setTasksOverlayOpen]);
 
   const allPendingTasks = useMemo(() => {
-    return tasks.filter((task) => !task.completed && task.date !== todayStr);
+    return tasks.filter((task) => !task.completed && task.date && task.date < todayStr);
   }, [tasks, todayStr]);
 
   const completedTasks = useMemo(() => {
@@ -628,7 +628,7 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
   }, [tasks]);
 
   const sortedPending = useMemo(() => {
-    return [...allPendingTasks].sort((a, b) => a.date.localeCompare(b.date));
+    return [...allPendingTasks].sort((a, b) => b.date.localeCompare(a.date));
   }, [allPendingTasks]);
 
   const getTaskDateLabel = useCallback((dateStr: string) => {

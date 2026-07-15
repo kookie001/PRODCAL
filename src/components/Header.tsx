@@ -56,7 +56,7 @@ export const Header: React.FC<HeaderProps> = ({
   }, [activeDate]);
 
   const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
-  const pendingCount = useMemo(() => tasks.filter((task) => !task.completed && task.date !== todayStr).length, [tasks, todayStr]);
+  const pendingCount = useMemo(() => tasks.filter((task) => !task.completed && task.date && task.date < todayStr).length, [tasks, todayStr]);
 
   const calendarDropdownRef = useRef<HTMLDivElement>(null);
 

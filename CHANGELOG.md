@@ -1,6 +1,10 @@
 # Changelog
 
+## [2026-07-15]
+- Fix chevron expand/collapse button and subtasks visibility getting stuck after a timeline task is dragged and dropped (normal reschedule or drag-to-category). Resolved by linking the visual rendering of the active drag state to the synchronous `dragging.current` ref (`isCurrentlyDragging = isActivelyDragging && dragging.current`), guaranteeing that the UI immediately resets to its non-dragging state and re-enables chevron interactions when the gesture ends, even before React state batching processes the asynchronous state update.
+
 ## [2026-07-14]
+- Fix pending tasks list and pending badges to correctly exclude today's and future tasks (showing only incomplete tasks with past dates before today) and sort them descending (most recent past date first).
 - Fix pencil and completion circle both non-functional on timeline card by removing conflicting `onPointerDown` handlers that were cancelling all touch and mouse end events, and styling them with robust non-overlapping tap targets (28px) placed side-by-side.
 - Add a small pencil (edit) icon to the LEFT of the completion circle on the timeline task card. Tapping this pencil promotes the current task title to the top/first element of the subtask list, blanks the main task title, and opens the TaskSheet in edit mode with the pre-populated blank title and updated subtasks list, allowing the user to type a new title and save while preserving date, time, category, and existing subtasks.
 - Add timeline task card drag-to-category: dragging a card vertically to reschedule still works exactly as before, but dragging it up and dropping it over any of the category tabs (Work, Personal, Health, Other) assigns that category to the task with a subtle haptic vibration and real-time hover highlight feedback.

@@ -1594,6 +1594,8 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
   const currentTop = useRef(0)
   const lastTouchTime = useRef(0)
 
+  const isCurrentlyDragging = isActivelyDragging && dragging.current
+
   useEffect(() => {
     setEditTitle(task.title)
   }, [task.title])
@@ -1940,7 +1942,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         borderRadius: '12px',
         border: borderStyle,
         minHeight: '44px',
-        overflow: (expanded && !isActivelyDragging) ? 'visible' : 'hidden',
+        overflow: (expanded && !isCurrentlyDragging) ? 'visible' : 'hidden',
         touchAction: 'none',
         userSelect: 'none',
         WebkitUserSelect: 'none',
@@ -1949,7 +1951,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
-        zIndex: (expanded && !isActivelyDragging) ? 200 : (dragging.current ? 250 : (style?.zIndex || 1)),
+        zIndex: (expanded && !isCurrentlyDragging) ? 200 : (dragging.current ? 250 : (style?.zIndex || 1)),
       }}
     >
       {/* MAIN ROW — always visible */}
@@ -2012,7 +2014,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
               alignItems: 'center',
               justifyContent: 'center',
               transition: 'transform 180ms ease',
-              transform: (expanded && !isActivelyDragging) ? 'rotate(90deg)' : 'rotate(0deg)',
+              transform: (expanded && !isCurrentlyDragging) ? 'rotate(90deg)' : 'rotate(0deg)',
             }}>
               <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
                 <path d="M2 3L4 5L6 3" stroke={fg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -2214,7 +2216,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       </div>
 
       {/* SUBTASKS — expand below */}
-      {(expanded && !isActivelyDragging) && (
+      {(expanded && !isCurrentlyDragging) && (
         <div 
           data-subtask-panel="true"
           onClick={(e) => e.stopPropagation()}
@@ -2329,7 +2331,7 @@ const DayView: React.FC<DayViewProps> = ({
   
   const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
   const pendingCount = useMemo(() => {
-    return allTasks.filter((task) => !task.completed && task.date !== todayStr).length;
+    return allTasks.filter((task) => !task.completed && task.date && task.date < todayStr).length;
   }, [allTasks, todayStr]);
 
   const reorderSubtasks = useTaskStore((state) => state.reorderSubtasks);
