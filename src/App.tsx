@@ -64,37 +64,11 @@ export default function App() {
     let lastBackPress = 0;
 
     const handleBackButton = (e: PopStateEvent) => {
-      // 1. Check if task sheet (FAB) is open — highest priority
-      const isFABOpen = useTaskStore.getState().isFABOpen;
-      const isTaskSheetOpen = useTaskStore.getState().isTaskSheetOpen;
-      if (isFABOpen || isTaskSheetOpen) {
-        // Check if calendar picker is open inside the TaskSheet
-        const calendarPickerOverlay = document.getElementById('calendar-picker-overlay');
-        if (calendarPickerOverlay) {
-          calendarPickerOverlay.click();
-          e.preventDefault();
-          window.history.pushState(null, '', window.location.href);
-          return;
-        }
-
-        // Check if clock picker is open inside the TaskSheet
-        const clockPickerOverlay = document.getElementById('clock-picker-overlay');
-        if (clockPickerOverlay) {
-          clockPickerOverlay.click();
-          e.preventDefault();
-          window.history.pushState(null, '', window.location.href);
-          return;
-        }
-
-        // Otherwise directly close the task sheet using real state functions
-        useTaskStore.getState().setFABOpen(false);
-        useTaskStore.getState().setTaskSheetOpen(false);
-        useTaskStore.getState().setEditingTask(null);
-        useTaskStore.getState().setPrefilledTime('');
-        useTaskStore.getState().setPrefilledTitle('');
-        
+      // 1. Check if task sheet is open — highest priority
+      if (useTaskStore.getState().isTaskSheetOpen || useTaskStore.getState().isFABOpen) {
+        window.dispatchEvent(new CustomEvent('task-sheet-back-press'));
         e.preventDefault();
-        window.history.pushState(null, '', window.location.href);
+        window.history.pushState(null, '', window.location.href); // re-arm so next press is captured
         return;
       }
 

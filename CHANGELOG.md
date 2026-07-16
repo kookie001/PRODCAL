@@ -1,6 +1,27 @@
 # Changelog
 
+## [2026-07-16]
+- Convert home page Day view from visual time-grid to simple time-ordered list:
+  - Removed 24-hour vertical timeline grid column, hour labels, and horizontal grid lines completely.
+  - Rendered scheduled and all-day tasks as a beautiful, fluid, vertical stacked list ordered ascending by time (All-Day tasks at the very top, followed by 12:00 AM to 11:59 PM).
+  - Designed an elegant, high-contrast, larger flex-based task card format: `[time] | (V chevron) title | pencil | completion-circle`.
+  - Added empty state handler for days with no tasks.
+  - Completely removed vertical drag-to-reschedule logic and visual rescheduling guides.
+  - Refactored touch and mouse drag-to-category handlers to use precise 2D translation transforms (`transform: translate(dx, dy)`) for visual feedback, maintaining full drag-to-category capabilities while cleanly avoiding vertical rescheduling.
+
 ## [2026-07-15]
+- Remove temporary sheetOpen debug badge.
+- Simplify task sheet back button and close handling:
+  - Removed all local `popstate` listeners, `poppedRef`, and complex history manipulations from `TaskSheet.tsx` to prevent stack corruption and desynchronization.
+  - Set `App.tsx`'s global back button handler as the single source of truth for back gesture interception. When the sheet is open (`isTaskSheetOpen || isFABOpen`), pressing OS back dispatches a unified `'task-sheet-back-press'` custom event to the sheet, intercepts the default navigation, and cleanly re-arms the single dummy state.
+  - Implemented a subscriber in `TaskSheet.tsx` that listens to `'task-sheet-back-press'` and closes the sheet immediately in a single press (dismissing the keyboard naturally).
+  - Completely removed the on-screen close button (chevron icon) from the task sheet's top header so that closing is managed exclusively by the OS hardware back button (with Save still saving + closing).
+  - Disabled backdrop and top handlebar click-to-close interactions to prevent accidental sheet dismissals, setting backdrop click to focus-blur any active inputs instead.
+- Apply critical mobile performance optimizations:
+  - Add a custom memo comparison function for `DraggableTaskBlock` to shallowly compare changing style properties (`top`, `left`, `width`, `height`, `marginTop`, `position`) individually, bypassing re-renders from referentially new inline style objects.
+  - Wrap high-level view components (`MonthView`, `WeekView`, `DayView`, and `ScheduleView`) in `React.memo` to prevent cascading render trees when tasks or active dates are unchanged.
+  - Scoped the Zustand store subscription in `DayView` for the `pendingCount` badge by using a specific state filter selector wrapped in a memoized `useCallback`, preventing the entire view from re-rendering on unrelated task updates.
+  - Removed high-cost `boxShadow` animations from the `whileHover` state on `DraggableTaskBlock` to reduce paint and compositor overhead during mobile scroll gestures.
 - Fix chevron expand/collapse button and subtasks visibility getting stuck after a timeline task is dragged and dropped (normal reschedule or drag-to-category). Resolved by linking the visual rendering of the active drag state to the synchronous `dragging.current` ref (`isCurrentlyDragging = isActivelyDragging && dragging.current`), guaranteeing that the UI immediately resets to its non-dragging state and re-enables chevron interactions when the gesture ends, even before React state batching processes the asynchronous state update.
 
 ## [2026-07-14]

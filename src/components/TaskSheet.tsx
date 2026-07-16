@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -378,22 +378,62 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
     }, 50);
   };
 
-  const handleSheetBack = () => {
+  const handleClose = useCallback(() => {
+    setIsOpen(false);
+    setTimeout(() => {
+      if (propOnClose) {
+        propOnClose();
+      } else {
+        setFABOpen(false);
+        setEditingTask(null);
+        setPrefilledTime('');
+        setPrefilledTitle('');
+      }
+    }, 280);
+  }, [propOnClose, setFABOpen, setEditingTask, setPrefilledTime, setPrefilledTitle]);
+
+  const handleSheetBack = useCallback(() => {
+    // 1. Check if calendar picker is open inside the TaskSheet
+    const calendarPickerOverlay = document.getElementById('calendar-picker-overlay');
+    if (calendarPickerOverlay) {
+      calendarPickerOverlay.click();
+      return;
+    }
+
+    // 2. Check if clock picker is open inside the TaskSheet
+    const clockPickerOverlay = document.getElementById('clock-picker-overlay');
+    if (clockPickerOverlay) {
+      clockPickerOverlay.click();
+      return;
+    }
+
     const active = document.activeElement as HTMLElement;
     if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
       active.blur(); // keyboard open → just close keyboard
       return;
     }
     handleClose(); // keyboard already closed → close the sheet (no save)
-  };
+  }, [handleClose]);
 
   // Sync sheet open status to the store for global back gesture bypass
   useEffect(() => {
-    setTaskSheetOpen(isOpen);
+    setTaskSheetOpen(true);
     return () => {
       setTaskSheetOpen(false);
     };
-  }, [isOpen, setTaskSheetOpen]);
+  }, [setTaskSheetOpen]);
+
+  // Listen to the custom event dispatched by App.tsx when OS Back button is pressed
+  useEffect(() => {
+    const handleBackPressEvent = () => {
+      // One press of OS back = close the sheet and go home immediately.
+      handleClose();
+    };
+    window.addEventListener('task-sheet-back-press', handleBackPressEvent);
+    return () => {
+      window.removeEventListener('task-sheet-back-press', handleBackPressEvent);
+    };
+  }, [handleClose]);
 
   // Animate sheet sliding in on mount
   useEffect(() => {
@@ -449,20 +489,6 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
       hasInitializedRef.current = false;
     }
   }, [activeIsOpen, activeMode, activeEditTask, currentDateStr, prefilledTime, prefilledTitle]);
-
-  const handleClose = () => {
-    setIsOpen(false);
-    setTimeout(() => {
-      if (propOnClose) {
-        propOnClose();
-      } else {
-        setFABOpen(false);
-        setEditingTask(null);
-        setPrefilledTime('');
-        setPrefilledTitle('');
-      }
-    }, 280);
-  };
 
   const handleAddEmptySubtask = () => {
     if (subtasks.length >= 50) return;
@@ -590,7 +616,11 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
         className={`absolute inset-0 bg-black/40 cursor-default transition-opacity duration-280 ${
           isOpen ? 'opacity-100' : 'opacity-0'
         }`}
-        onClick={handleSheetBack}
+        onClick={() => {
+          if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
+        }}
       />
 
       {/* Modal Core Sheet — full height, flex column */}
@@ -626,47 +656,13 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
       >
         {/* FIXED TOP: handle bar + Save button — never moves */}
         <div 
-          style={{ flexShrink: 0, cursor: 'pointer' }} 
+          style={{ flexShrink: 0 }} 
           className="pt-4 pb-2 px-6 select-none"
-          onClick={(e) => {
-            const target = e.target as HTMLElement;
-            if (!target.closest('button, input, select, textarea')) {
-              e.stopPropagation();
-              handleSheetBack();
-            }
-          }}
         >
           <div className="w-8 h-1 bg-[#DADCE0] rounded-full mx-auto mb-3" />
           
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2 flex-1 min-w-0 mr-4">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleSheetBack();
-                }}
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  border: 'none',
-                  background: 'transparent',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  touchAction: 'manipulation',
-                  cursor: 'pointer',
-                  flexShrink: 0,
-                }}
-                className="hover:bg-gray-100 rounded-full transition-colors"
-              >
-                {/* down-chevron icon */}
-                <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-                  <path d="M6 9L11 14L16 9" stroke="#5F6368" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
-
               <input
                 ref={inputRef}
                 type="text"

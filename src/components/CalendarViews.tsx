@@ -307,7 +307,7 @@ const NON_TIMED_TASK_STYLE: React.CSSProperties = {
   top: 'auto',
 };
 
-const MonthView: React.FC<ViewProps> = ({
+const MonthView = React.memo<ViewProps>(({
   activeDate,
   tasks,
   setSelectedTaskForDetails,
@@ -544,7 +544,9 @@ const MonthView: React.FC<ViewProps> = ({
     </div>
   </div>
   );
-};
+});
+
+MonthView.displayName = "MonthView";
 
 /* ============================================================================
    2. WEEK VIEW COMPONENT
@@ -571,7 +573,7 @@ interface WeekViewProps {
   isThreeDay?: boolean;
 }
 
-const WeekView: React.FC<WeekViewProps> = ({
+const WeekView = React.memo<WeekViewProps>(({
   activeDate,
   tasks,
   setSelectedTaskForDetails,
@@ -1423,7 +1425,9 @@ const WeekView: React.FC<WeekViewProps> = ({
     </div>
   </div>
   );
-};
+});
+
+WeekView.displayName = "WeekView";
 
 
 const SortableSubtaskRow = React.memo(({
@@ -1566,10 +1570,20 @@ const SortableSubtaskRow = React.memo(({
 
 SortableSubtaskRow.displayName = "SortableSubtaskRow";
 
+const format12hTime = (timeStr?: string): string => {
+  if (!timeStr) return 'All-Day';
+  const [h, m] = timeStr.split(':').map(Number);
+  if (isNaN(h)) return timeStr;
+  const hour = h % 12 === 0 ? 12 : h % 12;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const min = m !== undefined ? `:${String(m).padStart(2, '0')}` : '';
+  return `${hour}${min} ${ampm}`;
+};
+
 interface DraggableTaskBlockProps {
   task: Task;
   pixelsPerMinute?: number;
-  onReschedule: (taskId: string, newTime: string) => void;
+  onReschedule?: (taskId: string, newTime: string) => void;
   style?: React.CSSProperties;
   onEditOpen: (task: Task) => void;
 }
@@ -1712,6 +1726,9 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
     setIsActivelyDragging(false)
     setIsDraggingSubtask(false)
     clearTabHighlights()
+    if (blockRef.current) {
+      blockRef.current.style.transform = ''
+    }
   }, [clearTabHighlights])
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -1728,9 +1745,6 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
     moved.current = false
     dragging.current = true
     dragStartY.current = e.touches[0].clientY
-    if (blockRef.current) {
-      currentTop.current = parseFloat(blockRef.current.style.top || '0')
-    }
 
     const onTouchEndNative = () => {
       lastTouchTime.current = Date.now()
@@ -1741,19 +1755,6 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
           if (navigator.vibrate) {
             navigator.vibrate(10)
           }
-          if (blockRef.current) {
-            blockRef.current.style.top = style?.top?.toString() || ''
-          }
-        } else {
-          const finalTop = parseFloat(blockRef.current.style.top || '0')
-          const pixelsPerMinute = 64 / 60
-          const minutes = finalTop / pixelsPerMinute
-          const snappedMinutes = Math.round(minutes / 15) * 15
-          const clampedMins = Math.max(0, Math.min(1425, snappedMinutes))
-          const h = Math.floor(clampedMins / 60)
-          const m = clampedMins % 60
-          const newTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-          onReschedule(task.id, newTime)
         }
       }
       clearTabHighlights()
@@ -1780,19 +1781,6 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         if (navigator.vibrate) {
           navigator.vibrate(10)
         }
-        if (blockRef.current) {
-          blockRef.current.style.top = style?.top?.toString() || ''
-        }
-      } else {
-        const finalTop = parseFloat(blockRef.current.style.top || '0')
-        const pixelsPerMinute = 64 / 60
-        const minutes = finalTop / pixelsPerMinute
-        const snappedMinutes = Math.round(minutes / 15) * 15
-        const clampedMins = Math.max(0, Math.min(1425, snappedMinutes))
-        const h = Math.floor(clampedMins / 60)
-        const m = clampedMins % 60
-        const newTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-        onReschedule(task.id, newTime)
       }
     }
     clearTabHighlights()
@@ -1817,9 +1805,6 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
     moved.current = false
     dragging.current = true
     dragStartY.current = e.clientY
-    if (blockRef.current) {
-      currentTop.current = parseFloat(blockRef.current.style.top || '0')
-    }
 
     const onMouseMove = (moveEvent: MouseEvent) => {
       if (isDraggingSubtask) return
@@ -1833,9 +1818,8 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         }
       }
       if (moved.current) {
-        const newTop = currentTop.current + dy
         if (blockRef.current) {
-          blockRef.current.style.top = `${newTop}px`
+          blockRef.current.style.transform = `translate(${dx}px, ${dy}px)`
         }
         const clientX = moveEvent.clientX
         const clientY = moveEvent.clientY
@@ -1853,19 +1837,6 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
           if (navigator.vibrate) {
             navigator.vibrate(10)
           }
-          if (blockRef.current) {
-            blockRef.current.style.top = style?.top?.toString() || ''
-          }
-        } else {
-          const finalTop = parseFloat(blockRef.current.style.top || '0')
-          const pixelsPerMinute = 64 / 60
-          const minutes = finalTop / pixelsPerMinute
-          const snappedMinutes = Math.round(minutes / 15) * 15
-          const clampedMins = Math.max(0, Math.min(1425, snappedMinutes))
-          const h = Math.floor(clampedMins / 60)
-          const m = clampedMins % 60
-          const newTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-          onReschedule(task.id, newTime)
         }
       }
       clearTabHighlights()
@@ -1894,9 +1865,8 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         e.preventDefault()
       }
       if (moved.current) {
-        const newTop = currentTop.current + dy
         if (blockRef.current) {
-          blockRef.current.style.top = `${newTop}px`
+          blockRef.current.style.transform = `translate(${dx}px, ${dy}px)`
         }
         const clientX = e.touches[0].clientX
         const clientY = e.touches[0].clientY
@@ -1932,18 +1902,17 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       onMouseDown={handleMouseDown}
       whileHover={{
         y: -1,
-        boxShadow: completed ? '0 4px 8px rgba(0,0,0,0.04)' : '0 8px 16px rgba(30,64,175,0.12)',
       }}
       transition={{ duration: 0.2, type: 'spring', stiffness: 300, damping: 20 }}
       style={{
-        position: 'absolute',
-        ...style,
+        position: 'relative',
+        width: '100%',
         backgroundColor: bg,
         borderRadius: '12px',
         border: borderStyle,
-        minHeight: '44px',
+        minHeight: '48px',
         overflow: (expanded && !isCurrentlyDragging) ? 'visible' : 'hidden',
-        touchAction: 'none',
+        touchAction: 'pan-y',
         userSelect: 'none',
         WebkitUserSelect: 'none',
         boxSizing: 'border-box',
@@ -1951,7 +1920,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
-        zIndex: (expanded && !isCurrentlyDragging) ? 200 : (dragging.current ? 250 : (style?.zIndex || 1)),
+        zIndex: (expanded && !isCurrentlyDragging) ? 200 : (dragging.current ? 250 : 1),
       }}
     >
       {/* MAIN ROW — always visible */}
@@ -1959,69 +1928,96 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         display: 'flex',
         alignItems: 'center',
         padding: '0 8px',
-        height: '44px',
+        height: '48px',
         gap: '8px',
         width: '100%',
         boxSizing: 'border-box',
       }}>
 
-        {/* LEFT: expand toggle — small, minimal */}
-        {task.subtasks && task.subtasks.filter(s => !s.completed).length > 0 && (
-          <button
-            className="chevron-button"
-            onTouchStart={(e) => {
-              e.stopPropagation()
-              e.preventDefault()
-            }}
-            onMouseDown={(e) => {
-              e.stopPropagation()
-              e.preventDefault()
-            }}
-            onTouchEnd={(e) => {
-              e.stopPropagation()
-              e.preventDefault()
-              setExpanded(prev => !prev)
-            }}
-            onMouseUp={(e) => {
-              e.stopPropagation()
-              e.preventDefault()
-              setExpanded(prev => !prev)
-            }}
-            style={{
-              width: '44px',
-              height: '44px',
-              minWidth: '44px',
-              marginLeft: '-14px',
-              marginRight: '-14px',
-              background: 'transparent',
-              border: 'none',
-              padding: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              flexShrink: 0,
-            }}
-          >
+        {/* TIME BLOCK */}
+        <div style={{
+          paddingLeft: '4px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'flex-start',
+          minWidth: '64px',
+          flexShrink: 0,
+        }}>
+          <span style={{
+            fontSize: '11px',
+            fontWeight: 800,
+            color: completed ? '#9CA3AF' : '#1E40AF',
+            whiteSpace: 'nowrap',
+          }}>
+            {format12hTime(task.time)}
+          </span>
+        </div>
 
-            <div style={{
-              width: '16px',
-              height: '16px',
-              borderRadius: '50%',
-              background: completed ? 'rgba(0,0,0,0.05)' : 'rgba(30,64,175,0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'transform 180ms ease',
-              transform: (expanded && !isCurrentlyDragging) ? 'rotate(90deg)' : 'rotate(0deg)',
-            }}>
-              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                <path d="M2 3L4 5L6 3" stroke={fg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        {/* THIN SEPARATOR */}
+        <div style={{
+          width: '1px',
+          height: '24px',
+          backgroundColor: completed ? '#E5E7EB' : '#BFDBFE',
+          flexShrink: 0,
+        }} />
+
+        {/* LEFT: expand toggle (chevron) — only if incomplete subtasks exist */}
+        <div style={{
+          width: '24px',
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          {task.subtasks && task.subtasks.filter(s => !s.completed).length > 0 && (
+            <button
+              className="chevron-button"
+              onTouchStart={(e) => {
+                e.stopPropagation()
+                e.preventDefault()
+              }}
+              onMouseDown={(e) => {
+                e.stopPropagation()
+                e.preventDefault()
+              }}
+              onTouchEnd={(e) => {
+                e.stopPropagation()
+                e.preventDefault()
+                setExpanded(prev => !prev)
+              }}
+              onMouseUp={(e) => {
+                e.stopPropagation()
+                e.preventDefault()
+                setExpanded(prev => !prev)
+              }}
+              style={{
+                width: '24px',
+                height: '24px',
+                background: 'transparent',
+                border: 'none',
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <svg 
+                width="10" 
+                height="10" 
+                viewBox="0 0 8 8" 
+                fill="none"
+                style={{
+                  transition: 'transform 150ms ease',
+                  transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                }}
+              >
+                <path d="M2 1.5L5.5 4L2 6.5" stroke={fg} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-            </div>
-          </button>
-        )}
+            </button>
+          )}
+        </div>
 
         {/* CENTER: task title — takes all remaining space, priority */}
         {isEditing ? (
@@ -2272,6 +2268,19 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
 
     </motion.div>
   )
+}, (prev, next) => {
+  return (
+    prev.task === next.task &&
+    prev.pixelsPerMinute === next.pixelsPerMinute &&
+    prev.onReschedule === next.onReschedule &&
+    prev.onEditOpen === next.onEditOpen &&
+    prev.style?.top === next.style?.top &&
+    prev.style?.left === next.style?.left &&
+    prev.style?.width === next.style?.width &&
+    prev.style?.height === next.style?.height &&
+    prev.style?.marginTop === next.style?.marginTop &&
+    prev.style?.position === next.style?.position
+  );
 })
 
 DraggableTaskBlock.displayName = "DraggableTaskBlock";
@@ -2301,7 +2310,7 @@ interface DayViewProps {
 }
 
 
-const DayView: React.FC<DayViewProps> = ({
+const DayView = React.memo<DayViewProps>(({
   activeDate,
   tasks,
   setSelectedTaskForDetails,
@@ -2327,12 +2336,11 @@ const DayView: React.FC<DayViewProps> = ({
   const setTasksOverlayOpen = useTaskStore((state) => state.setTasksOverlayOpen);
   const isTasksOverlayOpen = useTaskStore((state) => state.isTasksOverlayOpen);
   const setCurrentDate = useTaskStore((state) => state.setCurrentDate);
-  const allTasks = useTaskStore((state) => state.tasks);
   
   const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
-  const pendingCount = useMemo(() => {
-    return allTasks.filter((task) => !task.completed && task.date && task.date < todayStr).length;
-  }, [allTasks, todayStr]);
+  const pendingCount = useTaskStore(
+    useCallback((state) => state.tasks.filter((task) => !task.completed && task.date && task.date < todayStr).length, [todayStr])
+  );
 
   const reorderSubtasks = useTaskStore((state) => state.reorderSubtasks);
   const toggleSubtask = useTaskStore((state) => state.toggleSubtask);
@@ -2695,17 +2703,14 @@ const DayView: React.FC<DayViewProps> = ({
     });
   }, [tasks, activeDate]);
 
-  const nonTimedDayTasks = useMemo(() => {
-    return dayTasks.filter(t => !t.time);
+  const sortedDayTasks = useMemo(() => {
+    return [...dayTasks].sort((a, b) => {
+      if (!a.time && !b.time) return 0;
+      if (!a.time) return -1; // All-Day at the top
+      if (!b.time) return 1;
+      return a.time.localeCompare(b.time);
+    });
   }, [dayTasks]);
-
-  const timedDayTasks = useMemo(() => {
-    return dayTasks.filter(t => !!t.time);
-  }, [dayTasks]);
-
-  const laidOutTimedTasks = useMemo(() => {
-    return layoutTasks(timedDayTasks);
-  }, [timedDayTasks]);
 
   return (
     <div className="h-full w-full overflow-hidden bg-white">
@@ -2752,416 +2757,27 @@ const DayView: React.FC<DayViewProps> = ({
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto text-gray-800"
       >
-        <div 
-          style={{ position: 'relative', overflow: 'hidden' }}
-          className="flex w-full min-h-[1536px]"
-        >
-          {/* Time column width — increase to 56px */}
-          <div 
-            style={{ width: '56px', minWidth: '56px' }} 
-            className="border-r border-gray-200 flex-shrink-0 bg-gray-50/10 text-right pr-3 text-[10px] font-semibold text-gray-400"
-          >
-            {hours.map((hour) => (
-              <div key={hour} className="h-16 pt-1">
-                {hour === 0 ? '12 AM' : hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
+        <div className="flex flex-col space-y-2.5 py-4 px-3 select-none">
+          {sortedDayTasks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+              <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-4 shadow-2xs">
+                <CheckSquare size={32} className="stroke-[1.5px]" />
               </div>
-            ))}
-          </div>
-
-          {/* 24 hour content canvas */}
-          <div className="flex-1 relative min-h-[1536px]">
-          {hours.map((hour) => {
-            const slotTime = `${format(activeDate, 'yyyy-MM-dd')}|${hour}`;
-            return (
-              <div
-                key={hour}
-                onTouchStart={longPress.start(slotTime)}
-                onTouchEnd={longPress.cancel}
-                onTouchMove={longPress.move}
-                className="h-16 border-b border-gray-100 hover:bg-gray-50/40 cursor-pointer transition-colors"
-              />
-            );
-          })}
-
-          {/* Red line time indicator */}
-          {isTodayDay && (
-            <div 
-              className="absolute left-0 right-0 border-t-2 border-[#EA4335] z-10 flex items-center"
-              style={{ 
-                top: `${((currentHourMinute.hour * 60) + currentHourMinute.minute) * (1536 / 1440)}px` 
-              }}
-            >
-              <div className="w-2.5 h-2.5 rounded-full bg-[#EA4335] -ml-[5px]" />
+              <h3 className="text-sm font-bold text-gray-900">No tasks for today</h3>
+              <p className="text-xs text-gray-400 mt-1 max-w-[200px]">
+                Enjoy your day!
+              </p>
             </div>
-          )}
-
-          {/* Snap guide line while dragging a task */}
-          {draggedTaskId && tempTimeStr && (() => {
-            const [h, m] = tempTimeStr.split(':').map(Number);
-            const offset = ((h * 60) + m) * (1536 / 1440);
-            return (
-              <div 
-                className="absolute left-0 right-0 border-t-2 border-dashed border-blue-500 z-40 pointer-events-none flex items-center"
-                style={{ top: `${offset}px` }}
-              >
-                <div className="bg-blue-600 text-white font-mono text-[9px] font-extrabold px-1.5 py-0.5 rounded-md shadow-md ml-1 flex items-center space-x-1 border border-blue-400">
-                  <Clock size={8} />
-                  <span>{tempTimeStr}</span>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Subtask Drag Hover Preview on Timeline */}
-          {subDraggedHour !== null && draggedSubTaskId && (
-            <div 
-              className="absolute left-4 right-4 p-3 bg-blue-50/80 border-2 border-dashed border-blue-400 rounded-xl flex items-center justify-between text-xs font-semibold text-blue-700 pointer-events-none animate-pulse z-50 shadow-sm"
-              style={{
-                top: `${subDraggedHour * 64}px`,
-                height: '60px'
-              }}
-            >
-              <div className="flex items-center space-x-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
-                <span>Move subtask here</span>
-              </div>
-              <span className="font-mono text-[9px] bg-blue-100 px-1.5 py-0.5 rounded text-blue-600">
-                {String(subDraggedHour).padStart(2, '0')}:00
-              </span>
-            </div>
-          )}
-
-          {/* Legacy inline drag-and-drop code disabled */}
-          {false && dayTasks.map((task) => {
-            if (!task.time && draggedTaskId !== task.id) return null;
-
-            const [taskHour, taskMin] = (task.time || "00:00").split(':').map(Number);
-            const startOffsetMins = (taskHour * 60) + (taskMin || 0);
-            const topPos = startOffsetMins * (1536 / 1440);
-
-            const cat = CATEGORIES.find((c) => c.id === task.category) || CATEGORIES[0];
-
-            const isExpanded = !!expandedTasks[task.id];
-            const isCollapsed = !isExpanded;
-            const hasSubtasks = task.subtasks && task.subtasks.length > 0;
-
-            const isDraggingThis = draggedTaskId === task.id;
-            const currentTop = isDraggingThis ? Math.max(0, dragStartTop + dragCurrentOffset) : topPos;
-            const displayTime = isDraggingThis && tempTimeStr ? tempTimeStr : (task.time || "All-Day");
-
-            const deleteTask = useTaskStore.getState().deleteTask;
-            const setEditingTask = useTaskStore.getState().setEditingTask;
-
-            return (
-              <div
-                key={task.id}
-                className="absolute left-4 right-4 overflow-hidden rounded-2xl"
-                style={{ 
-                  top: `${currentTop}px`,
-                  height: isExpanded ? 'auto' : '48px',
-                  minHeight: '48px',
-                  zIndex: isDraggingThis ? 100 : isExpanded ? 40 : 5,
-                }}
-              >
-                {/* Swipe background */}
-                <div className="absolute inset-0 bg-rose-600 rounded-2xl flex items-center justify-between px-4 text-white z-0 pointer-events-none">
-                  <Trash2 size={18} className="animate-pulse" />
-                  <Trash2 size={18} className="animate-pulse" />
-                </div>
-
-                 {/* Draggable Task Card */}
-                 <motion.div
-                   drag="x"
-                   dragDirectionLock
-                   dragConstraints={{ left: 0, right: 0 }}
-                   dragElastic={{ left: 0.95, right: 0.95 }}
-                   onDragEnd={(event, info) => {
-                     const threshold = 100;
-                     if (Math.abs(info.offset.x) > threshold) {
-                       deleteTask(task.id);
-                     }
-                   }}
-                   onClick={(e) => {
-                     e.stopPropagation();
-                     setExpandedTasks(prev => ({ ...prev, [task.id]: !prev[task.id] }));
-                   }}
-                   className={`w-full p-2 rounded-2xl border text-xs shadow-xs transition-colors duration-150 flex flex-col select-none pl-8 z-10 relative group
-                     ${isDraggingThis 
-                       ? 'scale-[1.02] shadow-sm opacity-95 border-blue-500 ring-2 ring-blue-500/30' 
-                       : isExpanded 
-                         ? 'ring-1.5 ring-blue-400/50 border-blue-400 shadow-xs'
-                         : 'hover:scale-[1.002]'
-                     }
-                     ${task.completed
-                       ? 'bg-[#E8EAFD] text-[#5F6368] border-[#DADCE0]'
-                       : 'bg-[#1A73E8] text-white border-[#1A73E8]'
-                     }
-                   `}
-                   style={{ 
-                     overflow: 'visible',
-                     touchAction: 'pan-y'
-                   }}
-                 >
-                   {/* Ripple effect */}
-                   <Ripple color={task.completed ? 'rgba(0, 0, 0, 0.04)' : 'rgba(0, 0, 0, 0.07)'} />
-
-                   {/* Left accent stripe */}
-                   <div 
-                     className="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-2xl transition-colors" 
-                     style={{ backgroundColor: task.completed ? '#cbd5e1' : cat.color.solid }}
-                   />
-
-                   {/* Dedicated vertical drag handle */}
-                   <button
-                     type="button"
-                     onPointerDown={(e) => {
-                       e.stopPropagation();
-                       if (e.pointerType === 'mouse' && e.button !== 0) return;
-                       const target = e.currentTarget as HTMLElement;
-                       const pointerId = e.pointerId;
-                       const startY = e.clientY;
-                       const startX = e.clientX;
-                       
-                       if ((window as any)._dragTimer) clearTimeout((window as any)._dragTimer);
-                       
-                       (window as any)._dragTimer = setTimeout(() => {
-                         try {
-                           target.setPointerCapture(pointerId);
-                           onTaskDragStart(task.id, topPos, startY);
-                         } catch (err) {}
-                       }, 150);
-
-                       target.setAttribute('data-start-y', startY.toString());
-                       target.setAttribute('data-start-x', startX.toString());
-                     }}
-                     onPointerMove={(e) => {
-                       e.stopPropagation();
-                       const target = e.currentTarget as HTMLElement;
-                       if (draggedTaskId === task.id) {
-                         onTaskDragMove(e.clientY);
-                       } else {
-                         const startY = parseFloat(target.getAttribute('data-start-y') || '');
-                         const startX = parseFloat(target.getAttribute('data-start-x') || '');
-                         if (!isNaN(startY) && !isNaN(startX)) {
-                           const diffY = Math.abs(e.clientY - startY);
-                           const diffX = Math.abs(e.clientX - startX);
-                           if ((diffY > 6 || diffX > 6) && (window as any)._dragTimer) {
-                             clearTimeout((window as any)._dragTimer);
-                             (window as any)._dragTimer = null;
-                           }
-                         }
-                       }
-                     }}
-                     onPointerUp={(e) => {
-                       e.stopPropagation();
-                       if ((window as any)._dragTimer) {
-                         clearTimeout((window as any)._dragTimer);
-                         (window as any)._dragTimer = null;
-                       }
-                       if (draggedTaskId === task.id) {
-                         const target = e.currentTarget as HTMLElement;
-                         try {
-                           target.releasePointerCapture(e.pointerId);
-                         } catch (err) {}
-                         onTaskDragEnd();
-                       }
-                     }}
-                     className="absolute left-1.5 top-1/2 -translate-y-1/2 w-4 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700 cursor-grab active:cursor-grabbing rounded hover:bg-black/5 active:bg-black/10 transition-colors z-20"
-                     style={{ touchAction: 'none' }}
-                     title="Drag vertically to change time"
-                   >
-                     <GripVertical size={13} className="opacity-60" />
-                   </button>
-
-                   {/* Header row containing checkbox, title, and chevron */}
-                   <div className="flex items-center justify-between min-w-0 relative z-10 w-full h-8">
-                     <div className="flex items-center min-w-0 flex-1">
-                       {/* Custom checkbox */}
-                       <button
-                         type="button"
-                         onPointerDown={(e) => e.stopPropagation()}
-                         onClick={(e) => {
-                           e.stopPropagation();
-                           updateTask(task.id, { completed: !task.completed });
-                         }}
-                         className="p-0.5 rounded-full text-current hover:opacity-80 transition-opacity flex-shrink-0 mr-2 cursor-pointer"
-                       >
-                         <span 
-                           className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all
-                             ${task.completed 
-                               ? 'bg-blue-600 border-blue-600 text-white' 
-                               : 'bg-transparent border-current'
-                             }
-                           `}
-                         >
-                           {task.completed && <Check size={10} className="stroke-[3px] text-white" />}
-                         </span>
-                       </button>
-
-                       <div className={`font-semibold truncate leading-tight flex-1 relative ${task.completed ? 'opacity-60 line-through' : ''}`}>
-                         <span>{task.title}</span>
-                       </div>
-                     </div>
-
-                     <div className="flex items-center space-x-1.5 pl-2 flex-shrink-0">
-                       <span className="text-xs opacity-75 font-medium whitespace-nowrap">
-                         {displayTime}
-                       </span>
-                       <ChevronRight 
-                         size={16} 
-                         className={`transition-transform duration-200 transform ${isExpanded ? 'rotate-90' : 'rotate-0'}`} 
-                       />
-                     </div>
-                   </div>
-
-                   {/* Expanded details container */}
-                   {isExpanded && (
-                     <div className="mt-2.5 pt-2.5 border-t border-white/10 flex flex-col space-y-2 relative z-10 w-full">
-                       {/* Category Pill and Date Info */}
-                       <div className="flex items-center justify-between">
-                         <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-white/15 text-current border border-white/10">
-                           {cat.name}
-                         </span>
-                         <div className="flex items-center space-x-1.5 text-xs opacity-85">
-                           <CalendarDays size={13} />
-                           <span>{task.date}</span>
-                         </div>
-                       </div>
-
-                       {/* Subtasks inside expanded task as a bulleted list */}
-                       {hasSubtasks && (
-                         <div className="space-y-1.5 border-t border-white/5 pt-2.5">
-                           {task.subtasks.map((sub, idx) => {
-                             const isDragging = draggedSubTaskId === task.id && draggedSubIndex === idx;
-                             return (
-                               <div 
-                                 key={sub.id} 
-                                 className={`flex items-center space-x-2 py-0.5 transition-shadow select-none relative
-                                   ${isDragging ? 'z-50 opacity-70 scale-[1.02]' : ''}
-                                 `}
-                                 style={isDragging ? { transform: `translateY(${subDraggedOffset}px)`, position: 'relative' } : undefined}
-                               >
-                                 {/* Grab Handle */}
-                                 <span
-                                   onPointerDown={(e) => handleSubPointerDown(task.id, idx, e)}
-                                   onPointerMove={(e) => handleSubPointerMove(task.id, idx, e)}
-                                   onPointerUp={(e) => handleSubPointerUp(task.id, idx, e)}
-                                   className="text-current/60 hover:text-current cursor-grab active:cursor-grabbing px-1 touch-none select-none flex items-center justify-center w-5 h-5 hover:bg-white/10 rounded font-bold"
-                                 >
-                                   ≡
-                                 </span>
-
-                                 <button
-                                   type="button"
-                                   onPointerDown={(e) => e.stopPropagation()}
-                                   onClick={(e) => {
-                                     e.stopPropagation();
-                                     toggleSubtask(task.id, sub.id);
-                                   }}
-                                   className="p-1 text-current hover:opacity-80 rounded flex-shrink-0 cursor-pointer"
-                                 >
-                                   <span 
-                                     className={`w-3.5 h-3.5 rounded-full flex items-center justify-center border border-current flex-shrink-0 transition-all
-                                       ${sub.completed ? 'bg-white border-white' : 'bg-transparent'}
-                                     `}
-                                   >
-                                     {sub.completed && <Check size={8} className="stroke-[3px] text-blue-600" />}
-                                   </span>
-                                 </button>
-                                 <span className={`text-xs flex-1 truncate ${sub.completed ? 'line-through opacity-50' : 'font-medium'}`}>
-                                   {sub.title}
-                                 </span>
-                               </div>
-                             );
-                           })}
-                         </div>
-                       )}
-
-                       {/* Actions: Edit & Delete */}
-                       <div className="flex items-center space-x-2 pt-1">
-                         <button
-                           type="button"
-                           onPointerDown={(e) => e.stopPropagation()}
-                           onClick={(e) => {
-                             e.stopPropagation();
-                             setEditingTask(task);
-                             setFABOpen(true);
-                           }}
-                           className="flex items-center space-x-1 px-3 py-1 rounded bg-white/15 hover:bg-white/25 text-current font-semibold text-xs select-none cursor-pointer transition-colors"
-                         >
-                           <Edit3 size={12} />
-                           <span>Edit</span>
-                         </button>
-                         <button
-                           type="button"
-                           onPointerDown={(e) => e.stopPropagation()}
-                           onClick={(e) => {
-                             e.stopPropagation();
-                             deleteTask(task.id);
-                           }}
-                           className="flex items-center space-x-1 px-3 py-1 rounded bg-rose-500/80 hover:bg-rose-600 text-white font-semibold text-xs select-none cursor-pointer transition-colors"
-                         >
-                           <Trash2 size={12} />
-                           <span>Delete</span>
-                         </button>
-                       </div>
-                     </div>
-                   )}
-                 </motion.div>
-               </div>
-             );
-           })}
-
-          {/* Non-timed tasks list */}
-          <div className="absolute top-2 left-4 right-4 flex flex-col space-y-1.5">
-            {nonTimedDayTasks.map((task) => (
+          ) : (
+            sortedDayTasks.map((task) => (
               <DraggableTaskBlock
                 key={task.id}
                 task={task}
-                pixelsPerMinute={64 / 60}
-                onReschedule={handleReschedule}
                 onEditOpen={openEditSheet}
-                style={NON_TIMED_TASK_STYLE}
               />
-            ))}
-          </div>
+            ))
+          )}
         </div>
-
-        {/* Timed Tasks placement */}
-        {!isTasksOverlayOpen && (() => {
-          return laidOutTimedTasks.map((task) => {
-            const cat = CATEGORIES.find((c) => c.id === task.category) || CATEGORIES[0];
-            const isExpanded = !!expandedTasks[task.id];
-            
-            // Overlapping tasks now stack vertically at full width rather than dividing side-by-side
-            const blockWidth = "calc(100% - 56px - 12px)";
-            const blockLeft = "calc(56px + 6px)";
-
-            const [taskHour, taskMin] = (task.time || "00:00").split(':').map(Number);
-            const totalMins = (taskHour * 60) + (taskMin || 0);
-            const topOffset = totalMins * (64 / 60);
-
-            // Stack offset: 52px per stack level (column)
-            const stackOffsetHeight = task.column * 52;
-
-            return (
-              <DraggableTaskBlock
-                key={task.id}
-                task={task}
-                pixelsPerMinute={64 / 60}
-                onReschedule={handleReschedule}
-                onEditOpen={openEditSheet}
-                style={{
-                  width: blockWidth,
-                  left: blockLeft,
-                  top: `${topOffset}px`,
-                  marginTop: `${stackOffsetHeight}px`,
-                }}
-              />
-            );
-          });
-        })()}
-
       </div>
     </div>
     {editingTaskState && (
@@ -3173,9 +2789,10 @@ const DayView: React.FC<DayViewProps> = ({
         />
       )}
     </div>
-  </div>
   );
-};
+});
+
+DayView.displayName = "DayView";
 
 /* ============================================================================
    4. SCHEDULE VIEW COMPONENT
@@ -3255,7 +2872,7 @@ interface ScheduleViewProps {
   setSelectedTaskForDetails: (task: Task | null) => void;
 }
 
-const ScheduleView: React.FC<ScheduleViewProps> = ({
+const ScheduleView = React.memo<ScheduleViewProps>(({
   activeDate,
   tasks,
   setSelectedTaskForDetails,
@@ -3473,7 +3090,9 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({
     </div>
   </div>
   );
-};
+});
+
+ScheduleView.displayName = "ScheduleView";
 
 /* ============================================================================
    GOOGLE CALENDAR MOBILE STYLE KEYWORD ILLUSTRATIONS
