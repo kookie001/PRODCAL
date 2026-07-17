@@ -1,6 +1,31 @@
 # Changelog
 
 ## [2026-07-17]
+- Fix date/time pickers broken by keyboard toolbar change:
+  - Fixed a focus-bubbling bug in `TaskSheet.tsx` where focusing buttons (such as date/time rows, options, or categories) triggered `handleFocus` and unconditionally set `keyboardOpen(true)`.
+  - Restricted the form `onFocus` wrapper to only activate `setKeyboardOpen(true)` if the targeted element is a text input or textarea (`INPUT` or `TEXTAREA`).
+  - Ensures the calendar and clock picker buttons remain fully responsive and can be clicked to open the pickers in all states without unmounting the options container.
+- Add pinned toolbar (Add Subtask + More Options) visible above keyboard while typing:
+  - Added a conditional pinned toolbar row in `TaskSheet.tsx` that replaces the regular date/time and category section when `keyboardOpen` is true.
+  - The toolbar contains "+ Add Subtask" on the left and "More options ▾" on the right.
+  - Clicking "More options ▾" in the toolbar blurs any active input, closes the keyboard, and opens the collapsible options/category drawer.
+  - Clicking "+ Add Subtask" correctly adds and focuses a new subtask row.
+  - When keyboard is closed, the layout smoothly reverts to showing the "Add subtask" button below the subtasks list and the regular collapsible "More options" section.
+- Remove reserved trailing space after separator for tighter card spacing:
+  - Removed `minWidth` constraints from the wrapper containing the date/time block and thin separator `|` in both `DraggableTaskBlock` (`CalendarViews.tsx`) and `TaskItemRow` (`TasksOverlay.tsx`).
+  - Let this wrapper sit with natural content-hugging width, allowing the date/time text, separator, chevron slot, and title to sit closely together with tight, small, consistent margins.
+- Left-align date/time naturally, use trailing-space wrapper technique for title alignment:
+  - Replaced the fixed-width box of the date/time text block with a natural content-hugging, left-aligned layout starting flush at the card's left padding (no empty gaps on the left).
+  - Wrapped the date/time block and thin separator `|` together inside a custom wrapper element with a consistent `minWidth` of `104px` in both `DraggableTaskBlock` and `TaskItemRow`.
+  - Ensures that short times/dates have the separator sitting snugly right next to them with a tight fixed `8px` margin, while any extra unfilled layout buffer naturally flows to the right (before the chevron and title), keeping columns perfectly aligned.
+- Right-align date/time text within fixed block to eliminate gap before separator:
+  - Switched horizontal alignment of left block content in both `DraggableTaskBlock` (`CalendarViews.tsx`) and `TaskItemRow` (`TasksOverlay.tsx`) from left-aligned (`flex-start` / `items-start`) to right-aligned (`flex-end` / `items-end`).
+  - Ensures both short and long date/time strings sit flush against the thin separator `|` with no internal blank gaps, while keeping columns perfectly aligned.
+- Standardize card spacing: content-fit block width, identical explicit margins on both cards:
+  - Reduced left date/time block width from `88px` to a content-fit `76px` in both `DraggableTaskBlock` (`CalendarViews.tsx`) and `TaskItemRow` (`TasksOverlay.tsx`) to support the longest realistic text length ("18 December") without wrapping or layout wasted space.
+  - Removed container flex gaps (`gap: 8px` on Home card) and inconsistent margins (`mr-3` on Pending card).
+  - Applied identical explicit marginRight values (`6px`) to the date/time block, thin separator, and chevron slot on both card types.
+  - Added consistent explicit spacing (`marginLeft: 8px`) for right-aligned items (pencil edit button, checkbox circle) to ensure absolute alignment symmetry of all columns.
 - Redesign category tabs as rounded pill tiles:
   - Transformed flat category tabs with bottom underlines into modern, rounded pill-shaped chip tiles.
   - Set active/selected tabs to show filled background in their respective category colors with white text and a white dot indicator.

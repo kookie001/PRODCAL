@@ -1929,43 +1929,50 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         alignItems: 'center',
         padding: '0 8px',
         height: '48px',
-        gap: '8px',
         width: '100%',
         boxSizing: 'border-box',
       }}>
 
-        {/* TIME BLOCK */}
+        {/* WRAPPER FOR TIME/DATE + SEPARATOR */}
         <div style={{
-          paddingLeft: '4px',
           display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'flex-start',
-          width: '88px',
-          minWidth: '88px',
+          alignItems: 'center',
           flexShrink: 0,
         }}>
-          <span style={{
-            fontSize: '11px',
-            fontWeight: 800,
-            color: completed ? '#9CA3AF' : '#1E40AF',
-            whiteSpace: 'nowrap',
+          {/* TIME BLOCK */}
+          <div style={{
+            paddingLeft: '4px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'flex-start',
+            marginRight: '8px',
+            flexShrink: 0,
           }}>
-            {format12hTime(task.time)}
-          </span>
-        </div>
+            <span style={{
+              fontSize: '11px',
+              fontWeight: 800,
+              color: completed ? '#9CA3AF' : '#1E40AF',
+              whiteSpace: 'nowrap',
+            }}>
+              {format12hTime(task.time)}
+            </span>
+          </div>
 
-        {/* THIN SEPARATOR */}
-        <div style={{
-          width: '1px',
-          height: '24px',
-          backgroundColor: completed ? '#E5E7EB' : '#BFDBFE',
-          flexShrink: 0,
-        }} />
+          {/* THIN SEPARATOR */}
+          <div style={{
+            width: '1px',
+            height: '24px',
+            backgroundColor: completed ? '#E5E7EB' : '#BFDBFE',
+            marginRight: '8px',
+            flexShrink: 0,
+          }} />
+        </div>
 
         {/* LEFT: expand toggle (chevron) — only if incomplete subtasks exist */}
         <div style={{
           width: '24px',
+          marginRight: '6px',
           flexShrink: 0,
           display: 'flex',
           alignItems: 'center',
@@ -2144,6 +2151,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
             minWidth: '28px',
             padding: 0,
             margin: 0,
+            marginLeft: '8px',
             background: 'transparent',
             border: 'none',
             cursor: 'pointer',
@@ -2184,6 +2192,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
             minWidth: '28px',
             padding: 0,
             margin: 0,
+            marginLeft: '8px',
             background: 'transparent',
             border: 'none',
             cursor: 'pointer',

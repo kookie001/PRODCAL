@@ -6,6 +6,11 @@
 
 ## Resolved Bugs
 
+- **BUG 23: Date and time pickers (CalendarPicker & ClockPicker) stopped opening when tapped inside TaskSheet**
+  - *Description:* Tapping the date row or time row inside the "More options" section of `TaskSheet` did not open the calendar or clock pickers.
+  - *Root Cause:* The `<form>` container in `TaskSheet.tsx` had `onFocus={handleFocus}` which set `keyboardOpen(true)`. When the user tapped any button in the form, such as the date row button or time row button, that button received focus, triggering the form's `onFocus` event due to bubbling. This set `keyboardOpen` to `true`, instantly switching the UI to the keyboard toolbar and unmounting the options drawer buttons, preventing the click from opening the pickers.
+  - *Resolution:* Updated `handleFocus` in `TaskSheet.tsx` to check the tag name of the focused target. It now only sets `keyboardOpen` to `true` if the target is an `INPUT` or `TEXTAREA`. Focusing buttons (such as options, dates, or category buttons) no longer triggers `keyboardOpen(true)`, keeping the pickers fully active and responsive.
+
 - **BUG 22: Redesign Day View timeline to list layout, remove vertical reschedule-drag, keep category-drag**
   - *Description:* Visual timeline grid (vertical hours and background horizontal lines) took up too much vertical space and made viewing scheduled tasks cluttered. Drag-to-reschedule vertically on a absolute-positioned grid was error-prone and caused accidental timeline changes.
   - *Root Cause:* The Day view was structured around a fixed 24-hour vertical grid using absolute positioning based on hour pixel-offsets.

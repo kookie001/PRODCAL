@@ -303,23 +303,26 @@ const TaskItemRow = React.memo(({
           </div>
         )}
 
-        {/* Left: date — compact */}
-        <div className="shrink-0 select-none flex flex-col justify-center items-start" style={{ width: '88px', flexShrink: 0 }}>
-          <span className="text-xs font-bold whitespace-nowrap" style={{ color: isCompleted ? '#9CA3AF' : '#1E40AF' }}>
-            {format(dateObj, 'd MMMM')}
-          </span>
-          {task.time && (
-            <span className="text-[10px] font-medium whitespace-nowrap mt-0.5" style={{ color: isCompleted ? '#9CA3AF' : '#5F6368' }}>
-              {format12hTime(task.time)}
+        {/* WRAPPER FOR TIME/DATE + SEPARATOR */}
+        <div className="shrink-0 flex items-center" style={{ flexShrink: 0 }}>
+          {/* Left: date — compact */}
+          <div className="shrink-0 select-none flex flex-col justify-center items-start" style={{ marginRight: '8px', flexShrink: 0 }}>
+            <span className="text-xs font-bold whitespace-nowrap" style={{ color: isCompleted ? '#9CA3AF' : '#1E40AF' }}>
+              {format(dateObj, 'd MMMM')}
             </span>
-          )}
+            {task.time && (
+              <span className="text-[10px] font-medium whitespace-nowrap mt-0.5" style={{ color: isCompleted ? '#9CA3AF' : '#5F6368' }}>
+                {format12hTime(task.time)}
+              </span>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="w-px h-5 shrink-0" style={{ backgroundColor: isCompleted ? '#E5E7EB' : '#BFDBFE', marginRight: '8px' }} />
         </div>
 
-        {/* Divider */}
-        <div className="w-px h-5 mr-3 shrink-0" style={{ backgroundColor: isCompleted ? '#E5E7EB' : '#BFDBFE' }} />
-
         {/* Fixed-width chevron slot — same width on every card */}
-        <div style={{ width: '24px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: '24px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '6px' }}>
           {incompleteSubtasks.length > 0 && (
             <span 
               style={{ 
@@ -353,7 +356,8 @@ const TaskItemRow = React.memo(({
             e.stopPropagation();
             updateTask(task.id, { completed: !task.completed });
           }}
-          className="ml-3 w-8 h-8 rounded-full flex items-center justify-center shrink-0 active:scale-95 transition-transform duration-100 cursor-pointer"
+          className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 active:scale-95 transition-transform duration-100 cursor-pointer"
+          style={{ marginLeft: '8px' }}
         >
           <span style={{
             width: '18px',
