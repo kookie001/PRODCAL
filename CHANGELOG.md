@@ -1,6 +1,20 @@
 # Changelog
 
+## [2026-07-17]
+- Redesign category tabs as rounded pill tiles:
+  - Transformed flat category tabs with bottom underlines into modern, rounded pill-shaped chip tiles.
+  - Set active/selected tabs to show filled background in their respective category colors with white text and a white dot indicator.
+  - Formatted unselected tabs with subtle colored borders and light background tints, displaying the custom category dot indicator with elegant dark text.
+  - Kept all critical `data-category-tab` data attributes to ensure that hover targets, dragging cache, and filtering work flawlessly.
+
 ## [2026-07-16]
+- Align card left-blocks to exactly 88px fixed width:
+  - Updated both `DraggableTaskBlock` (`CalendarViews.tsx`) and `TaskItemRow` (`TasksOverlay.tsx`) to use a fixed width of 88px for the left date/time block.
+  - Ensures the thin separator, chevron slot, and task title always align perfectly at the same horizontal position between cards, and avoids staggered titles on the pending page regardless of date string length.
+- Move "+ Add subtask" button to below the subtask list in the task sheet:
+  - Repositioned the Add subtask button in `TaskSheet.tsx` to sit directly below the subtask items.
+  - Ensures subtask list elements and input fields start typing immediately under the title.
+  - Maintained all existing functionalities (add, edit, remove, drag-and-drop sort, auto-scroll, and save interactions).
 - Convert home page Day view from visual time-grid to simple time-ordered list:
   - Removed 24-hour vertical timeline grid column, hour labels, and horizontal grid lines completely.
   - Rendered scheduled and all-day tasks as a beautiful, fluid, vertical stacked list ordered ascending by time (All-Day tasks at the very top, followed by 12:00 AM to 11:59 PM).

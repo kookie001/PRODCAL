@@ -65,24 +65,28 @@ export const CategoryTabBar: React.FC = () => {
       className="w-full bg-white border-b border-gray-150 px-4 flex items-center overflow-x-auto scrollbar-none flex-shrink-0 h-12"
       style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' }}
     >
-      <div className="flex items-center space-x-3 whitespace-nowrap pr-8 relative h-full">
-        {/* Sliding indicator */}
-        <div 
-          className="absolute bottom-0 h-[3px] bg-[#1A73E8] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] rounded-t-full pointer-events-none"
-          style={{
-            left: `${indicatorStyle.left}px`,
-            width: `${indicatorStyle.width}px`
-          }}
-        />
-
+      <div className="flex items-center space-x-2 whitespace-nowrap pr-8 relative h-full">
         {/* All filter pill */}
         <button
           onClick={() => setSelectedCategory('All')}
           data-category-tab="All"
-          className={`h-full px-2.5 text-xs font-semibold tracking-wide transition-colors cursor-pointer select-none flex items-center justify-center relative
+          style={{
+            height: '32px',
+            borderRadius: '20px',
+            padding: '0 14px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            userSelect: 'none',
+            fontSize: '12px',
+            fontWeight: 600,
+            transition: 'all 200ms ease',
+          }}
+          className={`shrink-0 border transition-all duration-200
             ${selectedCategory === 'All'
-              ? 'active-tab text-[#1A73E8]'
-              : 'text-[#5F6368] hover:text-[#202124]'
+              ? 'active-tab bg-[#1A73E8] border-[#1A73E8] text-white'
+              : 'bg-blue-50/50 border-blue-100 text-gray-700 hover:bg-blue-100/50 hover:text-gray-900'
             }
           `}
         >
@@ -97,16 +101,31 @@ export const CategoryTabBar: React.FC = () => {
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
               data-category-tab={cat.id}
-              className={`flex items-center space-x-1.5 h-full px-2.5 text-xs font-semibold tracking-wide transition-colors cursor-pointer select-none
+              style={{
+                height: '32px',
+                borderRadius: '20px',
+                padding: '0 14px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                userSelect: 'none',
+                fontSize: '12px',
+                fontWeight: 600,
+                transition: 'all 200ms ease',
+                backgroundColor: isActive ? cat.color.solid : undefined,
+                borderColor: isActive ? cat.color.solid : undefined,
+              }}
+              className={`shrink-0 flex items-center space-x-1.5 border transition-all duration-200
                 ${isActive
-                  ? 'active-tab text-[#1A73E8]'
-                  : 'text-[#5F6368] hover:text-[#202124]'
+                  ? 'active-tab text-white'
+                  : `${cat.color.bgLight} ${cat.color.borderLight} text-gray-700 hover:bg-opacity-80`
                 }
               `}
             >
               <span 
-                className="w-2 h-2 rounded-full flex-shrink-0 transition-transform" 
-                style={{ backgroundColor: cat.color.solid }} 
+                className="w-2 h-2 rounded-full flex-shrink-0 transition-colors duration-200" 
+                style={{ backgroundColor: isActive ? '#ffffff' : cat.color.solid }} 
               />
               <span>{cat.name}</span>
             </button>

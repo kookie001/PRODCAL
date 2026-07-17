@@ -719,19 +719,6 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
           }}
           className="scroll-container border-t border-gray-100"
         >
-          {/* Add subtask button */}
-          {subtasks.length < 50 && (
-            <button
-              type="button"
-              onClick={handleAddEmptySubtask}
-              style={{ minHeight: '36px', touchAction: 'manipulation' }}
-              className="flex items-center text-[13px] text-[#1A73E8] font-semibold hover:bg-blue-50/50 rounded-full px-3 py-1.5 focus:outline-none mb-2"
-            >
-              <Plus size={14} className="mr-1" />
-              <span>Add subtask</span>
-            </button>
-          )}
-
           {/* Subtask list — dnd-kit sortable */}
           {subtasks.length > 0 && (
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -754,6 +741,19 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
                 </div>
               </SortableContext>
             </DndContext>
+          )}
+
+          {/* Add subtask button */}
+          {subtasks.length < 50 && (
+            <button
+              type="button"
+              onClick={handleAddEmptySubtask}
+              style={{ minHeight: '36px', touchAction: 'manipulation' }}
+              className="flex items-center text-[13px] text-[#1A73E8] font-semibold hover:bg-blue-50/50 rounded-full px-3 py-1.5 focus:outline-none mt-2"
+            >
+              <Plus size={14} className="mr-1" />
+              <span>Add subtask</span>
+            </button>
           )}
         </div>
 

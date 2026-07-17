@@ -1,0 +1,2 @@
+0000000000000000000000000000000000000000 852485a9fa0b60db5b9f3cf0c171098b012f599d AI Coder <coder@aistudio.com> 1784189992 +0000	commit (initial): Convert home Day view from time-grid to time-ordered list, remove reschedule-drag, keep category-drag
+852485a9fa0b60db5b9f3cf0c171098b012f599d d2f51a4ff4ed7c2f482d0ac52003a22d29f985e9 AI Coder <coder@aistudio.com> 1784192363 +0000	commit: Move Add Subtask button below subtask list in task sheet

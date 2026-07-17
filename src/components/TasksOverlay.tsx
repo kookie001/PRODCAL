@@ -304,7 +304,7 @@ const TaskItemRow = React.memo(({
         )}
 
         {/* Left: date — compact */}
-        <div className="shrink-0 mr-3 select-none flex flex-col justify-center items-start">
+        <div className="shrink-0 select-none flex flex-col justify-center items-start" style={{ width: '88px', flexShrink: 0 }}>
           <span className="text-xs font-bold whitespace-nowrap" style={{ color: isCompleted ? '#9CA3AF' : '#1E40AF' }}>
             {format(dateObj, 'd MMMM')}
           </span>

@@ -1941,7 +1941,8 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
           flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'flex-start',
-          minWidth: '64px',
+          width: '88px',
+          minWidth: '88px',
           flexShrink: 0,
         }}>
           <span style={{
