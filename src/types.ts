@@ -15,6 +15,7 @@ export interface Task {
   completed: boolean;
   subtasks: Subtask[];
   createdAt: string;
+  isPending?: boolean;
 }
 
 export interface DeletedTask extends Task {

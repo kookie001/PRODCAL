@@ -1,6 +1,18 @@
 # Changelog
 
+## [2026-07-18]
+- Introduce manually flagging tasks as "Pending":
+  - Added "Pending" optional boolean field `isPending?: boolean` to the `Task` type in `types.ts`, fully persisted to localStorage via the task store.
+  - Rendered a new "Pending" pill chip right after "All" in `CategoryTabBar.tsx` with a warm amber accent, serving as an interactive filter and category drop target.
+  - Implemented 2D drag-to-category drop handling for the "Pending" chip: dropping a task onto the "Pending" tile flags the task as `isPending: true` instantly while preserving its original category, date, and times.
+  - Excluded today's manually flagged pending tasks from the home timeline/Day view so that they only appear in the pending overlay.
+  - Updated the pending list filter (`TasksOverlay.tsx`) to display both past overdue incomplete tasks and any manually flagged `isPending` tasks.
+  - Created a priority-based sorting order for the pending list: manually flagged tasks matching today's date are placed at the absolute top of the list, followed by other past overdue tasks sorted descending by date.
+  - Adjusted the pending count badges in `Header.tsx` and `CalendarViews.tsx` to utilize the new inclusive pending filter for a consistent and accurate count across the app.
+
 ## [2026-07-17]
+- Remove temporary debug screen from Edit/create page:
+  - Cleaned up the `TaskSheet.tsx` component by removing the temporary red `DEBUG` text block containing state variables (`keyboardOpen`, `moreOptionsOpen`, `showCalendar`, `showClock`) to ensure a production-ready, polished UI interface.
 - Fix date/time pickers broken by keyboard toolbar change:
   - Fixed a focus-bubbling bug in `TaskSheet.tsx` where focusing buttons (such as date/time rows, options, or categories) triggered `handleFocus` and unconditionally set `keyboardOpen(true)`.
   - Restricted the form `onFocus` wrapper to only activate `setKeyboardOpen(true)` if the targeted element is a text input or textarea (`INPUT` or `TEXTAREA`).

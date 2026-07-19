@@ -624,7 +624,7 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
   }, [setIsOpen, setTasksOverlayOpen]);
 
   const allPendingTasks = useMemo(() => {
-    return tasks.filter((task) => !task.completed && task.date && task.date < todayStr);
+    return tasks.filter((task) => !task.completed && task.date && (task.date < todayStr || task.isPending === true));
   }, [tasks, todayStr]);
 
   const completedTasks = useMemo(() => {
@@ -632,8 +632,16 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
   }, [tasks]);
 
   const sortedPending = useMemo(() => {
-    return [...allPendingTasks].sort((a, b) => b.date.localeCompare(a.date));
-  }, [allPendingTasks]);
+    return [...allPendingTasks].sort((a, b) => {
+      // today's manually-pending tasks first
+      const aToday = a.isPending && a.date === todayStr;
+      const bToday = b.isPending && b.date === todayStr;
+      if (aToday && !bToday) return -1;
+      if (bToday && !aToday) return 1;
+      // otherwise, most recent date first (descending)
+      return b.date.localeCompare(a.date);
+    });
+  }, [allPendingTasks, todayStr]);
 
   const getTaskDateLabel = useCallback((dateStr: string) => {
     if (!dateStr) return 'No Date';

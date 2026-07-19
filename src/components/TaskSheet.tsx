@@ -704,10 +704,6 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
               Save
             </button>
           </div>
-
-          <div style={{ fontSize: '11px', color: '#EF4444', textAlign: 'center', marginTop: '6px', fontFamily: 'monospace' }}>
-            DEBUG: kbOpen={String(keyboardOpen)} | moreOpen={String(moreOptionsOpen)} | showCal={String(showCalendar)} | showClk={String(showClock)}
-          </div>
           
           {/* Add subtask button removed from here */}
         </div>

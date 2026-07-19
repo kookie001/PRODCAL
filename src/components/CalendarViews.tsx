@@ -147,8 +147,12 @@ export const CalendarViews: React.FC<CalendarViewsProps> = ({ searchQuery }) => 
 
   // Filter tasks by category and exclude completed tasks from timeline (do NOT filter by search query anymore!)
   const filteredTasks = useMemo(() => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
     return tasks.filter((task) => {
       if (task.completed) return false;
+      if (selectedCategory === 'Pending') {
+        return task.date < todayStr || task.isPending === true;
+      }
       const matchesCategory = selectedCategory === 'All' || task.category === selectedCategory;
       return matchesCategory;
     });
@@ -1751,7 +1755,11 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       if (dragging.current && moved.current && blockRef.current) {
         const droppedCat = getTabAtCoords(lastPointerPos.current.x, lastPointerPos.current.y)
         if (droppedCat && droppedCat !== 'All') {
-          updateTask(task.id, { category: droppedCat as CategoryType })
+          if (droppedCat === 'Pending') {
+            updateTask(task.id, { isPending: true })
+          } else {
+            updateTask(task.id, { category: droppedCat as CategoryType })
+          }
           if (navigator.vibrate) {
             navigator.vibrate(10)
           }
@@ -1777,7 +1785,11 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
     if (dragging.current && moved.current && blockRef.current) {
       const droppedCat = getTabAtCoords(lastPointerPos.current.x, lastPointerPos.current.y)
       if (droppedCat && droppedCat !== 'All') {
-        updateTask(task.id, { category: droppedCat as CategoryType })
+        if (droppedCat === 'Pending') {
+          updateTask(task.id, { isPending: true })
+        } else {
+          updateTask(task.id, { category: droppedCat as CategoryType })
+        }
         if (navigator.vibrate) {
           navigator.vibrate(10)
         }
@@ -1833,7 +1845,11 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       if (dragging.current && moved.current && blockRef.current) {
         const droppedCat = getTabAtCoords(lastPointerPos.current.x, lastPointerPos.current.y)
         if (droppedCat && droppedCat !== 'All') {
-          updateTask(task.id, { category: droppedCat as CategoryType })
+          if (droppedCat === 'Pending') {
+            updateTask(task.id, { isPending: true })
+          } else {
+            updateTask(task.id, { category: droppedCat as CategoryType })
+          }
           if (navigator.vibrate) {
             navigator.vibrate(10)
           }
@@ -2349,7 +2365,7 @@ const DayView = React.memo<DayViewProps>(({
   
   const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
   const pendingCount = useTaskStore(
-    useCallback((state) => state.tasks.filter((task) => !task.completed && task.date && task.date < todayStr).length, [todayStr])
+    useCallback((state) => state.tasks.filter((task) => !task.completed && task.date && (task.date < todayStr || task.isPending === true)).length, [todayStr])
   );
 
   const reorderSubtasks = useTaskStore((state) => state.reorderSubtasks);
@@ -2708,10 +2724,11 @@ const DayView = React.memo<DayViewProps>(({
 
   const dayTasks = useMemo(() => {
     return tasks.filter((task) => {
+      if (task.isPending && task.date === todayStr) return false;
       const taskDate = new Date(task.date + 'T00:00:00');
       return isSameDay(taskDate, activeDate);
     });
-  }, [tasks, activeDate]);
+  }, [tasks, activeDate, todayStr]);
 
   const sortedDayTasks = useMemo(() => {
     return [...dayTasks].sort((a, b) => {

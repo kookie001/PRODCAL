@@ -93,6 +93,33 @@ export const CategoryTabBar: React.FC = () => {
           All
         </button>
 
+        {/* Pending filter pill */}
+        <button
+          onClick={() => setSelectedCategory('Pending')}
+          data-category-tab="Pending"
+          style={{
+            height: '32px',
+            borderRadius: '20px',
+            padding: '0 14px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            userSelect: 'none',
+            fontSize: '12px',
+            fontWeight: 600,
+            transition: 'all 200ms ease',
+          }}
+          className={`shrink-0 border transition-all duration-200
+            ${selectedCategory === 'Pending'
+              ? 'active-tab bg-[#F29900] border-[#F29900] text-white'
+              : 'bg-amber-50/50 border-amber-100 text-gray-700 hover:bg-amber-100/50 hover:text-gray-900'
+            }
+          `}
+        >
+          Pending
+        </button>
+
         {/* Dynamic Category pills */}
         {categories.map((cat) => {
           const isActive = selectedCategory === cat.id;
