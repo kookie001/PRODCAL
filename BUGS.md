@@ -6,6 +6,26 @@
 
 ## Resolved Bugs
 
+- **BUG 26: Stale-render bug when dropping a timeline task card onto the "Pending" category tab/tile**
+  - *Description:* Dropping a task onto the "Pending" category tab/tile correctly flags the task as pending, but the UI (removing it from today's timeline and adding it to the pending list) does not refresh until the user manually taps or scrolls the screen.
+  - *Root Cause:* Prior updates on drop called the generic `updateTask` with a partial object. While functional, the update path did not consistently trigger an immediate, high-priority reactive subscription update across all memoized views for this specific field change, resulting in a stale render until a gesture or interaction forced a re-render.
+  - *Resolution:* Added a dedicated, highly optimized, and strictly immutable store action `setTaskPending` that maps over the tasks array and returns a clean, shallow-copied state array, bypassing any scheduling or batching latency and forcing React to refresh the timeline and pending list immediately upon drop with zero manual interaction.
+
+- **BUG 27: Missing drag-and-drop hover feedback and color-matching glow on category tabs**
+  - *Description:* When dragging a task card towards the category bar at the top, the hovered category tab only highlighted in a generic blue color, failing to use that category's own thematic color and lacking a polished visual glow.
+  - *Root Cause:* The `updateTabHighlights` utility had a hardcoded background color (`rgba(26, 115, 232, 0.15)`) and didn't read dynamic category color mappings from the store.
+  - *Resolution:* Refactored `updateTabHighlights` to query the dynamic category configurations from the store and identify the hovered tab's actual category color. Implemented a sleek, layout-honest visual styling: when hovered during drag, the tab glows with a 3px ring in its own category color (`boxShadow: 0 0 0 3px <categoryColor>44`), its border highlights in its thematic color, and its background applies a smooth, semi-transparent 10% color tint, all powered by lightweight transform transitions (`transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1)`) for premium, lag-free micro-interactions.
+
+- **BUG 25: Stale-render bug on rescheduling a past task from the pending list onto the current-day timeline**
+  - *Description:* Dragging a past task (e.g. 14 July) from the pending list onto today's timeline correctly updated its date in the data, but it did not appear on today's timeline until the user tapped or scrolled the screen.
+  - *Root Cause:* When dropping the task from the pending list onto the timeline, the drop handler in `TasksOverlay.tsx` updated the task's date and time, but failed to set `isPending` to `false`. Since `isPending` remained `true` and the date was set to today's date (`todayStr`), the task met the condition `task.isPending && task.date === todayStr` inside the DayView's `dayTasks` filter, causing it to be filtered out of the hourly timeline list and fail to render until some action triggered a change.
+  - *Resolution:* Added `isPending: false` to the task properties during the drop update in `TasksOverlay.tsx`, instantly and correctly marking the task as no longer pending when scheduled on the timeline. This removes it from the pending list and displays it on the timeline immediately.
+
+- **BUG 24: Stale-render bug when dragging a timeline task card to the "Pending" category tab**
+  - *Description:* Dragging a task (e.g., 20 July) into pending made it disappear from the timeline momentarily, but then it re-appeared when the user tapped the screen.
+  - *Root Cause:* Dropping a task onto the "Pending" category pill set `isPending: true`. However, the DayView's `dayTasks` filter only excluded pending tasks if their date matched today's date (`if (task.isPending && task.date === todayStr) return false;`). For tasks on other dates (e.g., 20 July when today was 19 July), the task was not excluded, meaning it remained scheduled on the 20 July hourly timeline. Once the gesture ended and the dragging state reset, the task re-appeared on the 20 July timeline.
+  - *Resolution:* Simplified the DayView `dayTasks` filter to unconditionally exclude all pending tasks (where `task.isPending` is `true`) regardless of the date, ensuring they leave the hourly timeline instantly and permanently as soon as they are flagged as pending.
+
 - **BUG 23: Date and time pickers (CalendarPicker & ClockPicker) stopped opening when tapped inside TaskSheet**
   - *Description:* Tapping the date row or time row inside the "More options" section of `TaskSheet` did not open the calendar or clock pickers.
   - *Root Cause:* The `<form>` container in `TaskSheet.tsx` had `onFocus={handleFocus}` which set `keyboardOpen(true)`. When the user tapped any button in the form, such as the date row button or time row button, that button received focus, triggering the form's `onFocus` event due to bubbling. This set `keyboardOpen` to `true`, instantly switching the UI to the keyboard toolbar and unmounting the options drawer buttons, preventing the click from opening the pickers.

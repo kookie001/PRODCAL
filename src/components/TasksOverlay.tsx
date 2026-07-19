@@ -492,6 +492,17 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
 
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
+  const [dropDebug, setDropDebug] = useState<{
+    windowScrollY: number;
+    scrollTop: number;
+    timelineFound: boolean;
+    dropX: number;
+    dropY: number;
+    rect: { top: number; bottom: number; left: number; right: number } | null;
+    isInside: boolean;
+    computedTime: string;
+    computedDate: string;
+  } | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout>>();
   const touchStartPos = useRef({ x: 0, y: 0 });
   const isDraggingFromList = useRef(false);
@@ -570,13 +581,45 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
       const dropX = touch.clientX;
       const dropY = touch.clientY;
 
-      if (
+      const isInside = !!(
         rect &&
         dropX >= rect.left &&
         dropX <= rect.right &&
         dropY >= rect.top &&
         dropY <= rect.bottom
-      ) {
+      );
+
+      let computedTime = 'N/A';
+      let formattedDate = 'N/A';
+
+      if (rect) {
+        const relativeY = dropY - rect.top + (timelineEl ? timelineEl.scrollTop : 0);
+        const pixelsPerMinute = 1536 / 1440;
+        const minutes = Math.round((relativeY / pixelsPerMinute) / 15) * 15;
+        const h = Math.floor(minutes / 60).toString().padStart(2, '0');
+        const m = (minutes % 60).toString().padStart(2, '0');
+        computedTime = `${h}:${m}`;
+
+        const activeDateObj = new Date(useTaskStore.getState().currentDate);
+        const year = activeDateObj.getFullYear();
+        const month = String(activeDateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(activeDateObj.getDate()).padStart(2, '0');
+        formattedDate = `${year}-${month}-${day}`;
+      }
+
+      setDropDebug({
+        windowScrollY: window.scrollY,
+        scrollTop: timelineEl ? timelineEl.scrollTop : 0,
+        timelineFound: !!timelineEl,
+        dropX,
+        dropY,
+        rect: rect ? { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right } : null,
+        isInside,
+        computedTime,
+        computedDate: formattedDate,
+      });
+
+      if (isInside && rect && timelineEl) {
         const relativeY = dropY - rect.top + timelineEl.scrollTop;
         const pixelsPerMinute = 1536 / 1440;
         const minutes = Math.round((relativeY / pixelsPerMinute) / 15) * 15;
@@ -591,7 +634,8 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
 
         updateTask(draggedTaskRef.current.id, {
           date: formattedDate,
-          time: `${h}:${m}`
+          time: `${h}:${m}`,
+          isPending: false
         });
 
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -1057,6 +1101,60 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
         >
           <span className="truncate flex-1">{draggedTask.title}</span>
           <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full ml-2 select-none">Drag</span>
+        </div>
+      )}
+
+      {/* On-screen Drop Debug Readout */}
+      {dropDebug && (
+        <div 
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 99999,
+            maxWidth: '90%',
+            width: '380px',
+            backgroundColor: 'rgba(17, 24, 39, 0.95)',
+            color: '#10B981',
+            padding: '12px',
+            borderRadius: '12px',
+            fontSize: '11px',
+            fontFamily: 'monospace',
+            lineHeight: '1.4',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.3)',
+            border: '1px solid #374151',
+          }}
+          className="pointer-events-auto"
+        >
+          <div className="flex justify-between items-center border-b border-gray-700 pb-1.5 mb-1.5">
+            <span className="font-bold text-gray-200 text-xs">DROP DIAGNOSTICS</span>
+            <button 
+              onClick={() => setDropDebug(null)}
+              className="text-gray-400 hover:text-white px-1.5 py-0.5 bg-gray-800 rounded-sm cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+          <div><strong className="text-gray-400">window.scrollY:</strong> {dropDebug.windowScrollY}px</div>
+          <div><strong className="text-gray-400">timelineEl.scrollTop:</strong> {dropDebug.scrollTop}px</div>
+          <div><strong className="text-gray-400">Timeline found:</strong> {dropDebug.timelineFound ? 'YES' : 'NO'}</div>
+          <div><strong className="text-gray-400">Drop coords (x, y):</strong> ({Math.round(dropDebug.dropX)}, {Math.round(dropDebug.dropY)})</div>
+          {dropDebug.rect ? (
+            <div>
+              <strong className="text-gray-400">Timeline Rect:</strong>
+              <div className="pl-3 text-[10px]">
+                top: {Math.round(dropDebug.rect.top)} | bottom: {Math.round(dropDebug.rect.bottom)}<br/>
+                left: {Math.round(dropDebug.rect.left)} | right: {Math.round(dropDebug.rect.right)}
+              </div>
+            </div>
+          ) : (
+            <div><strong className="text-gray-400">Timeline Rect:</strong> null</div>
+          )}
+          <div className="mt-1.5 pt-1.5 border-t border-gray-800 flex justify-between items-center">
+            <span><strong className="text-gray-400">Detected Inside:</strong> <span className={dropDebug.isInside ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>{dropDebug.isInside ? 'TRUE' : 'FALSE'}</span></span>
+            <span><strong className="text-gray-400">Computed Time:</strong> <span className="text-blue-400 font-bold">{dropDebug.computedTime}</span></span>
+          </div>
         </div>
       )}
     </div>

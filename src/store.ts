@@ -39,6 +39,7 @@ interface TaskState {
 interface TaskActions {
   addTask: (task: Omit<Task, 'id' | 'createdAt'>) => void;
   updateTask: (id: string, updatedFields: Partial<Task>) => void;
+  setTaskPending: (id: string) => void;
   deleteTask: (id: string) => void;
   addCategory: (name: string) => void;
   
@@ -296,6 +297,12 @@ export const useTaskStore = create<TaskState & TaskActions>()(
           isFABOpen: false
         };
       }),
+
+      setTaskPending: (id) => set((state) => ({
+        tasks: state.tasks.map((t) =>
+          t.id === id ? { ...t, isPending: true } : t
+        )
+      })),
 
       deleteTask: (id) => set((state) => {
         const taskToDelete = state.tasks.find((task) => task.id === id);

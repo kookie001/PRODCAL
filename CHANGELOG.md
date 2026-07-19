@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026-07-19]
+- Fix stale UI render bug on dropping a timeline task card onto the "Pending" category tab/tile:
+  - Added a dedicated, strictly immutable `setTaskPending` store action that updates the `tasks` state array, bypassing scheduling latency and instantly refreshing the timeline and pending list.
+  - Replaced the three updates to `isPending: true` in `CalendarViews.tsx` with calls to `setTaskPending`.
+- Add dynamic colored glow hover feedback during task-card drag over category tabs:
+  - Refactored `updateTabHighlights` in `CalendarViews.tsx` to read dynamic category definitions and colors from the store.
+  - Enhanced the active hovered category tab style to use a 3px ring in its own category color, a highlighted border, and a subtle semi-transparent background tint.
+  - Leveraged lightweight, layout-honest transitions (`transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1)`) to guarantee buttery-smooth, lag-free visual micro-interactions on both desktop and mobile touch devices.
+- Fix stale UI render bug on drag-and-drop actions:
+  - Reset `isPending` field to `false` when rescheduling a task from the pending list onto the daily timeline to ensure it leaves the pending list and gets scheduled correctly.
+  - Exclude pending tasks (where `isPending` is `true`) unconditionally from the hourly timeline DayView's `dayTasks` list so that they leave the timeline instantly when manually dragged to "Pending".
+- Add debug + diagnose device-specific pending-to-timeline drop failure:
+  - Added on-screen `dropDebug` state in `TasksOverlay.tsx` to record drop gesture metadata.
+  - Rendered a highly readable, absolute-layered, and dismissible `DROP DIAGNOSTICS` panel on the screen upon touch-drop to output real-time `window.scrollY`, timeline container `scrollTop`, bounds presence, drop coordinates `clientX`/`clientY`, `getBoundingClientRect()` properties, inside-detection status, and computed hour-minute results.
+
 ## [2026-07-18]
 - Introduce manually flagging tasks as "Pending":
   - Added "Pending" optional boolean field `isPending?: boolean` to the `Task` type in `types.ts`, fully persisted to localStorage via the task store.

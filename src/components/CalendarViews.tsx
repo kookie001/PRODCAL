@@ -1628,6 +1628,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
   }, [])
 
   const updateTask = useTaskStore((state) => state.updateTask)
+  const setTaskPending = useTaskStore((state) => state.setTaskPending)
   const deleteTask = useTaskStore((state) => state.deleteTask)
   const toggleSubtaskComplete = useTaskStore((state) => state.toggleSubtaskComplete)
   const toggleTaskComplete = (id: string) => {
@@ -1703,13 +1704,28 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
 
   const updateTabHighlights = useCallback((activeTabId: string | null) => {
     const tabs = document.querySelectorAll('[data-category-tab]');
+    const storeCategories = useTaskStore.getState().categories;
     tabs.forEach(tab => {
-      const isOver = tab.getAttribute('data-category-tab') === activeTabId;
+      const tabId = tab.getAttribute('data-category-tab');
+      const isOver = tabId === activeTabId;
       if (isOver && activeTabId !== 'All') {
-        (tab as HTMLElement).style.backgroundColor = 'rgba(26, 115, 232, 0.15)';
+        let colorHex = '#1A73E8'; // Default Fallback Color
+        if (tabId === 'Pending') {
+          colorHex = '#F29900';
+        } else {
+          const cat = storeCategories.find(c => c.id === tabId);
+          if (cat && cat.color && cat.color.solid) {
+            colorHex = cat.color.solid;
+          }
+        }
+        (tab as HTMLElement).style.boxShadow = `0 0 0 3px ${colorHex}44, 0 4px 10px rgba(0,0,0,0.1)`;
+        (tab as HTMLElement).style.borderColor = colorHex;
+        (tab as HTMLElement).style.backgroundColor = `${colorHex}1a`; // 10% opacity tint
         (tab as HTMLElement).style.transform = 'scale(1.05)';
-        (tab as HTMLElement).style.transition = 'all 150ms ease';
+        (tab as HTMLElement).style.transition = 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)';
       } else {
+        (tab as HTMLElement).style.boxShadow = '';
+        (tab as HTMLElement).style.borderColor = '';
         (tab as HTMLElement).style.backgroundColor = '';
         (tab as HTMLElement).style.transform = '';
       }
@@ -1719,6 +1735,8 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
   const clearTabHighlights = useCallback(() => {
     const tabs = document.querySelectorAll('[data-category-tab]');
     tabs.forEach(tab => {
+      (tab as HTMLElement).style.boxShadow = '';
+      (tab as HTMLElement).style.borderColor = '';
       (tab as HTMLElement).style.backgroundColor = '';
       (tab as HTMLElement).style.transform = '';
     });
@@ -1756,7 +1774,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         const droppedCat = getTabAtCoords(lastPointerPos.current.x, lastPointerPos.current.y)
         if (droppedCat && droppedCat !== 'All') {
           if (droppedCat === 'Pending') {
-            updateTask(task.id, { isPending: true })
+            setTaskPending(task.id)
           } else {
             updateTask(task.id, { category: droppedCat as CategoryType })
           }
@@ -1786,7 +1804,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       const droppedCat = getTabAtCoords(lastPointerPos.current.x, lastPointerPos.current.y)
       if (droppedCat && droppedCat !== 'All') {
         if (droppedCat === 'Pending') {
-          updateTask(task.id, { isPending: true })
+          setTaskPending(task.id)
         } else {
           updateTask(task.id, { category: droppedCat as CategoryType })
         }
@@ -1846,7 +1864,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         const droppedCat = getTabAtCoords(lastPointerPos.current.x, lastPointerPos.current.y)
         if (droppedCat && droppedCat !== 'All') {
           if (droppedCat === 'Pending') {
-            updateTask(task.id, { isPending: true })
+            setTaskPending(task.id)
           } else {
             updateTask(task.id, { category: droppedCat as CategoryType })
           }
@@ -2724,11 +2742,11 @@ const DayView = React.memo<DayViewProps>(({
 
   const dayTasks = useMemo(() => {
     return tasks.filter((task) => {
-      if (task.isPending && task.date === todayStr) return false;
+      if (task.isPending) return false;
       const taskDate = new Date(task.date + 'T00:00:00');
       return isSameDay(taskDate, activeDate);
     });
-  }, [tasks, activeDate, todayStr]);
+  }, [tasks, activeDate]);
 
   const sortedDayTasks = useMemo(() => {
     return [...dayTasks].sort((a, b) => {
