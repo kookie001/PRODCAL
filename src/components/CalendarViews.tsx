@@ -1593,6 +1593,15 @@ interface DraggableTaskBlockProps {
 }
 
 const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, onReschedule, onEditOpen }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: task.id });
+
   const addDebug = (msg: string) => {};
   const [expanded, setExpanded] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -1605,6 +1614,13 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
   const tapTimer = useRef<ReturnType<typeof setTimeout>>()
 
   const blockRef = useRef<HTMLDivElement>(null)
+
+  const combinedRef = useCallback((node: HTMLDivElement | null) => {
+    // @ts-ignore
+    blockRef.current = node;
+    setNodeRef(node);
+  }, [setNodeRef]);
+
   const touchStart = useRef({ x: 0, y: 0, time: 0 })
   const moved = useRef(false)
   const dragging = useRef(false)
@@ -1848,9 +1864,6 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         }
       }
       if (moved.current) {
-        if (blockRef.current) {
-          blockRef.current.style.transform = `translate(${dx}px, ${dy}px)`
-        }
         const clientX = moveEvent.clientX
         const clientY = moveEvent.clientY
         lastPointerPos.current = { x: clientX, y: clientY }
@@ -1899,9 +1912,6 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         e.preventDefault()
       }
       if (moved.current) {
-        if (blockRef.current) {
-          blockRef.current.style.transform = `translate(${dx}px, ${dy}px)`
-        }
         const clientX = e.touches[0].clientX
         const clientY = e.touches[0].clientY
         lastPointerPos.current = { x: clientX, y: clientY }
@@ -1915,7 +1925,9 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
 
   return (
     <motion.div
-      ref={blockRef}
+      ref={combinedRef}
+      {...attributes}
+      {...listeners}
       onTouchStart={handleTouchStart}
       onTouchEnd={(e) => {
         lastTouchTime.current = Date.now()
@@ -1946,15 +1958,18 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         border: borderStyle,
         minHeight: '48px',
         overflow: (expanded && !isCurrentlyDragging) ? 'visible' : 'hidden',
-        touchAction: 'pan-y',
+        touchAction: 'none',
         userSelect: 'none',
         WebkitUserSelect: 'none',
         boxSizing: 'border-box',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+        boxShadow: isDragging ? '0 8px 16px rgba(0,0,0,0.12)' : '0 2px 4px rgba(0,0,0,0.02)',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
-        zIndex: (expanded && !isCurrentlyDragging) ? 200 : (dragging.current ? 250 : 1),
+        zIndex: isDragging ? 250 : ((expanded && !isCurrentlyDragging) ? 200 : (dragging.current ? 250 : 1)),
+        transform: transform ? CSS.Transform.toString(transform) : undefined,
+        transition: transition || undefined,
+        opacity: isDragging ? 0.7 : 1,
       }}
     >
       {/* MAIN ROW — always visible */}
@@ -2387,6 +2402,7 @@ const DayView = React.memo<DayViewProps>(({
   );
 
   const reorderSubtasks = useTaskStore((state) => state.reorderSubtasks);
+  const reorderTasks = useTaskStore((state) => state.reorderTasks);
   const toggleSubtask = useTaskStore((state) => state.toggleSubtask);
   const updateTask = useTaskStore((state) => state.updateTask);
 
@@ -2750,12 +2766,47 @@ const DayView = React.memo<DayViewProps>(({
 
   const sortedDayTasks = useMemo(() => {
     return [...dayTasks].sort((a, b) => {
+      const orderA = a.manualOrder ?? 0;
+      const orderB = b.manualOrder ?? 0;
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
       if (!a.time && !b.time) return 0;
       if (!a.time) return -1; // All-Day at the top
       if (!b.time) return 1;
       return a.time.localeCompare(b.time);
     });
   }, [dayTasks]);
+
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: {
+      distance: 8,
+    },
+  });
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: {
+      delay: 250,
+      tolerance: 5,
+    },
+  });
+  const daySensors = useSensors(pointerSensor, touchSensor);
+
+  const handleDragEnd = useCallback((event: any) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = sortedDayTasks.findIndex((t) => t.id === active.id);
+    const newIndex = sortedDayTasks.findIndex((t) => t.id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const reordered = arrayMove(sortedDayTasks, oldIndex, newIndex) as Task[];
+      const updatedWithOrder = reordered.map((task, idx) => ({
+        ...task,
+        manualOrder: idx + 1
+      }));
+      reorderTasks(updatedWithOrder);
+    }
+  }, [sortedDayTasks, reorderTasks]);
 
   return (
     <div className="h-full w-full overflow-hidden bg-white">
@@ -2802,27 +2853,39 @@ const DayView = React.memo<DayViewProps>(({
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto text-gray-800"
       >
-        <div className="flex flex-col space-y-2.5 py-4 px-3 select-none">
-          {sortedDayTasks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-              <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-4 shadow-2xs">
-                <CheckSquare size={32} className="stroke-[1.5px]" />
-              </div>
-              <h3 className="text-sm font-bold text-gray-900">No tasks for today</h3>
-              <p className="text-xs text-gray-400 mt-1 max-w-[200px]">
-                Enjoy your day!
-              </p>
+        <DndContext
+          sensors={daySensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+          modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+        >
+          <SortableContext
+            items={sortedDayTasks.map((t) => t.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="flex flex-col space-y-2.5 py-4 px-3 select-none">
+              {sortedDayTasks.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+                  <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-4 shadow-2xs">
+                    <CheckSquare size={32} className="stroke-[1.5px]" />
+                  </div>
+                  <h3 className="text-sm font-bold text-gray-900">No tasks for today</h3>
+                  <p className="text-xs text-gray-400 mt-1 max-w-[200px]">
+                    Enjoy your day!
+                  </p>
+                </div>
+              ) : (
+                sortedDayTasks.map((task) => (
+                  <DraggableTaskBlock
+                    key={task.id}
+                    task={task}
+                    onEditOpen={openEditSheet}
+                  />
+                ))
+              )}
             </div>
-          ) : (
-            sortedDayTasks.map((task) => (
-              <DraggableTaskBlock
-                key={task.id}
-                task={task}
-                onEditOpen={openEditSheet}
-              />
-            ))
-          )}
-        </div>
+          </SortableContext>
+        </DndContext>
       </div>
     </div>
     {editingTaskState && (

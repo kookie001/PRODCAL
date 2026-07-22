@@ -1,6 +1,67 @@
 # Changelog
 
+## [2026-07-21]
+- Fix pending card edit opening blank:
+  - Cleanly separated the card body click (which expands subtasks) from the card title click by adding a dedicated `onClick` handler with `e.stopPropagation()` directly to the title's `<p>` tag in `TaskItemRow`.
+  - Tapping the title now opens the edit sheet with the task's full data pre-filled, while tapping elsewhere on the card (or the chevron area) continues to expand/collapse the subtasks list without any gesture conflict.
+- Fix pending task drop onto timeline to schedule as an All-day task:
+  - Updated the touch-drop gesture end handler (`handleGlobalTouchEnd`) in `TasksOverlay.tsx` to set the task's `time` property to `''` (empty string) instead of assigning a time based on the drop Y-coordinate.
+  - Dropping a pending task onto the timeline now correctly schedules it to that day as an All-day task while ignoring the exact drop Y-position, matching the expected behavior and allowing the user to manually set a time later via editing.
+
+## [2026-07-20]
+- Fix page horizontal shift during tile drag and polish reorder motion:
+  - Created and implemented a custom `restrictToHorizontalViewport` modifier for `DndContext` and `DragOverlay` that clamps the dragging coordinates so the tile stays perfectly within the visible screen boundaries (`0` and `window.innerWidth`) with a 4px cushion, completely eliminating off-screen escape.
+  - Set `overflow-x: hidden` globally on `html`, `body`, and the `#root` container to ensure absolute layout rigidity.
+  - Customized SortableCategoryTab's CSS transition property using easing (`cubic-bezier(0.25, 1, 0.5, 1)`) and timing (`250ms`) to match the smooth feel of vertical card reorders.
+  - Implemented subtle, tactile vibration haptics on drag start and successful reorder swaps.
+  - Balanced `DragOverlay` scaling to `1.05` paired with a premium soft drop shadow.
+
+- Replace timing-based category tab reorder with a robust dedicated drag-handle design:
+  - Eliminated timing-based activation delays (`TouchSensor` delay and `PointerSensor` distance constraints) to restore instant, zero-delay drag responsiveness.
+  - Implemented a subtle, elegant drag handle (grip icon ⣿, using `GripVertical`) on the left edge of each category tab.
+  - Bound dnd-kit's `listeners` and `attributes` exclusively to the grip handle element so that dragging is initiated only when grabbing the grip handle.
+  - Restored clean, standard mouse/touch behavior on the rest of the tab button body, enabling flawless horizontal scroll swiping and instant tap-to-filter category selection.
+  - Updated the static `StaticCategoryTab` and `DragOverlay` elements with matching handle elements and sizes to ensure smooth, jitter-free horizontal drag animations.
+
+- Resolve scroll vs reorder gesture conflict on category tab bar via delay-based drag activation:
+  - Configured `TouchSensor` with a 250ms delay and 8px tolerance activation constraint. Quick swipes bypass the delay to natively scroll the tab bar, while a 250ms hold reliably initiates horizontal drag-reordering.
+  - Replaced PointerSensor's 400ms hold delay with an 8px distance activation constraint, ensuring mouse reordering on desktop is instant and highly responsive.
+  - Added explicit `touchAction: 'pan-x'` styling to individual sortable category buttons to allow native browser horizontal panning when swiping, while letting dnd-kit's TouchSensor cancel scroll once drag is activated.
+
 ## [2026-07-19]
+- Fix category tab bar scroll broken by reorder feature, match tile drag motion to card reorder smoothness:
+  - Removed the static `touch-none` class from all sortable category tab buttons. This restores full horizontal swipe/scroll on the tab bar since touch actions are no longer browser-restricted when the user isn't actively long-press dragging.
+  - Replaced the static `transition-all` class on draggable tabs with `transition-colors`. This prevents CSS transitions from clashing with dnd-kit's high-frequency inline `transform` updates, eliminating lag and making horizontal reorder motion silky smooth.
+  - Aligned style declarations of `SortableCategoryTab` to match the exact `transform` and `transition` safety checks of the smooth vertical card reorder.
+- Fix category tile stretch and jank: add DragOverlay with fixed size, remove legacy transform conflict:
+  - Introduced a separate `<DragOverlay>` for category tab drag gestures to isolate floating active state from normal DOM layout.
+  - Refactored `SortableCategoryTab` items to act as static placeholders with controlled opacity during active drags, avoiding direct scale/shadow applications on in-place items.
+  - Configured `StaticCategoryTab` with strict `flexShrink: 0`, `fit-content` width, and `whiteSpace: nowrap` to prevent visual pill stretching/deformation.
+  - Bound dnd-kit horizontal axis modifier constraint (`restrictToHorizontalAxis`) to both the `<DndContext>` and `<DragOverlay>` to lock movement strictly left-to-right.
+- Fix free-floating drag: apply modifier to DragOverlay and remove conflicting legacy drag code:
+  - Removed conflicting legacy pre-dnd-kit manual style transform manipulation (`blockRef.current.style.transform = ...`) inside mouse and touch movement listeners of `DraggableTaskBlock`.
+  - Transferred exclusive visual translation and drag coordinate bounds control to dnd-kit's vertical sorting setup.
+  - Preserved coordinates tracking for the drag-to-category features intact, allowing seamless category highlighting and drop assignment.
+- Add long-press + horizontal drag reorder for category tabs (dnd-kit, all tiles reorderable):
+  - Added `categoryOrder` field to the task store in `src/store.ts` and registered it for persistent local storage.
+  - Configured pointer and touch sensors with activation constraints (delay: 400ms, tolerance: 5px) to gracefully separate normal single-tap filtering from long-press sorting.
+  - Wrapped the entire category tab list in dnd-kit `DndContext` and `SortableContext` with a horizontal sorting strategy.
+  - Constrained reordering movement strictly to the horizontal X-axis using `restrictToHorizontalAxis` modifier.
+  - Allowed all tabs (including default tabs 'All' and 'Pending') to be reordered with premium magnetic gap-slide animations.
+- Constrain home card drag-to-reorder to vertical axis only using dnd-kit modifier:
+  - Added `restrictToParentElement` to the modifiers on the home list's `DndContext` to keep the dragged card confined cleanly within the list bounds.
+  - Fully locked card movement on drag to the Y axis (vertical axis only) by supplying both `restrictToVerticalAxis` and `restrictToParentElement` to lock out horizontal drift/wobble.
+- Remove drop diagnostics panel and ghost preview during pending drag:
+  - Completely removed the on-screen `DROP DIAGNOSTICS` panel from the bottom of the screen when completing drag gestures.
+  - Set the background pending task list container to fully fade out (`opacity-0`) during active dragging, eliminating the faint ghost duplicate/overlapping clone visual clutter.
+  - Maintained the full drag-and-drop mechanics (grab, move, drop) completely intact and untouched.
+- Add drag-to-reorder on home Day view with manualOrder:
+  - Added optional `manualOrder?: number` to the `Task` interface in `types.ts` and task store state to track reordering, fully persisted to localStorage.
+  - Implemented `reorderTasks` action in `store.ts` to assign sequential `manualOrder` values to day tasks upon reorder drop.
+  - Set newly created tasks to default to the end of the list by calculating `maxOrder + 1` of the same day's existing tasks.
+  - Wrapped the home DayView task list in dnd-kit's `DndContext` and `SortableContext` using the `verticalListSortingStrategy`.
+  - Bound `useSortable` hook inside `DraggableTaskBlock` using a combined ref callback to merge dnd-kit node registration with local refs.
+  - Configured pointer and touch sensors with touch activation delay to ensure smooth scrolling while enabling magnetic drag-to-reorder vertical list animations.
 - Fix stale UI render bug on dropping a timeline task card onto the "Pending" category tab/tile:
   - Added a dedicated, strictly immutable `setTaskPending` store action that updates the `tasks` state array, bypassing scheduling latency and instantly refreshing the timeline and pending list.
   - Replaced the three updates to `isPending: true` in `CalendarViews.tsx` with calls to `setTaskPending`.

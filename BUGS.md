@@ -6,6 +6,83 @@
 
 ## Resolved Bugs
 
+- **BUG 38: Tapping a pending card's title opens the edit sheet blank**
+  - *Description:* Clicking or tapping on the title of a task in the "My Tasks/Pending" list opened the edit sheet completely empty instead of loaded with that task's existing data (title, subtasks, category, date, all-day status).
+  - *Root Cause:*
+    1. Clicking the card triggered `handleRowClick` on the outer card wrapper. If the task had incomplete subtasks, the click was intercepted to toggle the subtasks expanded state, which completely bypassed opening the edit sheet.
+    2. Tapping the title was not separated from the outer row click, resulting in a conflict between expanding subtasks and opening the edit sheet.
+  - *Resolution:* Added an explicit `onClick` handler directly to the title `<p>` tag in `TaskItemRow` with `e.stopPropagation()`. This immediately dispatches `setEditingTask(task)` with the complete task object when the title is clicked. Restructured `handleRowClick` on the card body to only expand the subtasks, completely and cleanly separating the two interactions.
+
+- **BUG 39: Dragging a pending task onto the timeline assigns a drop-position time instead of making it an All-day task**
+  - *Description:* When a pending task was dragged onto the daily timeline, its time was computed based on the vertical drop position, which scheduled it at a random hourly slot instead of as an All-day task.
+  - *Root Cause:* The drop handler inside `handleGlobalTouchEnd` computed `h` and `m` based on the touch Y-coordinate and passed them as the `time` parameter to the store's `updateTask` action.
+  - *Resolution:* Updated the `updateTask` call in the drop handler in `TasksOverlay.tsx` to set `time: ''`, which flags it as an All-day task on the timeline for that day while ignoring the vertical Y-coordinate.
+
+- **BUG 37: Dragging a category tile horizontally beyond viewport bounds shifts the entire page sideways**
+  - *Description:* When dragging a category tab tile left or right, if the cursor/active overlay moves past the edges of the screen, the entire web page/viewport shifts sideways, leaving an empty white gap on the right and pushing main components off-screen.
+  - *Root Cause:*
+    1. Absolute/fixed positioning of dnd-kit's `DragOverlay` elements extends the scrollable document size when positioned off-screen, prompting the browser to expand the horizontal body bounds.
+    2. Lack of horizontal layout constraint boundary modifiers on `DndContext` and `DragOverlay` allowed drag previews to wander outside the category tab bar.
+  - *Resolution:*
+    1. Added the `restrictToParentElement` modifier to BOTH `DndContext` and `DragOverlay` to clamp drag coordinates within the category tab bar container's bounds.
+    2. Enforced `overflow-x: hidden` globally on `body` and `#root` elements to prevent horizontal scroll layout thrashing during any custom dragging operations.
+
+- **BUG 36: Replace long-press category reorder with a reliable drag-handle approach to completely eliminate horizontal scroll/tap conflicts**
+  - *Description:* Long-press delays are inherently sensitive and conflict with native horizontal scrolling (making scroll sensitive or breaking reorder completely).
+  - *Root Cause:* Implementing horizontal list sorting alongside a horizontal scrolling scrollbar container using timing-based long-press gestures causes a clash. The browser cannot differentiate a scroll swipe from a touch-drag start without awkward delay configurations.
+  - *Resolution:*
+    1. Replaced the delay-based sensor constraints with a dedicated, highly polished drag handle (grip icon ⣿, using Lucide `GripVertical`) embedded inside each category tile.
+    2. Bound dnd-kit's drag listeners and attributes (`attributes` and `listeners` from `useSortable`) **only** to the grip handle element.
+    3. Left the main body of the tile with its normal click listener (`onClick`) for tap-to-filter category selection.
+    4. By isolating these three distinct interaction zones (scroll = tile body swipe, tap = tile click, drag = grip handle press/drag), all three gestures now coexist flawlessly with absolute reliability and zero conflict.
+    5. Cleaned up and simplified the `PointerSensor` and `TouchSensor` configurations by completely removing activation delays.
+
+- **BUG 35: Category tab bar horizontal scroll vs horizontal drag-reorder gesture conflict**
+  - *Description:* On mobile/touch devices, fixing horizontal scroll (BUG 33) broke long-press drag-to-reorder, and vice-versa. Quick swipes and deliberate hold-to-drag gestures were not correctly distinguished because of sub-optimal sensor constraints and a lack of explicit `touchAction` styles.
+  - *Root Cause:*
+    1. The `TouchSensor` was configured with a long 400ms delay and low 5px tolerance, meaning tiny natural finger tremors during the hold cancelled drag activation.
+    2. The `PointerSensor` also had a 400ms delay, making desktop mouse reordering feel sluggish/broken instead of initiating instantly.
+    3. The individual category buttons did not have an explicit `touchAction: 'pan-x'` CSS styling, which meant the browser could start a native scroll gesture before the sensor's activation delay resolved, preventing dnd-kit from taking over.
+  - *Resolution:*
+    1. Configured the `TouchSensor` with a responsive 250ms activation delay and an increased 8px tolerance. This allows quick horizontal swipes to natively scroll the tab bar, while a 250ms hold reliably initiates a drag.
+    2. Switched the desktop `PointerSensor` to use a 8px distance activation constraint instead of a delay, providing instant "grab and drag" responsiveness for mouse users.
+    3. Added `touchAction: 'pan-x'` to the style of the individual sortable category buttons. This explicitly instructs the browser to allow horizontal scrolling normally when swiped, but permits the TouchSensor to call `preventDefault()` and cancel scroll once a drag starts.
+
+- **BUG 33: Category tab bar horizontal scroll locked/broken after implementing drag reordering**
+  - *Description:* Users could no longer horizontally scroll/swipe the category tab bar on touch devices or desktops to view off-screen categories.
+  - *Root Cause:* The sortable category tab buttons were statically styled with the Tailwind class `touch-none`. Since these buttons spanned almost the entire width of the scrollable container, they intercepted and completely suppressed browser-level horizontal touch gestures, disabling native scrolling.
+  - *Resolution:* Removed `touch-none` from the sortable tab buttons. Browser-level horizontal scroll gestures are now fully permitted unless a 400ms sustained long-press initiates active dragging (which programmatically cancels scroll via dnd-kit's TouchSensor).
+
+- **BUG 34: Category tab drag-to-reorder motion feels janky and lags behind pointer/finger**
+  - *Description:* Category tab movement was slow, stuttered, and lacked the premium fluid feel of vertical task card reordering.
+  - *Root Cause:* Draggable tab buttons had the Tailwind class `transition-all duration-200` which conflicts with dnd-kit's high-frequency inline `transform` styling. The browser tried to interpolate/transition every single frame-level inline transform update, causing extreme lag.
+  - *Resolution:* Replaced `transition-all` with `transition-colors` on draggable buttons. This preserves smooth background/color transitions when active selections change, but leaves inline `transform` values entirely uninhibited, making the horizontal reorder movement perfectly smooth and responsive.
+
+- **BUG 32: Task card reordering on home Day view drifts horizontally on real touch devices**
+  - *Description:* Dragged task cards still move horizontally following the finger/mouse, even though `restrictToVerticalAxis` was added to the list's `DndContext`.
+  - *Root Cause:* Conflict with a legacy custom drag-to-category implementation that manually performed DOM-level transform style operations (`blockRef.current.style.transform = ...`) in its touch/mouse event listeners. This direct manipulation overrode and fought with dnd-kit's react-state transforms.
+  - *Resolution:* Removed the manual visual transform style modifications from the legacy move listeners, transferring full coordinate translation and bounds control exclusively to dnd-kit's `useSortable` and the vertical-axis/parent-container modifiers. Left pointer tracking/coordinates caching intact for drag-to-category hover assignment.
+
+- **BUG 31: Add drag-to-reorder for Category Tabs (dnd-kit Sortable)**
+  - *Description:* Category tabs could not be reordered or sorted, limiting users from prioritizing custom list views.
+  - *Root Cause:* There was no sorting or ordering model implemented for categories, and the `CategoryTabBar` rendered categories in a static pre-defined list.
+  - *Resolution:* Implemented a dnd-kit `DndContext` and `SortableContext` wrapping all category tabs, configured with a horizontal list strategy and pointer/touch sensors with activation constraints (delay: 400ms, tolerance: 5px) to safely separate regular tab tapping from sustained long-press sorting gestures. Added and persisted `categoryOrder` in the Zustand task store.
+
+- **BUG 30: Task cards on home Day view wobble horizontally during vertical drag-to-reorder**
+  - *Description:* When dragging a task card to reorder items in the home Day view list, the card would drift horizontally (left/right) with the pointer/finger, resulting in an unpolished feel.
+  - *Root Cause:* The dnd-kit `DndContext` wrapping the home list did not enforce strict vertical axis constraints on the active draggable item.
+  - *Resolution:* Configured the home list's `DndContext` modifiers array with both `restrictToVerticalAxis` and `restrictToParentElement` from `@dnd-kit/modifiers` to strictly lock dragging movement to the vertical Y-axis and prevent the card from escaping the container's bounds.
+
+- **BUG 29: Remove drop diagnostics panel and ghost preview during pending-to-timeline drag**
+  - *Description:* The DROP DIAGNOSTICS panel shown at the bottom of the screen upon dropping and the faint background ghost/faded duplicate of the pending task list during drag were visual clutter.
+  - *Root Cause:* The diagnostic readout overlay was left enabled after debugging drop behaviors, and the container's opacity was set to `opacity-15` during active drag, allowing the faded pending items to still show through behind the floating dragged card.
+  - *Resolution:* Removed the on-screen rendering of the `DROP DIAGNOSTICS` panel from `TasksOverlay.tsx`. Changed the background pending task container opacity to `opacity-0` when `draggedTask` is active, completely hiding the faded items so that only the floating dragged card is visible over the clean timeline background.
+
+- **BUG 28: Add dnd-kit drag-to-reorder on home Day view with manualOrder**
+  - *Description:* Task cards on the home Day view did not support drag-to-reorder, and order was purely determined by scheduled time, restricting manual sorting.
+  - *Root Cause:* Task cards on the home Day view lacked a `manualOrder` field and dnd-kit sortable wrappers, preventing users from reordering tasks within the list vertically with fluid transitions and magnetic settle animations.
+  - *Resolution:* Added `manualOrder?: number` to the `Task` type and store. Implemented store-persisted `reorderTasks` action. Updated `addTask` to place new tasks at the end of the day list (`maxOrder + 1`). Wrapped the home DayView task list in dnd-kit `DndContext` and `SortableContext` with pointer/touch sensors, touch delay, and vertical restrictor. Integrated the `useSortable` hook with combined refs into `DraggableTaskBlock` to support vertical drag gap animations and magnetic settling.
+
 - **BUG 26: Stale-render bug when dropping a timeline task card onto the "Pending" category tab/tile**
   - *Description:* Dropping a task onto the "Pending" category tab/tile correctly flags the task as pending, but the UI (removing it from today's timeline and adding it to the pending list) does not refresh until the user manually taps or scrolls the screen.
   - *Root Cause:* Prior updates on drop called the generic `updateTask` with a partial object. While functional, the update path did not consistently trigger an immediate, high-priority reactive subscription update across all memoized views for this specific field change, resulting in a stale render until a gesture or interaction forced a re-render.

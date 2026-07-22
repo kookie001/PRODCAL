@@ -16,6 +16,7 @@ export interface Task {
   subtasks: Subtask[];
   createdAt: string;
   isPending?: boolean;
+  manualOrder?: number;
 }
 
 export interface DeletedTask extends Task {

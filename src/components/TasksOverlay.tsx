@@ -219,8 +219,6 @@ const TaskItemRow = React.memo(({
     const hasIncompleteSubtasks = incompleteSubtasks.length > 0;
     if (hasIncompleteSubtasks) {
       onToggleSubExpanded();
-    } else {
-      setEditingTask(task);
     }
   };
 
@@ -340,7 +338,14 @@ const TaskItemRow = React.memo(({
         </div>
 
         {/* Title — compact & matching timeline task font size/weight */}
-        <p className="flex-1 text-sm font-semibold truncate min-w-0" style={{ textDecoration: isCompleted ? 'line-through' : 'none', color: isCompleted ? '#9CA3AF' : '#1E40AF' }}>
+        <p 
+          className="flex-1 text-sm font-semibold truncate min-w-0 cursor-pointer" 
+          style={{ textDecoration: isCompleted ? 'line-through' : 'none', color: isCompleted ? '#9CA3AF' : '#1E40AF' }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setEditingTask(task);
+          }}
+        >
           {task.title}
         </p>
 
@@ -634,7 +639,7 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
 
         updateTask(draggedTaskRef.current.id, {
           date: formattedDate,
-          time: `${h}:${m}`,
+          time: '',
           isPending: false
         });
 
@@ -854,7 +859,7 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
           : 'md:max-w-[430px] md:mx-auto md:shadow-2xl md:border-x md:border-gray-200/50 md:rounded-t-3xl md:inset-y-4 md:h-[calc(100vh-32px)]'
       }`}
     >
-      <div className={`flex-1 flex flex-col h-full bg-white transition-opacity duration-200 ${draggedTask ? 'opacity-15 pointer-events-none' : ''}`}>
+      <div className={`flex-1 flex flex-col h-full bg-white transition-opacity duration-200 ${draggedTask ? 'opacity-0 pointer-events-none' : ''}`}>
           {/* Header Area (Swaps with multi-selection actions when active) */}
           <div className="flex items-center justify-between h-14 px-4 border-b border-gray-100 flex-shrink-0 bg-white select-none">
             {isMultiSelectMode ? (
@@ -1104,59 +1109,7 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
         </div>
       )}
 
-      {/* On-screen Drop Debug Readout */}
-      {dropDebug && (
-        <div 
-          style={{
-            position: 'fixed',
-            bottom: '24px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 99999,
-            maxWidth: '90%',
-            width: '380px',
-            backgroundColor: 'rgba(17, 24, 39, 0.95)',
-            color: '#10B981',
-            padding: '12px',
-            borderRadius: '12px',
-            fontSize: '11px',
-            fontFamily: 'monospace',
-            lineHeight: '1.4',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.3)',
-            border: '1px solid #374151',
-          }}
-          className="pointer-events-auto"
-        >
-          <div className="flex justify-between items-center border-b border-gray-700 pb-1.5 mb-1.5">
-            <span className="font-bold text-gray-200 text-xs">DROP DIAGNOSTICS</span>
-            <button 
-              onClick={() => setDropDebug(null)}
-              className="text-gray-400 hover:text-white px-1.5 py-0.5 bg-gray-800 rounded-sm cursor-pointer"
-            >
-              Close
-            </button>
-          </div>
-          <div><strong className="text-gray-400">window.scrollY:</strong> {dropDebug.windowScrollY}px</div>
-          <div><strong className="text-gray-400">timelineEl.scrollTop:</strong> {dropDebug.scrollTop}px</div>
-          <div><strong className="text-gray-400">Timeline found:</strong> {dropDebug.timelineFound ? 'YES' : 'NO'}</div>
-          <div><strong className="text-gray-400">Drop coords (x, y):</strong> ({Math.round(dropDebug.dropX)}, {Math.round(dropDebug.dropY)})</div>
-          {dropDebug.rect ? (
-            <div>
-              <strong className="text-gray-400">Timeline Rect:</strong>
-              <div className="pl-3 text-[10px]">
-                top: {Math.round(dropDebug.rect.top)} | bottom: {Math.round(dropDebug.rect.bottom)}<br/>
-                left: {Math.round(dropDebug.rect.left)} | right: {Math.round(dropDebug.rect.right)}
-              </div>
-            </div>
-          ) : (
-            <div><strong className="text-gray-400">Timeline Rect:</strong> null</div>
-          )}
-          <div className="mt-1.5 pt-1.5 border-t border-gray-800 flex justify-between items-center">
-            <span><strong className="text-gray-400">Detected Inside:</strong> <span className={dropDebug.isInside ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>{dropDebug.isInside ? 'TRUE' : 'FALSE'}</span></span>
-            <span><strong className="text-gray-400">Computed Time:</strong> <span className="text-blue-400 font-bold">{dropDebug.computedTime}</span></span>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 };

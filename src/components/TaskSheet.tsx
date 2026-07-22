@@ -308,7 +308,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
   isOpen: propIsOpen,
   onClose: propOnClose,
   editTask: propEditTask,
-  mode: propMode = 'create'
+  mode: propMode
 }) => {
   const isFABOpen = useTaskStore((state) => state.isFABOpen);
   const setFABOpen = useTaskStore((state) => state.setFABOpen);

@@ -17,6 +17,7 @@ interface TaskState {
   theme: 'light' | 'dark';
   selectedView: ViewType;
   categories: CategoryConfig[];
+  categoryOrder: string[];
   
   // Non-persisted transient state
   currentDate: string; // ISO String of the current active date for calendar view
@@ -41,7 +42,9 @@ interface TaskActions {
   updateTask: (id: string, updatedFields: Partial<Task>) => void;
   setTaskPending: (id: string) => void;
   deleteTask: (id: string) => void;
+  reorderTasks: (tasks: Task[]) => void;
   addCategory: (name: string) => void;
+  setCategoryOrder: (order: string[]) => void;
   
   setCurrentDate: (date: Date) => void;
   setDirection: (direction: 'next' | 'prev') => void;
@@ -249,6 +252,7 @@ export const useTaskStore = create<TaskState & TaskActions>()(
       theme: 'light',
       selectedView: 'month',
       categories: CATEGORIES,
+      categoryOrder: ['All', 'Pending', 'Work', 'Personal', 'Health', 'Holidays', 'Other'],
       
       currentDate: new Date().toISOString(),
       direction: 'next',
@@ -268,9 +272,12 @@ export const useTaskStore = create<TaskState & TaskActions>()(
 
       // Actions
       addTask: (taskData) => set((state) => {
+        const dayTasks = state.tasks.filter((t) => t.date === taskData.date);
+        const maxOrder = dayTasks.length > 0 ? Math.max(...dayTasks.map((t) => t.manualOrder ?? 0)) : 0;
         const newTask: Task = {
           ...taskData,
           id: `task-${Date.now()}`,
+          manualOrder: maxOrder + 1,
           createdAt: new Date().toISOString()
         };
         return {
@@ -278,6 +285,18 @@ export const useTaskStore = create<TaskState & TaskActions>()(
           isFABOpen: false,
           editingTask: null
         };
+      }),
+
+      reorderTasks: (orderedTasks) => set((state) => {
+        const orderMap = new Map(orderedTasks.map((t, idx) => [t.id, idx + 1]));
+        const updatedTasks = state.tasks.map((task) => {
+          const newOrder = orderMap.get(task.id);
+          if (newOrder !== undefined) {
+            return { ...task, manualOrder: newOrder };
+          }
+          return task;
+        });
+        return { tasks: updatedTasks };
       }),
 
       updateTask: (id, updatedFields) => set((state) => {
@@ -526,10 +545,15 @@ export const useTaskStore = create<TaskState & TaskActions>()(
           color,
         };
 
+        const nextOrder = state.categoryOrder ? [...state.categoryOrder, trimmedName] : ['All', 'Pending', 'Work', 'Personal', 'Health', 'Holidays', 'Other', trimmedName];
+
         return {
           categories: [...state.categories, newCategory],
+          categoryOrder: nextOrder,
         };
-      })
+      }),
+
+      setCategoryOrder: (order) => set({ categoryOrder: order })
     }),
     {
       name: 'google-calendar-tasks-store',
@@ -539,6 +563,7 @@ export const useTaskStore = create<TaskState & TaskActions>()(
         theme: state.theme,
         selectedView: state.selectedView,
         categories: state.categories,
+        categoryOrder: state.categoryOrder,
         deletedTasks: state.deletedTasks,
       }),
     }
