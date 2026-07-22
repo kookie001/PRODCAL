@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-07-22]
+- Hide completed subtasks in edit sheet and preserve on Save:
+  - Added `completedSubtasks` state in `TaskSheet.tsx` to hold completed subtasks separately on load and preserve them untouched.
+  - Adjusted the sheet's `useEffect` sync block to load only incomplete subtasks into the editable `subtasks` local list, matching the daily timeline card's behavior.
+  - Rewrote the payload construction in `handleSaveSubmit` to merge the edited/new incomplete subtasks with the preserved completed subtasks: `const finalSubtasks = [...editedIncomplete, ...completedSubtasks]`.
+  - Resolved the stripping bug where the `completed` field was lost on initialization by retaining each subtask's original `completed` status upon final submission.
+- Fix subtasks visually clipped on expanded task cards and stale chevron:
+  - Removed `overflow: 'hidden'` and enforced `overflow: 'visible'`, `height: 'auto'`, and `maxHeight: 'none'` on the expanded card's subtask panel and outer motion containers to allow cards to grow naturally with the list of subtasks.
+  - Added a memoized `incompleteSubtasks` array inside `DraggableTaskBlock` leveraging `task.subtasks` as a reactive dependency.
+  - Rewrote the custom React.memo comparison function of `DraggableTaskBlock` to explicitly inspect `prev.task.subtasks !== next.task.subtasks` reference changes, array lengths, incomplete subtask counts, and individual subtask details (IDs, titles, completion statuses) to guarantee reliable, high-fidelity UI reactivity.
+- Fix expanded task card ghosting through pending list overlay:
+  - Raised `TasksOverlay` container's z-index to `z-[800]` so it sits above all timeline cards (normal expanded card uses `200` and dragging card uses `250`), while keeping it safely below the `TaskSheet` (`2000`) and date/time pickers (`3000`).
+- Fix pending task drop ordering:
+  - When a pending task is dropped from the list overlay onto the timeline, it is assigned a `manualOrder` value lower than all existing tasks on that day (`Math.min(...existingOrders) - 1`), forcing it to render as the absolute first/topmost task at the top of the day's list while maintaining its All-day status and date assignment.
+- Default new tasks to All-day ON with no time:
+  - Reconfigured the default state in `TaskSheet.tsx` so that when a new task is created (via the FAB), the "All-day" toggle defaults to ON (`isAllDay` set to `true`) and no time is set. If `prefilledTime` is provided (e.g., from tapping a specific calendar hour slot), it will still correctly initialize with that time and All-day set to OFF.
+
 ## [2026-07-21]
 - Fix pending card edit opening blank:
   - Cleanly separated the card body click (which expands subtasks) from the card title click by adding a dedicated `onClick` handler with `e.stopPropagation()` directly to the title's `<p>` tag in `TaskItemRow`.

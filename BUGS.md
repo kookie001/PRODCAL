@@ -6,6 +6,42 @@
 
 ## Resolved Bugs
 
+- **BUG 44: Completed subtasks shown in task edit sheet and risk of data loss / completed field stripping**
+  - *Description:* Completed subtasks were visible in the task edit sheet, creating inconsistency with the daily timeline card (which hides completed subtasks). Additionally, because the edit sheet mapped subtasks on load by stripping the `completed` field, there was a risk of resetting completed subtasks back to incomplete upon saving, or losing them entirely if they were filtered out on load.
+  - *Root Cause:*
+    1. The edit sheet initialized its local `subtasks` list by mapping all task subtasks and stripping the `completed` property: `(task.subtasks || []).map(({ id, title }) => ({ id, title }))`.
+    2. No separate preservation of completed subtasks was implemented, meaning any filtered subtasks would be discarded during payload assembly on save.
+  - *Resolution:*
+    1. Modified the sheet initialization (`useEffect`) to split subtasks into two categories: `incompleteSubs` (where `completed` is false/undefined) and `completedSubs` (where `completed` is true).
+    2. Loaded only `incompleteSubs` into the local editable `subtasks` state (hiding completed subtasks from the edit view, matching the timeline card's behavior).
+    3. Stored `completedSubs` in a separate `completedSubtasks` state to preserve them untouched.
+    4. Rewrote `handleSaveSubmit` to reconstruct the full subtask array by merging the modified incomplete subtasks with the preserved completed subtasks: `const finalSubtasks = [...editedIncomplete, ...completedSubtasks]`. This fully preserves all completed subtasks along with their `completed: true` status.
+
+- **BUG 43: Subtasks visually clipped on expanded task cards and stale subtask chevron indicator**
+  - *Description:* When expanding a task card on the Day timeline grid, only a maximum of 2 subtasks were visible even though more existed. Also, the subtask expand/collapse chevron indicator sometimes failed to show up or update when subtasks changed.
+  - *Root Cause:*
+    1. The expanded subtask panel container had `overflow: 'hidden'` and lacked explicit auto-height instructions, causing elements to get clipped.
+    2. `DraggableTaskBlock` is wrapped in `React.memo` with a custom comparison function that only checked `prev.task === next.task`. It did not explicitly compare subtask fields or counts, preventing re-renders when subtasks were toggled or modified inside other contexts.
+  - *Resolution:*
+    1. Removed `overflow: 'hidden'` and set `overflow: 'visible'`, `height: 'auto'`, and `maxHeight: 'none'` on the expanded card's subtask panel and container elements.
+    2. Implemented a memoized `incompleteSubtasks` array inside `DraggableTaskBlock` using `task.subtasks` as a dependency.
+    3. Rewrote `DraggableTaskBlock`'s custom memo comparator to explicitly compare the `subtasks` reference, array length, incomplete subtask count, and individual subtask properties (`id`, `completed`, `title`). Any difference triggers an immediate re-render.
+
+- **BUG 40: Expanded task card ghosts/bleeds through the pending list overlay**
+  - *Description:* An expanded task card on the daily timeline remains visible and bleeds through on top of the open pending list overlay (`TasksOverlay`).
+  - *Root Cause:* The expanded task card uses `zIndex: 200` and dragging task card uses `zIndex: 250`, whereas the `TasksOverlay` container used `z-[100]`. Since 200/250 is greater than 100, the cards on the timeline rendered on top of the overlay.
+  - *Resolution:* Changed `TasksOverlay` to use `z-[800]`. This positions it above expanded/dragging timeline cards but keeps it safely below the main `TaskSheet` (`zIndex: 2000`) and the calendar/clock pickers (`zIndex: 3000`).
+
+- **BUG 41: Dragged pending task dropped on the timeline does not land at the top**
+  - *Description:* Dropping a task from the pending list onto the timeline scheduled it correctly as an All-day task, but it would land at a random position or at the bottom depending on the existing sort/manualOrder values of the target day.
+  - *Root Cause:* Dropping the task did not set a specific `manualOrder` value, so it defaulted to a neutral sorting priority, allowing existing cards to sit above it.
+  - *Resolution:* Updated the drop handler in `TasksOverlay.tsx` to calculate the minimum `manualOrder` of all existing tasks on the target day and set the dropped task's `manualOrder` to `Math.min(...existingOrders) - 1`. This guarantees it sorts to the absolute top as the first/topmost card in that day's list while keeping its All-day status and date assignment.
+
+- **BUG 42: New tasks default to All-day OFF with current time instead of All-day ON**
+  - *Description:* Creating a new task via the "+" FAB defaulted to All-day OFF and pre-filled the current time snapped to 15 minutes, whereas the preferred default is for tasks to start as All-day ON with no pre-filled time.
+  - *Root Cause:* The initialization `useEffect` in `TaskSheet.tsx` unconditionally initialized `isAllDay` to `false` and set `time` to either `prefilledTime` or the current snapped time.
+  - *Resolution:* Modified `TaskSheet.tsx` so that if `prefilledTime` is absent (i.e. creating a new task via the FAB), `isAllDay` defaults to `true` (ON) and `time` is initialized to `""` (no time set). If `prefilledTime` is present, it correctly uses that time and sets `isAllDay` to `false`.
+
 - **BUG 38: Tapping a pending card's title opens the edit sheet blank**
   - *Description:* Clicking or tapping on the title of a task in the "My Tasks/Pending" list opened the edit sheet completely empty instead of loaded with that task's existing data (title, subtasks, category, date, all-day status).
   - *Root Cause:*

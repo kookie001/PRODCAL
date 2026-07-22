@@ -1634,6 +1634,10 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
     setEditTitle(task.title)
   }, [task.title])
 
+  const incompleteSubtasks = useMemo(() => {
+    return (task.subtasks || []).filter(s => !s.completed);
+  }, [task.subtasks]);
+
 
 
   useEffect(() => {
@@ -1953,6 +1957,8 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       style={{
         position: 'relative',
         width: '100%',
+        height: (expanded && !isCurrentlyDragging) ? 'auto' : undefined,
+        maxHeight: 'none',
         backgroundColor: bg,
         borderRadius: '12px',
         border: borderStyle,
@@ -2027,7 +2033,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
           alignItems: 'center',
           justifyContent: 'center',
         }}>
-          {task.subtasks && task.subtasks.filter(s => !s.completed).length > 0 && (
+          {incompleteSubtasks.length > 0 && (
             <button
               className="chevron-button"
               onTouchStart={(e) => {
@@ -2283,10 +2289,12 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
             borderRadius: '0 0 12px 12px',
             padding: '4px 8px 8px 8px',
             borderTop: borderStyle,
-            overflow: 'hidden',  // CRITICAL — clips subtask to stay inside card
+            overflow: 'visible',
+            height: 'auto',
+            maxHeight: 'none',
           }}
         >
-          {((task.subtasks || []).filter((sub: any) => !sub.completed)).length === 0 && (
+          {incompleteSubtasks.length === 0 && (
             <span style={{ fontSize: '10px', color: fgSub }}>No subtasks</span>
           )}
           <DndContext
@@ -2301,25 +2309,22 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
             modifiers={[restrictToVerticalAxis, restrictToParentElement]}
           >
             <SortableContext
-              items={(task.subtasks || [])
-                .map((sub: any, i: number) => ({ id: sub.id || `subtask-${i}`, completed: sub.completed }))
-                .filter(item => !item.completed)
-                .map(item => item.id)}
+              items={incompleteSubtasks.map((sub) => sub.id || `subtask-${(task.subtasks || []).indexOf(sub)}`)}
               strategy={verticalListSortingStrategy}
             >
-              {(task.subtasks || [])
-                .map((sub: any, originalIndex: number) => ({ sub, originalIndex }))
-                .filter(({ sub }) => !sub.completed)
-                .map(({ sub, originalIndex }) => (
+              {incompleteSubtasks.map((sub) => {
+                const idx = (task.subtasks || []).indexOf(sub);
+                return (
                   <SortableSubtaskRow
-                    key={sub.id || `subtask-${originalIndex}`}
+                    key={sub.id || `subtask-${idx}`}
                     sub={sub}
-                    index={originalIndex}
+                    index={idx !== -1 ? idx : 0}
                     taskId={task.id}
                     fgSub={fgSub}
                     onToggle={(idx) => toggleSubtaskComplete(task.id, idx)}
                   />
-                ))}
+                );
+              })}
             </SortableContext>
           </DndContext>
         </div>
@@ -2328,8 +2333,26 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
     </motion.div>
   )
 }, (prev, next) => {
+  if (prev.task !== next.task) return false;
+
+  const prevSubtasks = prev.task.subtasks || [];
+  const nextSubtasks = next.task.subtasks || [];
+  if (prevSubtasks !== nextSubtasks) return false;
+  if (prevSubtasks.length !== nextSubtasks.length) return false;
+
+  const prevIncompleteCount = prevSubtasks.filter(s => !s.completed).length;
+  const nextIncompleteCount = nextSubtasks.filter(s => !s.completed).length;
+  if (prevIncompleteCount !== nextIncompleteCount) return false;
+
+  for (let i = 0; i < prevSubtasks.length; i++) {
+    const pSub = prevSubtasks[i];
+    const nSub = nextSubtasks[i];
+    if (pSub.id !== nSub.id) return false;
+    if (pSub.completed !== nSub.completed) return false;
+    if (pSub.title !== nSub.title) return false;
+  }
+
   return (
-    prev.task === next.task &&
     prev.pixelsPerMinute === next.pixelsPerMinute &&
     prev.onReschedule === next.onReschedule &&
     prev.onEditOpen === next.onEditOpen &&

@@ -637,10 +637,16 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
         const day = String(activeDateObj.getDate()).padStart(2, '0');
         const formattedDate = `${year}-${month}-${day}`;
 
+        const dayTasks = useTaskStore.getState().tasks.filter((t) => t.date === formattedDate);
+        const existingOrders = dayTasks.map((t) => t.manualOrder ?? 0);
+        const minOrder = existingOrders.length > 0 ? Math.min(...existingOrders) : 0;
+        const newOrder = minOrder - 1;
+
         updateTask(draggedTaskRef.current.id, {
           date: formattedDate,
           time: '',
-          isPending: false
+          isPending: false,
+          manualOrder: newOrder
         });
 
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -851,7 +857,7 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
 
   return (
     <div
-      className={`fixed inset-0 bg-transparent z-[100] flex flex-col overflow-hidden text-gray-800 tasks-overlay ${
+      className={`fixed inset-0 bg-transparent z-[800] flex flex-col overflow-hidden text-gray-800 tasks-overlay ${
         isOpen ? 'open' : ''
       } ${
         isFullScreen 

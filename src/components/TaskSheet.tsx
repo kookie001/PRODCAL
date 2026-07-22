@@ -345,6 +345,8 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
 
   // Subtasks list local editing state
   const [subtasks, setSubtasks] = useState<Omit<Subtask, 'completed'>[]>([]);
+  // Completed subtasks list preserved state
+  const [completedSubtasks, setCompletedSubtasks] = useState<Subtask[]>([]);
 
   // dnd-kit sensors setup for drag-reordering
   const sensors = useSensors(
@@ -461,7 +463,13 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
         setDate(activeEditTask.date || '');
         setTime(activeEditTask.time || '');
         setIsAllDay(!activeEditTask.time);
-        setSubtasks((activeEditTask.subtasks || []).map(({ id, title }) => ({ id, title })));
+        
+        const allSubs = activeEditTask.subtasks || [];
+        const incompleteSubs = allSubs.filter((s) => !s.completed);
+        const completedSubs = allSubs.filter((s) => s.completed);
+
+        setSubtasks(incompleteSubs.map(({ id, title }) => ({ id, title })));
+        setCompletedSubtasks(completedSubs);
       } else {
         // Create mode
         setTitle(prefilledTitle || '');
@@ -474,9 +482,15 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
         const dd = String(selectedDateObj.getDate()).padStart(2, '0');
         setDate(`${yyyy}-${mm}-${dd}`);
 
-        setTime(prefilledTime || formatTime(snapTo15(new Date())));
-        setIsAllDay(false);
+        if (prefilledTime) {
+          setTime(prefilledTime);
+          setIsAllDay(false);
+        } else {
+          setTime('');
+          setIsAllDay(true);
+        }
         setSubtasks([]);
+        setCompletedSubtasks([]);
       }
 
       // Auto-focus input
@@ -552,10 +566,10 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
     if (e) e.preventDefault();
     if (!title.trim()) return;
 
-    const finalSubtasks: Subtask[] = subtasks
+    const editedIncomplete: Subtask[] = subtasks
       .filter((sub) => sub.title.trim() !== '')
       .map((sub) => {
-        // Retain existing completion status if editing, else default to false
+        // Retain existing completion status (which is false) or default to false for new subtasks
         const existing = activeEditTask?.subtasks.find((s) => s.id === sub.id);
         return {
           id: sub.id,
@@ -563,6 +577,8 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
           completed: existing ? existing.completed : false,
         };
       });
+
+    const finalSubtasks: Subtask[] = [...editedIncomplete, ...completedSubtasks];
 
     let finalTime = '';
     if (!isAllDay) {
