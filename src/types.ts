@@ -4,6 +4,7 @@ export interface Subtask {
   id: string;
   title: string;
   completed: boolean;
+  completedAt?: number;
 }
 
 export interface Task {
@@ -13,6 +14,7 @@ export interface Task {
   date: string; // YYYY-MM-DD
   time?: string; // HH:MM (24h format or 12h format display)
   completed: boolean;
+  completedAt?: number;
   subtasks: Subtask[];
   createdAt: string;
   isPending?: boolean;

@@ -1,6 +1,24 @@
 # Changelog
 
+## [2026-07-24]
+- Merge completed subtasks into completed list with newest-first sorting:
+  - Combined completed tasks and completed subtasks into a single flattened list sorted by completedAt timestamp descending (newest completed item at the top).
+  - Ensured every completed subtask displays its title alongside its parent task title for context.
+  - Ensured completedAt timestamp is reliably captured and assigned whenever a subtask or task is completed.
+
 ## [2026-07-22]
+- Fix drag-to-category preview freeze and stutter:
+  - Eliminated high-frequency React state-driven position updates (`categoryDragCoords` state deleted).
+  - Implemented high-performance `requestAnimationFrame` direct DOM translation updates on `previewRef.current.style.transform`.
+  - Added drag start caching of tab bounding client rects via `cachedTabRects.current` to completely eliminate per-move frame layout thrashing (`getBoundingClientRect`).
+  - Added tab hover tracking `lastHoveredTabId.current` to only update styles when the active hovered tab actually changes.
+  - Ensured the preview is clamped to viewport bounds and behaves smoothly at 60fps across the category bar without freezing or stutter.
+- Show floating card preview during drag-to-category with smooth transition:
+  - Added a reactive `categoryDragCoords` state to track real-time pointer/touch positions when dragging a task block.
+  - Implemented boundary detection matching coordinates against the daily timeline container top limit (`clientY < containerTop`) to seamlessly transition the UI from reorder-mode to category-mode.
+  - Developed a hardware-accelerated floating card/chip preview utilizing `createPortal` to render the task title directly on `document.body` via dynamic `translate3d(x, y, 0)` translations, scaled to 1.05 with a soft shadow.
+  - Clamped coordinates to the viewport bounds, preventing off-screen drift and layout-shifting.
+  - Added conditional opacity rendering to hide the original list element (`opacity: 0`) when the floating portal preview is visible, providing an exceptionally smooth, distraction-free visual flow.
 - Hide completed subtasks in edit sheet and preserve on Save:
   - Added `completedSubtasks` state in `TaskSheet.tsx` to hold completed subtasks separately on load and preserve them untouched.
   - Adjusted the sheet's `useEffect` sync block to load only incomplete subtasks into the editable `subtasks` local list, matching the daily timeline card's behavior.

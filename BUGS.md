@@ -6,6 +6,26 @@
 
 ## Resolved Bugs
 
+- **BUG 46: Dragged-to-category portal preview freezes or stutters due to high-frequency React re-renders and layout thrashing**
+  - *Description:* When a user dragged a task card up toward the category area, the floating portal preview would freeze, lag, or stutter.
+  - *Root Cause:*
+    1. The preview's position was stored in React state (`categoryDragCoords`) and updated on every move event, triggering React re-renders up to 60+ times per second on the entire task block.
+    2. Tab coordinates were re-measured via `getBoundingClientRect()` on every move event inside `getTabAtCoords`, causing layout thrashing.
+  - *Resolution:*
+    1. Eliminated the `categoryDragCoords` React state.
+    2. Stored the coordinates in a mutable ref (`previewCoordsRef`) and updated the portal clone's style transform directly via a ref `previewRef` inside `requestAnimationFrame`.
+    3. Measured and cached the tab positions once at the beginning of the drag using `cachedTabRects.current`, completely eliminating layout thrashing during the move events.
+    4. Tracked the hovered tab ID via a ref to only perform style mutations on tab borders when the hovered tile actually changes.
+
+- **BUG 45: Dragged task card becomes invisible or clamped when dragged up toward the category bar**
+  - *Description:* When a user dragged a task card up toward the category bar, the card vanished from view or stayed stuck/clamped at the top edge of the list container, making the drag-to-category interaction feel unpolished.
+  - *Root Cause:* The task list container (`#day-timeline-container`) uses `restrictToParentElement` and `restrictToVerticalAxis` modifiers inside `DndContext`. These constraints correctly prevent free-floating reorder items but clamped the dragged element bounds to the container. When a user dragged above the container boundary, the physical DOM element stayed clamped at the top, while the cursor moved further up, making the dragged card appear disconnected or invisible.
+  - *Resolution:*
+    1. Introduced a reactive `categoryDragCoords` state inside `DraggableTaskBlock` to track high-fidelity pointer and touch drag coordinates.
+    2. Detected when the pointer coordinates cross above the timeline container bounds (`clientY < containerTop`).
+    3. When in category drag mode, rendered a GPU-smooth compact card/chip preview using `createPortal` at the `document.body` level, which follows the pointer via `translate3d(x, y, 0)` and stays perfectly clamped within the viewport boundaries (to prevent page-shift bugs).
+    4. Set the original card container's opacity to `0` during this mode to cleanly transition the visual representation from list element to floating category-mode preview.
+
 - **BUG 44: Completed subtasks shown in task edit sheet and risk of data loss / completed field stripping**
   - *Description:* Completed subtasks were visible in the task edit sheet, creating inconsistency with the daily timeline card (which hides completed subtasks). Additionally, because the edit sheet mapped subtasks on load by stripping the `completed` field, there was a risk of resetting completed subtasks back to incomplete upon saving, or losing them entirely if they were filtered out on load.
   - *Root Cause:*

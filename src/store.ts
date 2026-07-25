@@ -278,7 +278,8 @@ export const useTaskStore = create<TaskState & TaskActions>()(
           ...taskData,
           id: `task-${Date.now()}`,
           manualOrder: maxOrder + 1,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          completedAt: taskData.completed ? (taskData.completedAt || Date.now()) : undefined,
         };
         return {
           tasks: [newTask, ...state.tasks],
@@ -300,13 +301,35 @@ export const useTaskStore = create<TaskState & TaskActions>()(
       }),
 
       updateTask: (id, updatedFields) => set((state) => {
-        const updatedTasks = state.tasks.map((task) =>
-          task.id === id ? { ...task, ...updatedFields } : task
-        );
+        const updatedTasks = state.tasks.map((task) => {
+          if (task.id !== id) return task;
+          const fields = { ...updatedFields };
+          if (updatedFields.completed !== undefined) {
+            if (updatedFields.completed) {
+              fields.completedAt = fields.completedAt || task.completedAt || Date.now();
+            } else {
+              fields.completedAt = undefined;
+            }
+          }
+          if (updatedFields.subtasks) {
+            fields.subtasks = updatedFields.subtasks.map((sub) => {
+              if (sub.completed) {
+                const existingSub = task.subtasks?.find((s) => s.id === sub.id);
+                return {
+                  ...sub,
+                  completedAt: sub.completedAt || existingSub?.completedAt || Date.now(),
+                };
+              } else {
+                return { ...sub, completedAt: undefined };
+              }
+            });
+          }
+          return { ...task, ...fields };
+        });
         
         // Keep selectedTaskForDetails in sync if it is the one being updated
         const updatedDetails = state.selectedTaskForDetails?.id === id 
-          ? { ...state.selectedTaskForDetails, ...updatedFields }
+          ? updatedTasks.find(t => t.id === id) || state.selectedTaskForDetails
           : state.selectedTaskForDetails;
 
         return {
@@ -431,9 +454,15 @@ export const useTaskStore = create<TaskState & TaskActions>()(
         const updatedTasks = state.tasks.map((task) => {
           if (task.id !== taskId) return task;
           
-          const updatedSubtasks = task.subtasks.map((sub) =>
-            sub.id === subtaskId ? { ...sub, completed: !sub.completed } : sub
-          );
+          const updatedSubtasks = task.subtasks.map((sub) => {
+            if (sub.id !== subtaskId) return sub;
+            const nextCompleted = !sub.completed;
+            return {
+              ...sub,
+              completed: nextCompleted,
+              completedAt: nextCompleted ? (sub.completedAt || Date.now()) : undefined
+            };
+          });
           
           return { ...task, subtasks: updatedSubtasks };
         });
@@ -451,9 +480,15 @@ export const useTaskStore = create<TaskState & TaskActions>()(
       toggleSubtaskComplete: (taskId, subtaskIndex) => set((state) => {
         const updatedTasks = state.tasks.map((task) => {
           if (task.id !== taskId) return task;
-          const updatedSubtasks = task.subtasks.map((sub, i) =>
-            i === subtaskIndex ? { ...sub, completed: !sub.completed } : sub
-          );
+          const updatedSubtasks = task.subtasks.map((sub, i) => {
+            if (i !== subtaskIndex) return sub;
+            const nextCompleted = !sub.completed;
+            return {
+              ...sub,
+              completed: nextCompleted,
+              completedAt: nextCompleted ? (sub.completedAt || Date.now()) : undefined
+            };
+          });
           return { ...task, subtasks: updatedSubtasks };
         });
 

@@ -366,6 +366,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const subtaskScrollRef = useRef<HTMLDivElement>(null);
   const hasInitializedRef = useRef(false);
+  const openedFromPendingRef = useRef(false);
 
   const handleFocus = (e: React.FocusEvent) => {
     const target = e.target as HTMLElement;
@@ -456,6 +457,18 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
       if (hasInitializedRef.current) return;
       hasInitializedRef.current = true;
       setMoreOptionsOpen(false);
+
+      const todayObj = new Date();
+      const yyyy = todayObj.getFullYear();
+      const mm = String(todayObj.getMonth() + 1).padStart(2, '0');
+      const dd = String(todayObj.getDate()).padStart(2, '0');
+      const todayStr = `${yyyy}-${mm}-${dd}`;
+      const isPending = Boolean(
+        activeMode === 'edit' &&
+        activeEditTask &&
+        (activeEditTask.isPending === true || (activeEditTask.date && activeEditTask.date < todayStr))
+      );
+      openedFromPendingRef.current = isPending;
 
       if (activeMode === 'edit' && activeEditTask) {
         setTitle(activeEditTask.title || '');
@@ -810,6 +823,9 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
                   document.activeElement.blur();
                 }
                 setMoreOptionsOpen(true);
+                if (openedFromPendingRef.current) {
+                  setIsAllDay(true);
+                }
               }}
               style={{ minHeight: '36px', touchAction: 'manipulation' }}
               className="inline-flex items-center space-x-1 px-3 py-1.5 text-[13px] font-semibold text-[#1A73E8] hover:bg-gray-50 rounded-lg transition-colors focus:outline-none cursor-pointer select-none"
@@ -825,7 +841,13 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
                 if (document.activeElement instanceof HTMLElement) {
                   document.activeElement.blur();
                 }
-                setMoreOptionsOpen(prev => !prev);
+                setMoreOptionsOpen(prev => {
+                  const nextVal = !prev;
+                  if (nextVal && openedFromPendingRef.current) {
+                    setIsAllDay(true);
+                  }
+                  return nextVal;
+                });
               }}
               style={{ minHeight: '36px', touchAction: 'manipulation' }}
               className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-[13px] font-semibold text-[#1A73E8] hover:bg-gray-50 rounded-lg transition-colors focus:outline-none cursor-pointer select-none"

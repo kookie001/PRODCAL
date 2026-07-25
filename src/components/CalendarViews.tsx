@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   format,
   startOfMonth,
@@ -1608,6 +1609,22 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
   const [editTitle, setEditTitle] = useState(task.title)
   const [isDraggingSubtask, setIsDraggingSubtask] = useState(false)
   const [isActivelyDragging, setIsActivelyDragging] = useState(false)
+  const [isCategoryMode, setIsCategoryMode] = useState(false)
+  const isCategoryModeRef = useRef(false)
+  const previewRef = useRef<HTMLDivElement | null>(null)
+  const previewCoordsRef = useRef({ x: 0, y: 0 })
+  const cachedTabRects = useRef<{ id: string; rect: DOMRect }[]>([])
+  const dragContainerTop = useRef(200)
+  const lastHoveredTabId = useRef<string | null>(null)
+  const rafId = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (rafId.current) {
+        cancelAnimationFrame(rafId.current)
+      }
+    }
+  }, [])
   const lastTap = useRef<number>(0)
   const tapTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const tapCount = useRef(0)
@@ -1707,16 +1724,15 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
   const lastPointerPos = useRef({ x: 0, y: 0 })
 
   const getTabAtCoords = useCallback((x: number, y: number) => {
-    const tabs = document.querySelectorAll('[data-category-tab]');
-    for (const tab of Array.from(tabs)) {
-      const rect = tab.getBoundingClientRect();
+    for (const item of cachedTabRects.current) {
+      const rect = item.rect;
       if (
         x >= rect.left &&
         x <= rect.right &&
         y >= rect.top &&
         y <= rect.bottom
       ) {
-        return tab.getAttribute('data-category-tab');
+        return item.id;
       }
     }
     return null;
@@ -1762,12 +1778,31 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
     });
   }, []);
 
+  const startDragInit = useCallback(() => {
+    const tabs = document.querySelectorAll('[data-category-tab]');
+    cachedTabRects.current = Array.from(tabs).map(tab => ({
+      id: tab.getAttribute('data-category-tab') || '',
+      rect: tab.getBoundingClientRect()
+    }));
+    const container = document.getElementById('day-timeline-container');
+    dragContainerTop.current = container ? container.getBoundingClientRect().top : 200;
+    isCategoryModeRef.current = false;
+    lastHoveredTabId.current = null;
+  }, []);
+
   const resetDragState = useCallback(() => {
     dragging.current = false
     moved.current = false
     setIsActivelyDragging(false)
     setIsDraggingSubtask(false)
+    setIsCategoryMode(false)
+    isCategoryModeRef.current = false
+    lastHoveredTabId.current = null
     clearTabHighlights()
+    if (rafId.current) {
+      cancelAnimationFrame(rafId.current)
+      rafId.current = null
+    }
     if (blockRef.current) {
       blockRef.current.style.transform = ''
     }
@@ -1787,6 +1822,8 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
     moved.current = false
     dragging.current = true
     dragStartY.current = e.touches[0].clientY
+
+    startDragInit()
 
     const onTouchEndNative = () => {
       lastTouchTime.current = Date.now()
@@ -1856,6 +1893,8 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
     dragging.current = true
     dragStartY.current = e.clientY
 
+    startDragInit()
+
     const onMouseMove = (moveEvent: MouseEvent) => {
       if (isDraggingSubtask) return
       if (!dragging.current) return
@@ -1871,8 +1910,46 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         const clientX = moveEvent.clientX
         const clientY = moveEvent.clientY
         lastPointerPos.current = { x: clientX, y: clientY }
-        const activeTabId = getTabAtCoords(clientX, clientY)
-        updateTabHighlights(activeTabId)
+
+        const inCategoryZone = clientY < dragContainerTop.current;
+
+        if (inCategoryZone) {
+          if (!isCategoryModeRef.current) {
+            isCategoryModeRef.current = true;
+            setIsCategoryMode(true);
+          }
+        } else {
+          if (isCategoryModeRef.current) {
+            isCategoryModeRef.current = false;
+            setIsCategoryMode(false);
+            clearTabHighlights();
+            lastHoveredTabId.current = null;
+          }
+        }
+
+        if (isCategoryModeRef.current) {
+          const activeTabId = getTabAtCoords(clientX, clientY)
+          if (activeTabId !== lastHoveredTabId.current) {
+            lastHoveredTabId.current = activeTabId;
+            updateTabHighlights(activeTabId)
+          }
+
+          const previewWidth = 200;
+          const previewHeight = 44;
+          const clampedX = Math.max(8, Math.min(clientX - previewWidth / 2, window.innerWidth - previewWidth - 8));
+          const clampedY = Math.max(8, Math.min(clientY - previewHeight / 2, window.innerHeight - previewHeight - 8));
+
+          previewCoordsRef.current = { x: clampedX, y: clampedY };
+
+          if (rafId.current) {
+            cancelAnimationFrame(rafId.current);
+          }
+          rafId.current = requestAnimationFrame(() => {
+            if (previewRef.current) {
+              previewRef.current.style.transform = `translate3d(${clampedX}px, ${clampedY}px, 0) scale(1.05)`;
+            }
+          });
+        }
       }
     };
 
@@ -1919,8 +1996,46 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         const clientX = e.touches[0].clientX
         const clientY = e.touches[0].clientY
         lastPointerPos.current = { x: clientX, y: clientY }
-        const activeTabId = getTabAtCoords(clientX, clientY)
-        updateTabHighlights(activeTabId)
+
+        const inCategoryZone = clientY < dragContainerTop.current;
+
+        if (inCategoryZone) {
+          if (!isCategoryModeRef.current) {
+            isCategoryModeRef.current = true;
+            setIsCategoryMode(true);
+          }
+        } else {
+          if (isCategoryModeRef.current) {
+            isCategoryModeRef.current = false;
+            setIsCategoryMode(false);
+            clearTabHighlights();
+            lastHoveredTabId.current = null;
+          }
+        }
+
+        if (isCategoryModeRef.current) {
+          const activeTabId = getTabAtCoords(clientX, clientY)
+          if (activeTabId !== lastHoveredTabId.current) {
+            lastHoveredTabId.current = activeTabId;
+            updateTabHighlights(activeTabId)
+          }
+
+          const previewWidth = 200;
+          const previewHeight = 44;
+          const clampedX = Math.max(8, Math.min(clientX - previewWidth / 2, window.innerWidth - previewWidth - 8));
+          const clampedY = Math.max(8, Math.min(clientY - previewHeight / 2, window.innerHeight - previewHeight - 8));
+
+          previewCoordsRef.current = { x: clampedX, y: clampedY };
+
+          if (rafId.current) {
+            cancelAnimationFrame(rafId.current);
+          }
+          rafId.current = requestAnimationFrame(() => {
+            if (previewRef.current) {
+              previewRef.current.style.transform = `translate3d(${clampedX}px, ${clampedY}px, 0) scale(1.05)`;
+            }
+          });
+        }
       }
     }
     el.addEventListener('touchmove', onMove, { passive: false })
@@ -1975,7 +2090,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         zIndex: isDragging ? 250 : ((expanded && !isCurrentlyDragging) ? 200 : (dragging.current ? 250 : 1)),
         transform: transform ? CSS.Transform.toString(transform) : undefined,
         transition: transition || undefined,
-        opacity: isDragging ? 0.7 : 1,
+        opacity: isCategoryMode ? 0 : (isDragging ? 0.7 : 1),
       }}
     >
       {/* MAIN ROW — always visible */}
@@ -2330,6 +2445,41 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         </div>
       )}
 
+      {isCategoryMode && createPortal(
+        <div
+          ref={previewRef}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '200px',
+            height: '44px',
+            pointerEvents: 'none',
+            zIndex: 9999,
+            backgroundColor: bg,
+            border: borderStyle,
+            color: fg,
+            borderRadius: '12px',
+            padding: '0 12px',
+            boxShadow: '0 12px 24px rgba(0, 0, 0, 0.15)',
+            fontWeight: 600,
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            transform: `translate3d(${previewCoordsRef.current.x}px, ${previewCoordsRef.current.y}px, 0) scale(1.05)`,
+            transition: 'transform 0.05s linear, opacity 0.1s ease',
+            opacity: 0.95,
+            boxSizing: 'border-box',
+          }}
+        >
+          {task.title}
+        </div>,
+        document.body
+      )}
     </motion.div>
   )
 }, (prev, next) => {

@@ -18,7 +18,7 @@ import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSe
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useTaskStore } from '../store';
-import { CATEGORIES, Task } from '../types';
+import { CATEGORIES, Task, CategoryType, Subtask } from '../types';
 
 // Helper component for each Individual Task Item to encapsulate swipe-to-action & long-press states
 interface TaskItemRowProps {
@@ -769,33 +769,84 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
     });
   }, [sortedPending, gcalTaskQuery]);
 
-  // Completed search filter
-  const completedFiltered = useMemo(() => {
-    return completedTasks.filter((task) => {
+  const getItemTimestamp = (item: { completedAt?: number; createdAt?: string; date?: string }) => {
+    if (typeof item.completedAt === 'number') return item.completedAt;
+    if (item.createdAt) {
+      const t = new Date(item.createdAt).getTime();
+      if (!isNaN(t)) return t;
+    }
+    if (item.date) {
+      const t = new Date(item.date).getTime();
+      if (!isNaN(t)) return t;
+    }
+    return 0;
+  };
+
+  type CompletedEntry =
+    | {
+        kind: 'task';
+        id: string;
+        title: string;
+        category: CategoryType;
+        completedAt: number;
+        task: Task;
+      }
+    | {
+        kind: 'subtask';
+        id: string;
+        title: string;
+        parentTaskId: string;
+        parentTaskTitle: string;
+        category: CategoryType;
+        completedAt: number;
+        sub: Subtask;
+      };
+
+  // Combined completed list (tasks + subtasks) sorted newest completed first
+  const combinedCompletedList = useMemo(() => {
+    const entries: CompletedEntry[] = [];
+
+    tasks.forEach((task) => {
+      if (task.completed) {
+        entries.push({
+          kind: 'task',
+          id: task.id,
+          title: task.title,
+          category: task.category,
+          completedAt: getItemTimestamp(task),
+          task,
+        });
+      }
+    });
+
+    tasks.forEach((task) => {
+      if (task.subtasks) {
+        task.subtasks.forEach((sub) => {
+          if (sub.completed) {
+            entries.push({
+              kind: 'subtask',
+              id: `${task.id}-${sub.id}`,
+              title: sub.title,
+              parentTaskId: task.id,
+              parentTaskTitle: task.title,
+              category: task.category,
+              completedAt: getItemTimestamp(sub),
+              sub,
+            });
+          }
+        });
+      }
+    });
+
+    const filtered = entries.filter((entry) => {
       if (!gcalTaskQuery) return true;
       const q = gcalTaskQuery.toLowerCase();
-      const matchTitle = task.title.toLowerCase().includes(q);
-      const matchSubtasks = task.subtasks && task.subtasks.some(s => s.title.toLowerCase().includes(q));
-      return matchTitle || matchSubtasks;
+      const matchTitle = entry.title.toLowerCase().includes(q);
+      const matchParent = entry.kind === 'subtask' && entry.parentTaskTitle.toLowerCase().includes(q);
+      return matchTitle || matchParent;
     });
-  }, [completedTasks, gcalTaskQuery]);
 
-  // Completed subtasks search filter
-  const completedSubtasksFiltered = useMemo(() => {
-    return tasks
-      .filter((task) => !task.completed)
-      .flatMap((task) => 
-        (task.subtasks || [])
-          .filter((sub) => sub.completed)
-          .map((sub) => ({ sub, parent: task }))
-      )
-      .filter(({ sub, parent }) => {
-        if (!gcalTaskQuery) return true;
-        const q = gcalTaskQuery.toLowerCase();
-        const matchSubtaskTitle = sub.title.toLowerCase().includes(q);
-        const matchParentTitle = parent.title.toLowerCase().includes(q);
-        return matchSubtaskTitle || matchParentTitle;
-      });
+    return filtered.sort((a, b) => b.completedAt - a.completedAt);
   }, [tasks, gcalTaskQuery]);
 
   const hasAnyPending = searchFiltered.length > 0;
@@ -1016,14 +1067,14 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
             )}
 
             {/* Collapsible Completed Section */}
-            {(completedFiltered.length > 0 || completedSubtasksFiltered.length > 0) && !isMultiSelectMode && (
+            {combinedCompletedList.length > 0 && !isMultiSelectMode && (
               <div className="pt-4 border-t border-gray-150">
                 <button
                   type="button"
                   onClick={() => setIsCompletedExpanded(!isCompletedExpanded)}
                   className="flex items-center space-x-2 w-full text-left text-xs font-extrabold text-gray-500 hover:text-gray-800 transition-colors cursor-pointer select-none px-1 py-1"
                 >
-                  <span>Completed Tasks & Subtasks ({completedFiltered.length + completedSubtasksFiltered.length})</span>
+                  <span>Completed Tasks & Subtasks ({combinedCompletedList.length})</span>
                   <ChevronDown 
                     size={14} 
                     className="stroke-[3px] transition-transform duration-150"
@@ -1033,61 +1084,60 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
  
                 {isCompletedExpanded && (
                   <div className="mt-3 divide-y divide-gray-100 bg-gray-50/50 rounded-2xl p-2.5 border border-gray-100">
-                    {completedFiltered.map((task) => {
-                      const cat = CATEGORIES.find((c) => c.id === task.category) || CATEGORIES[0];
-                      return (
-                        <div key={task.id} className="flex items-center justify-between py-2.5 px-2">
-                          <div className="flex items-center space-x-3 min-w-0 flex-1">
+                    {combinedCompletedList.map((item) => {
+                      const cat = CATEGORIES.find((c) => c.id === item.category) || CATEGORIES[0];
+                      if (item.kind === 'task') {
+                        return (
+                          <div key={`comp-task-${item.id}`} className="flex items-center justify-between py-2.5 px-2">
+                            <div className="flex items-center space-x-3 min-w-0 flex-1">
+                              <button
+                                type="button"
+                                onClick={() => updateTask(item.id, { completed: false })}
+                                className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer text-white active:scale-90"
+                                style={{ backgroundColor: cat.color.solid }}
+                              >
+                                <Check size={11} className="stroke-[3.5px]" />
+                              </button>
+                              <span className="text-xs text-gray-400 font-bold truncate flex-1 relative inline-block">
+                                <span className="line-through text-gray-400">{item.title}</span>
+                              </span>
+                            </div>
                             <button
                               type="button"
-                              onClick={() => updateTask(task.id, { completed: false })}
-                              className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer text-white active:scale-90"
-                              style={{ backgroundColor: cat.color.solid }}
+                              onClick={() => deleteTask(item.id)}
+                              className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-colors cursor-pointer ml-2 flex items-center justify-center"
                             >
-                              <Check size={11} className="stroke-[3.5px]" />
+                              <Trash2 size={13} />
                             </button>
-                            <span className="text-xs text-gray-400 font-bold truncate flex-1 relative inline-block">
-                              <span className="line-through text-gray-400">{task.title}</span>
-                            </span>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => deleteTask(task.id)}
-                            className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-colors cursor-pointer ml-2 flex items-center justify-center"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      );
-                    })}
-
-                    {completedSubtasksFiltered.map(({ sub, parent }) => {
-                      const cat = CATEGORIES.find((c) => c.id === parent.category) || CATEGORIES[0];
-                      return (
-                        <div key={`subtask-comp-${parent.id}-${sub.id}`} className="flex items-center justify-between py-2.5 px-2 border-t border-gray-100/50">
-                          <div className="flex items-center space-x-3 min-w-0 flex-1">
+                        );
+                      } else {
+                        return (
+                          <div key={`comp-sub-${item.id}`} className="flex items-center justify-between py-2.5 px-2">
+                            <div className="flex items-center space-x-3 min-w-0 flex-1">
+                              <button
+                                type="button"
+                                onClick={() => toggleSubtask(item.parentTaskId, item.sub.id)}
+                                className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer text-white active:scale-90"
+                                style={{ backgroundColor: cat.color.solid }}
+                              >
+                                <Check size={11} className="stroke-[3.5px]" />
+                              </button>
+                              <span className="text-xs text-gray-400 font-bold truncate flex-1 relative inline-block">
+                                <span className="line-through text-gray-400">{item.title}</span>
+                                <span className="text-[10px] text-gray-400 font-normal ml-1.5 opacity-75">({item.parentTaskTitle})</span>
+                              </span>
+                            </div>
                             <button
                               type="button"
-                              onClick={() => toggleSubtask(parent.id, sub.id)}
-                              className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer text-white active:scale-90"
-                              style={{ backgroundColor: cat.color.solid }}
+                              onClick={() => deleteSubtask(item.parentTaskId, item.sub.id)}
+                              className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-colors cursor-pointer ml-2 flex items-center justify-center"
                             >
-                              <Check size={11} className="stroke-[3.5px]" />
+                              <Trash2 size={13} />
                             </button>
-                            <span className="text-xs text-gray-400 font-bold truncate flex-1 relative inline-block">
-                              <span className="line-through text-gray-400">{sub.title}</span>
-                              <span className="text-[10px] text-gray-400 font-normal ml-1.5 opacity-75">({parent.title})</span>
-                            </span>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => deleteSubtask(parent.id, sub.id)}
-                            className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-colors cursor-pointer ml-2 flex items-center justify-center"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      );
+                        );
+                      }
                     })}
                   </div>
                 )}
