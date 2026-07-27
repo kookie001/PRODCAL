@@ -65,7 +65,7 @@ export default function App() {
 
     const handleBackButton = (e: PopStateEvent) => {
       // 1. Check if task sheet is open — highest priority
-      if (useTaskStore.getState().isTaskSheetOpen || useTaskStore.getState().isFABOpen) {
+      if (useTaskStore.getState().isTaskSheetOpen || useTaskStore.getState().isFABOpen || useTaskStore.getState().editingTask !== null) {
         window.dispatchEvent(new CustomEvent('task-sheet-back-press'));
         e.preventDefault();
         window.history.pushState(null, '', window.location.href); // re-arm so next press is captured
@@ -165,7 +165,7 @@ export default function App() {
     <div className="flex items-center justify-center min-h-screen bg-slate-50 w-full overflow-hidden select-none">
       
       {/* Outer mock viewport bounds (strictly optimized for 360px - 430px) */}
-      <div className="w-full max-w-[430px] h-screen bg-white flex flex-col relative overflow-hidden shadow-2xl border-x border-gray-200/50 text-gray-800 font-sans transition-colors duration-200">
+      <div className="w-full max-w-[430px] h-screen h-[100dvh] bg-white flex flex-col relative overflow-hidden shadow-2xl border-x border-gray-200/50 text-gray-800 font-sans transition-colors duration-200">
         
         {/* Header Bar or Search Overlay */}
         <AnimatePresence mode="wait">
@@ -214,7 +214,7 @@ export default function App() {
         </AnimatePresence>
 
         {/* Main Body Layout */}
-        <div className="flex-1 flex overflow-hidden relative">
+        <div className="flex-1 flex overflow-hidden relative min-h-0">
           
           {/* Collapsible Left Sidebar */}
           <AnimatePresence>
@@ -231,7 +231,7 @@ export default function App() {
               opacity: isSidebarOpen ? 0.7 : 1,
             }}
             transition={{ type: 'spring', damping: 32, stiffness: 300 }}
-            className="flex-1 flex flex-col min-w-0 overflow-hidden bg-white origin-left"
+            className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden bg-white origin-left"
           >
             <CategoryTabBar />
             <CalendarViews searchQuery={searchQuery} />

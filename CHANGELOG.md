@@ -1,5 +1,25 @@
 # Changelog
 
+## [2026-07-27]
+- Fix home card reorder not working - repair onDragEnd/items/sort chain:
+  - Dynamically toggled `touchAction: isDragging ? 'none' : 'manipulation'` on `DraggableTaskBlock` so mobile browsers don't send `touchcancel` during vertical drag movement.
+  - Replaced overlapping `PointerSensor` with `MouseSensor` + `TouchSensor` pairing for clean touch/desktop activation.
+  - Switched sortable style transform formatting to `CSS.Translate.toString(transform)` and removed `restrictToParentElement` modifier.
+  - Ensured `onDragEnd` updates `manualOrder` immutably in Zustand store and list re-sorts by `manualOrder`.
+- Fix accidental edit-on-scroll, restore hold-drag reorder, fix back exits app from edit sheet:
+  - Required minimal movement (displacement <= 8px and duration <= 400ms) for card title tap-to-edit, preventing scrolls over titles from opening edit.
+  - Chained dnd-kit `TouchSensor` listeners (`listeners?.onTouchStart?.(e)`) in `TaskCard` so 200ms press-and-hold + drag reorders cards correctly on touch devices.
+  - Ensured `isTaskSheetOpen: true` is set synchronously on all edit sheet open paths (`openEditSheet`, `setEditingTask`, `setFABOpen`), and guarded `App.tsx` back button handler with `editingTask !== null` so pressing back closes the sheet and never exits the app.
+- Fix touch-scroll anywhere and horizontal day-swipe coexistence on Day view:
+  - Enabled native vertical scrolling across the entire list body by setting `touchAction: 'pan-y'` on task card containers and avoiding premature `e.preventDefault()` during touch movement.
+  - Enabled horizontal day-swipe across the entire list area (including on top of task cards) by updating `isInteractiveElement` in `slideContainerRef`.
+  - Guarded task title `<p>` touch handlers against moved touches (`moved.current`) so horizontal or vertical swiping never accidentally opens the task edit sheet.
+  - Preserved press-and-hold (200ms) for `dnd-kit` drag-to-reorder, drag-to-category, pending drop, and quick tap interactions.
+- Fix home Day view scroll: constrain height chain with flex + min-height:0 + dvh:
+  - Constrained full height chain with `h-[100dvh]` on outer mock viewport and `min-h-0` on flex column parents in `App.tsx` and `CalendarViews.tsx`.
+  - Allowed `#day-timeline-container` to shrink and scroll vertically when content overflows screen height (`overflow-y: auto`, `min-h-0`, `WebkitOverflowScrolling: 'touch'`).
+  - Preserved delay-activation sensors (`delay: 200, tolerance: 8`) so quick swipes scroll natively while 200ms press-and-hold triggers card reordering.
+
 ## [2026-07-24]
 - Merge completed subtasks into completed list with newest-first sorting:
   - Combined completed tasks and completed subtasks into a single flattened list sorted by completedAt timestamp descending (newest completed item at the top).

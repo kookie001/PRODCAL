@@ -386,12 +386,14 @@ export const useTaskStore = create<TaskState & TaskActions>()(
 
       setFABOpen: (isOpen) => set((state) => ({
         isFABOpen: isOpen,
+        isTaskSheetOpen: isOpen,
         editingTask: isOpen ? state.editingTask : null // Reset edit mode if closing
       })),
 
       setEditingTask: (task) => set({
         editingTask: task,
-        isFABOpen: task !== null
+        isFABOpen: task !== null,
+        isTaskSheetOpen: task !== null
       }),
 
       setSelectedTaskForDetails: (task) => set({ selectedTaskForDetails: task }),

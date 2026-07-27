@@ -6,6 +6,51 @@
 
 ## Resolved Bugs
 
+- **BUG 51: Home Day view card reorder failed to swap card positions on drag**
+  - *Description:* Holding a card lifted it (drag started), but dragging up or down failed to swap card positions or persist reorder.
+  - *Root Cause:*
+    1. Static `touchAction: 'pan-y'` on `DraggableTaskBlock` caused mobile browsers to capture vertical movement for native page scroll, firing `touchcancel` to `@dnd-kit/core` `TouchSensor` and aborting drag reorder.
+    2. `PointerSensor` and `TouchSensor` dual registration caused sensor activation conflicts on touch devices.
+    3. `CSS.Transform.toString(transform)` instead of `CSS.Translate.toString(transform)` caused sortable translate style distortions.
+    4. `restrictToParentElement` modifier constrained drag transforms near parent boundaries.
+  - *Resolution:*
+    1. Set dynamic `touchAction: isDragging ? 'none' : 'manipulation'` on `DraggableTaskBlock` so touch drag gestures aren't cancelled by browser scroll.
+    2. Used `MouseSensor` (distance: 8) and `TouchSensor` (delay: 200, tolerance: 8) in `useSensors` for clean desktop/touch separation.
+    3. Updated transform formatting to `CSS.Translate.toString(transform)` and removed `restrictToParentElement` from `DndContext`.
+    4. Guaranteed `handleDragEnd` reorders items immutably with updated `manualOrder` values in Zustand store.
+
+- **BUG 50: Accidental edit sheet opening on scroll, broken hold-drag reorder, and back button app exit from edit sheet**
+  - *Description:*
+    1. Swiping/scrolling over task titles accidentally opened the edit sheet.
+    2. Hold-and-drag card reordering failed on touch devices.
+    3. Pressing OS/browser back on the edit sheet exited the app instead of closing the sheet.
+  - *Root Cause:*
+    1. Title `<p>` touch handlers lacked touch displacement distance (`Math.hypot(dx, dy) > 8`) and press duration checks (`> 400ms`), causing swipe releases over titles to trigger tap-to-edit.
+    2. `TaskCard`'s custom `onTouchStart={handleTouchStart}` handler overwrote `listeners.onTouchStart` from dnd-kit `TouchSensor`, preventing dnd-kit's 200ms activation timer from starting.
+    3. `openEditSheet` in `CalendarViews.tsx` failed to set `isTaskSheetOpen: true` in the task store, bypassing `App.tsx`'s back button guard and causing OS back to exit the app.
+  - *Resolution:*
+    1. Enforced strict tap validation (`moved.current || dist > 8 || duration > 400` cancels tap) on title `<p>` touch handlers.
+    2. Chained `listeners?.onTouchStart?.(e)` and `listeners?.onPointerDown?.(e)` inside `TaskCard`'s event handlers so dnd-kit `TouchSensor` receives touchstart and activates hold-drag reorder after 200ms.
+    3. Updated `openEditSheet` and `useTaskStore` actions (`setEditingTask`, `setFABOpen`) to set `isTaskSheetOpen: true` synchronously across all edit sheet opening paths, and guarded `App.tsx` back button handler with `editingTask !== null`.
+
+- **BUG 49: Touch-scroll blocked on task card body and horizontal day-swipe opening edit sheet on task touch**
+  - *Description:* Touching on a task card body and dragging vertically failed to scroll the list, and swiping horizontally across a task card opened the task edit sheet instead of changing the active day.
+  - *Root Cause:*
+    1. Task cards had `touchAction: 'none'` set in CSS and `onMove` called `e.preventDefault()` unconditionally for any touch move > 8px, disabling native vertical browser scrolling.
+    2. `isTaskElement` in `slideContainerRef` ignored any touch starting on an element with `minHeight: 48px` (matching task cards), causing horizontal day-swipe to skip card touches and trigger card `onTouchEnd`, which opened the edit sheet.
+  - *Resolution:*
+    1. Updated task card CSS to `touchAction: 'pan-y'` and refined `onMove` so `e.preventDefault()` is only invoked when dragging up into the category bar.
+    2. Replaced `isTaskElement` with `isInteractiveElement` so horizontal day-swipe detects gestures across the entire Day view including task card bodies.
+    3. Added `moved.current` movement checks to task title `<p>` touch handlers to ensure swipes never accidentally open the edit modal.
+
+- **BUG 48: Home Day view task list failing to scroll on mobile due to unconstrained flexbox height**
+  - *Description:* On mobile devices, when task cards exceeded the screen height, the Day view list failed to scroll natively because the container expanded beyond the viewport.
+  - *Root Cause:* In CSS flexbox, flex children default to `min-height: auto`. Without explicit `min-h-0` on every nested flex container in the parent chain down to `#day-timeline-container`, the list expanded to fit all cards, preventing `overflow-y: auto` from triggering. Additionally, the root mock viewport relied solely on `h-screen` without `100dvh`.
+  - *Resolution:*
+    1. Set dynamic viewport height `h-[100dvh]` on the app root container.
+    2. Added `min-h-0` to all flex column wrappers in the hierarchy (`App.tsx` main body, `motion.main`, `CalendarViews` outer container, `DayView` outer wrapper, `slideContainerRef`, and `#day-timeline-container`).
+    3. Retained `WebkitOverflowScrolling: 'touch'` for native mobile momentum scrolling and `delay: 200, tolerance: 8` sensor activation constraint so quick swipes scroll natively while press-and-hold initiates reorder.
+
 - **BUG 46: Dragged-to-category portal preview freezes or stutters due to high-frequency React re-renders and layout thrashing**
   - *Description:* When a user dragged a task card up toward the category area, the floating portal preview would freeze, lag, or stutter.
   - *Root Cause:*

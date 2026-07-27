@@ -48,7 +48,7 @@ import { useSwipeable } from 'react-swipeable';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'motion/react';
 import { Ripple } from './Ripple';
 import { TaskSheet } from './TaskSheet';
-import { DndContext, closestCenter, TouchSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, closestCenter, TouchSensor, PointerSensor, MouseSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
@@ -276,7 +276,7 @@ export const CalendarViews: React.FC<CalendarViewsProps> = ({ searchQuery }) => 
   };
 
   return (
-    <div className="flex-1 flex flex-col relative overflow-hidden">
+    <div className="flex-1 flex flex-col relative overflow-hidden min-h-0">
       {renderView()}
 
       <QuickCreatePopover
@@ -1988,9 +1988,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       if (Math.abs(dy) > 8 || Math.abs(dx) > 8) {
         if (!moved.current) {
           moved.current = true
-          setIsActivelyDragging(true)
         }
-        e.preventDefault()
       }
       if (moved.current) {
         const clientX = e.touches[0].clientX
@@ -2003,6 +2001,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
           if (!isCategoryModeRef.current) {
             isCategoryModeRef.current = true;
             setIsCategoryMode(true);
+            setIsActivelyDragging(true);
           }
         } else {
           if (isCategoryModeRef.current) {
@@ -2014,6 +2013,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         }
 
         if (isCategoryModeRef.current) {
+          e.preventDefault();
           const activeTabId = getTabAtCoords(clientX, clientY)
           if (activeTabId !== lastHoveredTabId.current) {
             lastHoveredTabId.current = activeTabId;
@@ -2047,11 +2047,28 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       ref={combinedRef}
       {...attributes}
       {...listeners}
-      onTouchStart={handleTouchStart}
+      onTouchStart={(e) => {
+        listeners?.onTouchStart?.(e)
+        handleTouchStart(e)
+      }}
+      onPointerDown={(e) => {
+        listeners?.onPointerDown?.(e)
+      }}
       onTouchEnd={(e) => {
+        listeners?.onTouchEnd?.(e)
         lastTouchTime.current = Date.now()
         if (e.target === e.currentTarget) {
-          handleUnifiedTap(false)
+          const touch = e.changedTouches ? e.changedTouches[0] : null
+          let dist = 0
+          if (touch && touchStart.current) {
+            const dx = touch.clientX - touchStart.current.x
+            const dy = touch.clientY - touchStart.current.y
+            dist = Math.hypot(dx, dy)
+          }
+          const duration = Date.now() - (touchStart.current?.time || 0)
+          if (!moved.current && dist <= 8 && duration <= 400) {
+            handleUnifiedTap(false)
+          }
         }
         handleTouchEnd()
       }}
@@ -2060,11 +2077,16 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       onMouseUp={(e) => {
         if (Date.now() - lastTouchTime.current < 500) return
         if (e.target === e.currentTarget) {
-          handleUnifiedTap(false)
+          if (!moved.current) {
+            handleUnifiedTap(false)
+          }
         }
         resetDragState()
       }}
-      onMouseDown={handleMouseDown}
+      onMouseDown={(e) => {
+        listeners?.onMouseDown?.(e)
+        handleMouseDown(e)
+      }}
       whileHover={{
         y: -1,
       }}
@@ -2079,7 +2101,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         border: borderStyle,
         minHeight: '48px',
         overflow: (expanded && !isCurrentlyDragging) ? 'visible' : 'hidden',
-        touchAction: 'none',
+        touchAction: isDragging ? 'none' : 'manipulation',
         userSelect: 'none',
         WebkitUserSelect: 'none',
         boxSizing: 'border-box',
@@ -2088,7 +2110,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         flexDirection: 'column',
         justifyContent: 'center',
         zIndex: isDragging ? 250 : ((expanded && !isCurrentlyDragging) ? 200 : (dragging.current ? 250 : 1)),
-        transform: transform ? CSS.Transform.toString(transform) : undefined,
+        transform: transform ? CSS.Translate.toString(transform) : undefined,
         transition: transition || undefined,
         opacity: isCategoryMode ? 0 : (isDragging ? 0.7 : 1),
       }}
@@ -2240,12 +2262,22 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
           <p
             onTouchEnd={(e) => {
               lastTouchTime.current = Date.now()
+              const touch = e.changedTouches ? e.changedTouches[0] : null
+              let dist = 0
+              if (touch && touchStart.current) {
+                const dx = touch.clientX - touchStart.current.x
+                const dy = touch.clientY - touchStart.current.y
+                dist = Math.hypot(dx, dy)
+              }
+              const duration = Date.now() - (touchStart.current?.time || 0)
+              if (moved.current || dist > 8 || duration > 400) return
               e.stopPropagation()
               e.preventDefault()  // CRITICAL — prevents the synthetic onClick from also firing
               handleUnifiedTap(true)
             }}
             onMouseUp={(e) => {
               if (Date.now() - lastTouchTime.current < 500) return
+              if (moved.current) return
               e.stopPropagation()
               handleUnifiedTap(true)
             }}
@@ -2590,10 +2622,14 @@ const DayView = React.memo<DayViewProps>(({
 
   const openEditSheet = useCallback((task: Task) => {
     setEditingTaskState(task);
+    useTaskStore.getState().setEditingTask(task);
+    useTaskStore.getState().setTaskSheetOpen(true);
   }, []);
 
   const closeEditSheet = useCallback(() => {
     setEditingTaskState(null);
+    useTaskStore.getState().setEditingTask(null);
+    useTaskStore.getState().setTaskSheetOpen(false);
   }, []);
 
   const draggedSubIndex: number | null = null;
@@ -2801,14 +2837,12 @@ const DayView = React.memo<DayViewProps>(({
     let hasDeterminedDirection = false;
     let isIgnored = false;
 
-    const isTaskElement = (element: HTMLElement | null): boolean => {
+    const isInteractiveElement = (element: HTMLElement | null): boolean => {
       let curr = element;
       while (curr && curr !== el && curr !== document.body) {
         if (
-          curr.style.minHeight === '44px' || 
-          curr.style.minHeight === '48px' || 
           curr.tagName === 'BUTTON' || 
-          curr.getAttribute('data-subtask-panel') === 'true' ||
+          curr.tagName === 'INPUT' || 
           curr.getAttribute('data-subtask-drag-handle') === 'true' ||
           curr.classList.contains('chevron-button')
         ) {
@@ -2821,7 +2855,7 @@ const DayView = React.memo<DayViewProps>(({
 
     const handleTouchStartNative = (e: TouchEvent) => {
       const target = e.target as HTMLElement;
-      if (isTaskElement(target)) {
+      if (isInteractiveElement(target)) {
         isIgnored = true;
         isSwipeActive = false;
         hasDeterminedDirection = true;
@@ -2939,8 +2973,8 @@ const DayView = React.memo<DayViewProps>(({
 
   const sortedDayTasks = useMemo(() => {
     return [...dayTasks].sort((a, b) => {
-      const orderA = a.manualOrder ?? 0;
-      const orderB = b.manualOrder ?? 0;
+      const orderA = a.manualOrder ?? 9999;
+      const orderB = b.manualOrder ?? 9999;
       if (orderA !== orderB) {
         return orderA - orderB;
       }
@@ -2951,18 +2985,18 @@ const DayView = React.memo<DayViewProps>(({
     });
   }, [dayTasks]);
 
-  const pointerSensor = useSensor(PointerSensor, {
+  const mouseSensor = useSensor(MouseSensor, {
     activationConstraint: {
       distance: 8,
     },
   });
   const touchSensor = useSensor(TouchSensor, {
     activationConstraint: {
-      delay: 250,
-      tolerance: 5,
+      delay: 200,
+      tolerance: 8,
     },
   });
-  const daySensors = useSensors(pointerSensor, touchSensor);
+  const daySensors = useSensors(mouseSensor, touchSensor);
 
   const handleDragEnd = useCallback((event: any) => {
     const { active, over } = event;
@@ -2982,12 +3016,12 @@ const DayView = React.memo<DayViewProps>(({
   }, [sortedDayTasks, reorderTasks]);
 
   return (
-    <div className="h-full w-full overflow-hidden bg-white">
+    <div className="flex-1 flex flex-col min-h-0 w-full overflow-hidden bg-white">
 
 
       <div 
         ref={slideContainerRef}
-        className="flex-1 flex flex-col h-full bg-white overflow-hidden select-none"
+        className="flex-1 flex flex-col min-h-0 w-full bg-white overflow-hidden select-none"
       >
       {/* Pending Task Viewer (GCAL Style) */}
       {(() => {
@@ -3024,13 +3058,14 @@ const DayView = React.memo<DayViewProps>(({
         id="day-timeline-container"
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto text-gray-800"
+        className="flex-1 min-h-0 overflow-y-auto text-gray-800"
+        style={{ WebkitOverflowScrolling: 'touch' }}
       >
         <DndContext
           sensors={daySensors}
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}
-          modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+          modifiers={[restrictToVerticalAxis]}
         >
           <SortableContext
             items={sortedDayTasks.map((t) => t.id)}
