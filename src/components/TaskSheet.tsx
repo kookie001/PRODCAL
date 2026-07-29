@@ -58,6 +58,7 @@ const SortableSubtask = React.memo<SortableSubtaskProps>(({ id, value, onChange,
     >
       <span className="text-[#BDC1C6] text-base select-none">≡</span>
       <input
+        data-subtask-id={id}
         value={value}
         onChange={e => onChange(e.target.value)}
         onKeyDown={(e) => {
@@ -321,6 +322,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
   const prefilledTitle = useTaskStore((state) => state.prefilledTitle);
   const setPrefilledTitle = useTaskStore((state) => state.setPrefilledTitle);
   const currentDateStr = useTaskStore((state) => state.currentDate);
+  const selectedCategory = useTaskStore((state) => state.selectedCategory);
   const categories = useTaskStore((state) => state.categories);
   const setTaskSheetOpen = useTaskStore((state) => state.setTaskSheetOpen);
 
@@ -342,6 +344,11 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
   const [isDateTimeExpanded, setIsDateTimeExpanded] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false);
+
+  // Back button & history interception debug states
+  const [historyPushed, setHistoryPushed] = useState(false);
+  const [backHandlerActive, setBackHandlerActive] = useState(false);
+  const historyPushedRef = useRef(false);
 
   // Subtasks list local editing state
   const [subtasks, setSubtasks] = useState<Omit<Subtask, 'completed'>[]>([]);
@@ -386,6 +393,14 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
 
   const handleClose = useCallback(() => {
     setIsOpen(false);
+    
+    // Clean up pushed history state if it was pushed and not yet popped
+    if (historyPushedRef.current && window.history.state?.taskSheetOpen) {
+      historyPushedRef.current = false;
+      setHistoryPushed(false);
+      window.history.back();
+    }
+
     setTimeout(() => {
       if (propOnClose) {
         propOnClose();
@@ -403,6 +418,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
     const calendarPickerOverlay = document.getElementById('calendar-picker-overlay');
     if (calendarPickerOverlay) {
       calendarPickerOverlay.click();
+      window.history.pushState({ taskSheetOpen: true }, '');
       return;
     }
 
@@ -410,36 +426,48 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
     const clockPickerOverlay = document.getElementById('clock-picker-overlay');
     if (clockPickerOverlay) {
       clockPickerOverlay.click();
+      window.history.pushState({ taskSheetOpen: true }, '');
       return;
     }
 
+    // Mark history as popped by user back button
+    historyPushedRef.current = false;
+    setHistoryPushed(false);
+
+    // Immediately blur active input and close sheet on VERY FIRST back press
     const active = document.activeElement as HTMLElement;
     if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
-      active.blur(); // keyboard open → just close keyboard
-      return;
+      active.blur();
     }
-    handleClose(); // keyboard already closed → close the sheet (no save)
+    handleClose();
   }, [handleClose]);
 
-  // Sync sheet open status to the store for global back gesture bypass
+  // Sync sheet open status, push history state, and arm back handler
   useEffect(() => {
-    setTaskSheetOpen(true);
+    if (activeIsOpen) {
+      setTaskSheetOpen(true);
+      window.history.pushState({ taskSheetOpen: true }, '');
+      setHistoryPushed(true);
+      historyPushedRef.current = true;
+      setBackHandlerActive(true);
+    }
     return () => {
       setTaskSheetOpen(false);
+      setBackHandlerActive(false);
     };
-  }, [setTaskSheetOpen]);
+  }, [activeIsOpen, setTaskSheetOpen]);
 
   // Listen to the custom event dispatched by App.tsx when OS Back button is pressed
   useEffect(() => {
     const handleBackPressEvent = () => {
-      // One press of OS back = close the sheet and go home immediately.
-      handleClose();
+      // One press of OS back = handle back action on sheet (close pickers, keyboard, or sheet)
+      handleSheetBack();
     };
     window.addEventListener('task-sheet-back-press', handleBackPressEvent);
     return () => {
       window.removeEventListener('task-sheet-back-press', handleBackPressEvent);
     };
-  }, [handleClose]);
+  }, [handleSheetBack]);
 
   // Animate sheet sliding in on mount
   useEffect(() => {
@@ -486,7 +514,9 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
       } else {
         // Create mode
         setTitle(prefilledTitle || '');
-        setCategory('Work');
+        const isRealCategory = selectedCategory !== 'All' && selectedCategory !== 'Pending' && Boolean(selectedCategory);
+        const defaultCategory = isRealCategory ? selectedCategory : (categories[0]?.id || 'Work');
+        setCategory(defaultCategory);
         
         // Match currently selected date from store
         const selectedDateObj = new Date(currentDateStr);
@@ -518,48 +548,54 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
     } else {
       hasInitializedRef.current = false;
     }
-  }, [activeIsOpen, activeMode, activeEditTask, currentDateStr, prefilledTime, prefilledTitle]);
+  }, [activeIsOpen, activeMode, activeEditTask, currentDateStr, prefilledTime, prefilledTitle, selectedCategory, categories]);
 
-  const handleAddEmptySubtask = () => {
-    if (subtasks.length >= 50) return;
+  const handleSubtaskChange = useCallback((id: string, val: string) => {
+    setSubtasks((prev) => prev.map((s) => (s.id === id ? { ...s, title: val } : s)));
+  }, []);
 
-    // If the last subtask is already empty, just focus it instead of adding another empty one
-    const lastSub = subtasks[subtasks.length - 1];
-    if (lastSub && lastSub.title.trim() === '') {
+  const handleAddEmptySubtask = useCallback(() => {
+    setSubtasks((prev) => {
+      if (prev.length >= 50) return prev;
+
+      // If the last subtask is empty, focus it instead of adding another empty one
+      const lastSub = prev[prev.length - 1];
+      if (lastSub && lastSub.title.trim() === '') {
+        setTimeout(() => {
+          const inputs = document.querySelectorAll('.subtask-input');
+          const lastInput = inputs[inputs.length - 1] as HTMLInputElement;
+          if (lastInput) {
+            lastInput.focus();
+          }
+        }, 50);
+        return prev;
+      }
+
+      const newId = `sub-temp-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+      const newSub = {
+        id: newId,
+        title: '',
+      };
+
       setTimeout(() => {
         const inputs = document.querySelectorAll('.subtask-input');
         const lastInput = inputs[inputs.length - 1] as HTMLInputElement;
         if (lastInput) {
           lastInput.focus();
         }
+        subtaskScrollRef.current?.scrollTo({
+          top: subtaskScrollRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
       }, 50);
-      return;
-    }
 
-    const newId = `sub-temp-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
-    const newSub = {
-      id: newId,
-      title: '',
-    };
-    setSubtasks([...subtasks, newSub]);
+      return [...prev, newSub];
+    });
+  }, []);
 
-    // Focus the newly added subtask input
-    setTimeout(() => {
-      const inputs = document.querySelectorAll('.subtask-input');
-      const lastInput = inputs[inputs.length - 1] as HTMLInputElement;
-      if (lastInput) {
-        lastInput.focus();
-      }
-      subtaskScrollRef.current?.scrollTo({
-        top: subtaskScrollRef.current.scrollHeight,
-        behavior: 'smooth'
-      });
-    }, 50);
-  };
-
-  const handleDeleteSubtask = (subId: string) => {
-    setSubtasks(subtasks.filter((sub) => sub.id !== subId));
-  };
+  const handleDeleteSubtask = useCallback((subId: string) => {
+    setSubtasks((prev) => prev.filter((sub) => sub.id !== subId));
+  }, []);
 
   const getDefaultTime = (): string => {
     // Default to current time snapped to 15 min
@@ -579,7 +615,22 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
     if (e) e.preventDefault();
     if (!title.trim()) return;
 
-    const editedIncomplete: Subtask[] = subtasks
+    // Harvest active DOM values from subtask inputs to ensure any active typing is committed
+    const subtaskInputs = document.querySelectorAll<HTMLInputElement>('.subtask-input[data-subtask-id]');
+    const domValuesMap = new Map<string, string>();
+    subtaskInputs.forEach((input) => {
+      const id = input.getAttribute('data-subtask-id');
+      if (id) {
+        domValuesMap.set(id, input.value);
+      }
+    });
+
+    const currentSubtasks = subtasks.map((s) => ({
+      ...s,
+      title: domValuesMap.has(s.id) ? domValuesMap.get(s.id)! : s.title,
+    }));
+
+    const editedIncomplete: Subtask[] = currentSubtasks
       .filter((sub) => sub.title.trim() !== '')
       .map((sub) => {
         // Retain existing completion status (which is false) or default to false for new subtasks
@@ -756,16 +807,12 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={subtasks.map((s) => s.id)} strategy={verticalListSortingStrategy}>
                 <div className="space-y-0.5 pl-1">
-                  {subtasks.map((sub, index) => (
+                  {subtasks.map((sub) => (
                     <SortableSubtask
                       key={sub.id}
                       id={sub.id}
                       value={sub.title}
-                      onChange={(val) => {
-                        const updated = [...subtasks];
-                        updated[index] = { ...updated[index], title: val };
-                        setSubtasks(updated);
-                      }}
+                      onChange={(val) => handleSubtaskChange(sub.id, val)}
                       onRemove={() => handleDeleteSubtask(sub.id)}
                       onEnterPressed={handleAddEmptySubtask}
                     />

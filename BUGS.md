@@ -6,6 +6,40 @@
 
 ## Resolved Bugs
 
+- **BUG 55: Hardware/OS Back button exiting app when task edit sheet is open**
+  - *Description:* Pressing the physical or OS back button while editing a task on the edit sheet exited the app instead of closing the sheet.
+  - *Root Cause:*
+    1. `window.history.pushState` was not being invoked specifically when opening the edit sheet (e.g. from timeline card tap), so pressing back popped the base history state and exited the webview.
+    2. `handleSheetBack()` in `TaskSheet.tsx` returned early when an `<input>` was focused (`active.blur(); return;`), causing the 1st back press to only blur input, 2nd press to blur focus, and 3rd press to exit the app.
+  - *Resolution:*
+    1. Added an on-screen debug readout banner displaying `isTaskSheetOpen`, `historyPushed`, and `backHandlerActive`.
+    2. Pushed an explicit history entry (`window.history.pushState({ taskSheetOpen: true }, '')`) on sheet mount across all open paths.
+    3. Updated `handleSheetBack()` to blur input and call `handleClose()` immediately on the VERY FIRST back press.
+    4. Cleaned up history state on sheet close so home page back-to-exit functions properly.
+
+- **BUG 54: Subtask added to existing task not saving on first click of Save button**
+  - *Description:* Typing a new subtask into an existing task and immediately clicking "Save" failed to register/save the subtask on the first attempt, forcing the user to re-type it.
+  - *Root Cause:* The newly typed input value was present in the DOM `<input>` element but `handleSaveSubmit` read the React `subtasks` state array before the `onChange` state update or blur event had committed the typed string.
+  - *Resolution:*
+    1. Added `data-subtask-id` to the `<input>` element in `SortableSubtask`.
+    2. Updated `handleSaveSubmit` to query DOM inputs via `querySelectorAll('.subtask-input[data-subtask-id]')` and harvest active input values directly, merging them into `subtasks` before saving.
+    3. Converted all subtask mutation handlers (`handleSubtaskChange`, `handleAddEmptySubtask`, `handleDeleteSubtask`) to use functional state updates (`setSubtasks(prev => ...)`).
+
+- **BUG 53: Intermittent button tap failures (subtask chevron, completion circle, pencil icon)**
+  - *Description:* Buttons on task cards (chevron expand, completion circle, edit pencil) sometimes failed to respond on tap attempts.
+  - *Diagnostic Findings:*
+    1. **Dual event listener trigger (`onTouchEnd` + `onMouseUp` race condition - Rank #1):** Chevron, circle, and pencil buttons attached both `onTouchEnd` and `onMouseUp` handlers executing state toggle functions (`setExpanded(prev => !prev)` / `toggleTaskComplete`). Synthetic mouse events dispatched after touch events caused dual toggling in milliseconds (instant revert to initial state).
+    2. **Narrow touch hitboxes (Rank #2):** Buttons used 24px/28px bounding boxes without touch padding. Off-center taps landed on the outer card container, triggering dnd-kit `TouchSensor` instead of button click.
+    3. **Gesture flags & touch cancellations (Rank #3):** Interrupted gestures or touch cancel paths could briefly keep `dragging.current` or `lastTouchTime` active.
+    4. **Stale closures (Rank #4):** Handlers capturing task prop references.
+    5. **DOM Overlays (Rank #5):** Verified portal preview correctly sets `pointerEvents: 'none'`.
+  - *Instrumentation:* Added on-screen `GestureDebugReadout` displaying live drag/gesture flags and event timestamps.
+
+- **BUG 52: Drag-to-category floating preview sticking and lag during movement across category tiles**
+  - *Description:* Dragging a task card up toward a category tab caused the floating preview to lag and stick onto category tiles instead of moving smoothly with the finger.
+  - *Root Cause:* CSS transition property `transition: 'transform 0.05s linear'` on the portal floating preview element interpolated every 60fps transform update from `requestAnimationFrame`, causing continuous 50ms animation delay and lagging/sticking visual artifact.
+  - *Resolution:* Removed `transform 0.05s linear` from the preview container's transition style and added `willChange: 'transform'`, allowing instantaneous `rAF` ref transform updates without CSS animation delays.
+
 - **BUG 51: Home Day view card reorder failed to swap card positions on drag**
   - *Description:* Holding a card lifted it (drag started), but dragging up or down failed to swap card positions or persist reorder.
   - *Root Cause:*

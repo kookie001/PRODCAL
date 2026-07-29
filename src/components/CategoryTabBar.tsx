@@ -122,8 +122,8 @@ const SortableCategoryTab: React.FC<SortableCategoryTabProps> = ({
         data-category-tab="Pending"
         className={`shrink-0 border transition-colors duration-200 select-none flex items-center space-x-1.5
           ${isActive
-            ? 'active-tab bg-[#F29900] border-[#F29900] text-white'
-            : 'bg-amber-50/50 border-amber-100 text-gray-700 hover:bg-amber-100/50 hover:text-gray-900'
+            ? 'active-tab bg-[#1A73E8] border-[#1A73E8] text-white'
+            : 'bg-blue-50/50 border-blue-100 text-gray-700 hover:bg-blue-100/50 hover:text-gray-900'
           }
         `}
       >
@@ -146,8 +146,8 @@ const SortableCategoryTab: React.FC<SortableCategoryTabProps> = ({
   const isActive = selectedCategory === cat.id;
   const customStyle: React.CSSProperties = {
     ...style,
-    backgroundColor: isActive ? cat.color.solid : undefined,
-    borderColor: isActive ? cat.color.solid : undefined,
+    backgroundColor: isActive ? '#1A73E8' : undefined,
+    borderColor: isActive ? '#1A73E8' : undefined,
   };
 
   return (
@@ -158,8 +158,8 @@ const SortableCategoryTab: React.FC<SortableCategoryTabProps> = ({
       data-category-tab={cat.id}
       className={`shrink-0 flex items-center space-x-1.5 border transition-colors duration-200 select-none
         ${isActive
-          ? 'active-tab text-white'
-          : `${cat.color.bgLight} ${cat.color.borderLight} text-gray-700 hover:bg-opacity-80`
+          ? 'active-tab bg-[#1A73E8] border-[#1A73E8] text-white'
+          : 'bg-blue-50/50 border-blue-100 text-gray-700 hover:bg-blue-100/50 hover:text-gray-900'
         }
       `}
     >
@@ -240,8 +240,8 @@ const StaticCategoryTab: React.FC<StaticCategoryTabProps> = ({
         style={style}
         className={`shrink-0 border select-none touch-none flex items-center space-x-1.5
           ${isActive
-            ? 'bg-[#F29900] border-[#F29900] text-white font-semibold'
-            : 'bg-amber-50/50 border-amber-100 text-gray-700'
+            ? 'bg-[#1A73E8] border-[#1A73E8] text-white font-semibold'
+            : 'bg-blue-50/50 border-blue-100 text-gray-700'
           }
         `}
       >
@@ -257,8 +257,8 @@ const StaticCategoryTab: React.FC<StaticCategoryTabProps> = ({
   const isActive = selectedCategory === cat.id;
   const customStyle: React.CSSProperties = {
     ...style,
-    backgroundColor: isActive ? cat.color.solid : undefined,
-    borderColor: isActive ? cat.color.solid : undefined,
+    backgroundColor: isActive ? '#1A73E8' : undefined,
+    borderColor: isActive ? '#1A73E8' : undefined,
   };
 
   return (
@@ -266,8 +266,8 @@ const StaticCategoryTab: React.FC<StaticCategoryTabProps> = ({
       style={customStyle}
       className={`shrink-0 flex items-center space-x-1.5 border select-none touch-none
         ${isActive
-          ? 'text-white font-semibold'
-          : `${cat.color.bgLight} ${cat.color.borderLight} text-gray-700`
+          ? 'bg-[#1A73E8] border-[#1A73E8] text-white font-semibold'
+          : 'bg-blue-50/50 border-blue-100 text-gray-700'
         }
       `}
     >

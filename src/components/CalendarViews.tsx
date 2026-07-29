@@ -48,6 +48,8 @@ import { useSwipeable } from 'react-swipeable';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'motion/react';
 import { Ripple } from './Ripple';
 import { TaskSheet } from './TaskSheet';
+
+
 import { DndContext, closestCenter, TouchSensor, PointerSensor, MouseSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -2503,7 +2505,8 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             transform: `translate3d(${previewCoordsRef.current.x}px, ${previewCoordsRef.current.y}px, 0) scale(1.05)`,
-            transition: 'transform 0.05s linear, opacity 0.1s ease',
+            transition: 'opacity 0.1s ease',
+            willChange: 'transform',
             opacity: 0.95,
             boxSizing: 'border-box',
           }}
@@ -2618,18 +2621,8 @@ const DayView = React.memo<DayViewProps>(({
   const deleteTask = useTaskStore((state) => state.deleteTask);
   const setEditingTask = useTaskStore((state) => state.setEditingTask);
 
-  const [editingTaskState, setEditingTaskState] = useState<Task | null>(null);
-
   const openEditSheet = useCallback((task: Task) => {
-    setEditingTaskState(task);
     useTaskStore.getState().setEditingTask(task);
-    useTaskStore.getState().setTaskSheetOpen(true);
-  }, []);
-
-  const closeEditSheet = useCallback(() => {
-    setEditingTaskState(null);
-    useTaskStore.getState().setEditingTask(null);
-    useTaskStore.getState().setTaskSheetOpen(false);
   }, []);
 
   const draggedSubIndex: number | null = null;
@@ -3096,14 +3089,6 @@ const DayView = React.memo<DayViewProps>(({
         </DndContext>
       </div>
     </div>
-    {editingTaskState && (
-        <TaskSheet
-          isOpen={true}
-          onClose={closeEditSheet}
-          editTask={editingTaskState}
-          mode="edit"
-        />
-      )}
     </div>
   );
 });

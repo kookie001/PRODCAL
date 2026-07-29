@@ -1,6 +1,36 @@
 # Changelog
 
+## [2026-07-28]
+- Remove back-button debug, default new task to active category, unify tile colors to Work theme:
+  - Removed on-screen debug readout banner from `TaskSheet.tsx` while keeping back-button history interception logic fully intact.
+  - Set new task creation category default in `TaskSheet.tsx` to automatically use the currently selected active category (or fallback to first real category if 'All'/'Pending' is selected).
+  - Unified color theme of all category tiles (`All`, `Pending`, `Work`, `Personal`, `Health`, `Other`, custom categories) in `CategoryTabBar.tsx` to match the Work blue theme (`bg-[#1A73E8] border-[#1A73E8]` when active, `bg-blue-50/50 border-blue-100` when inactive) while keeping colored dot indicators intact.
+
+- Fix back button not intercepting edit sheet - arm history+guard on all open paths, with debug:
+  - Added on-screen debug readout banner displaying `isTaskSheetOpen`, `historyPushed`, and `backHandlerActive`.
+  - Pushed explicit history entry (`window.history.pushState({ taskSheetOpen: true }, '')`) whenever the sheet opens on any path (including timeline card tap).
+  - Updated `handleSheetBack()` in `TaskSheet.tsx` to blur focused inputs and close the sheet immediately on the VERY FIRST back press instead of requiring multiple back presses.
+  - Cleaned up history state on sheet close so home page back-to-exit gesture functions as expected.
+
+- Fix subtask not saving on first add + back button exiting app from edit sheet:
+  - Harvested DOM input values directly in `handleSaveSubmit` (`.subtask-input[data-subtask-id]`) so typing a subtask and immediately clicking Save captures and saves the subtask on the very first attempt.
+  - Converted subtask handlers (`handleSubtaskChange`, `handleAddEmptySubtask`, `handleDeleteSubtask`) to use functional state updates (`setSubtasks(prev => ...)`), eliminating stale state closures.
+  - Routed physical back press through `handleSheetBack()` in `TaskSheet.tsx` to handle open pickers/keyboard first or cleanly close the edit sheet without exiting the app.
+  - Consolidated edit sheet state rendering in `App.tsx` and removed redundant local `<TaskSheet>` render from `DayView` in `CalendarViews.tsx`.
+
 ## [2026-07-27]
+- Remove debug instrumentation for button failures:
+  - Removed on-screen `GestureDebugReadout` component overlay and DOM rendering from `DayView`.
+  - Removed event logging hooks (`logGestureEvent`) and temporary debug state listeners while preserving all button touch/click event handling logic.
+- Add debug instrumentation to diagnose intermittent button failures:
+  - Added on-screen `GestureDebugReadout` overlay displaying live values of drag/gesture flags (`isDragging`, `draggingCurrent`, `movedCurrent`, `isActivelyDragging`, `isCategoryMode`, `isDraggingSubtask`, `hasOverlayInDOM`) and event timestamps.
+  - Added event logging across chevron expand, pencil edit, completion circle, and card touch handlers.
+  - Diagnosed primary cause of intermittent button taps as `onTouchEnd` + `onMouseUp` dual event execution causing rapid state toggles.
+- Fix drag-to-category sticking: rAF ref transform, no per-frame re-renders:
+  - Removed CSS `transition: 'transform 0.05s linear'` from the portal floating preview element so `requestAnimationFrame` position updates apply directly without 50ms animation delays.
+  - Added `willChange: 'transform'` to preview container to ensure GPU-accelerated 60fps movement.
+  - Verified preview position updates directly via `previewRef` ref inside `requestAnimationFrame` without per-frame React state re-renders.
+  - Verified tab rects remain cached at drag start (`cachedTabRects.current`) and hovered-category tab highlight updates only when active tab changes (`lastHoveredTabId.current`).
 - Fix home card reorder not working - repair onDragEnd/items/sort chain:
   - Dynamically toggled `touchAction: isDragging ? 'none' : 'manipulation'` on `DraggableTaskBlock` so mobile browsers don't send `touchcancel` during vertical drag movement.
   - Replaced overlapping `PointerSensor` with `MouseSensor` + `TouchSensor` pairing for clean touch/desktop activation.
