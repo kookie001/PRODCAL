@@ -516,6 +516,7 @@ const MonthView = React.memo<ViewProps>(({
               return (
                 <div
                   key={task.id}
+                  id={`timeline-task-${task.id}`}
                   onClick={() => setSelectedTaskForDetails(task)}
                   className="flex items-center justify-between bg-white p-3 rounded-xl border border-gray-200/50 shadow-2xs hover:shadow-xs transition-all cursor-pointer active:scale-98"
                 >

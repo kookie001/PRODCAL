@@ -41,7 +41,9 @@ export const Header: React.FC<HeaderProps> = ({
   const selectedView = useTaskStore((state) => state.selectedView);
   const setSelectedView = useTaskStore((state) => state.setSelectedView);
   const tasks = useTaskStore((state) => state.tasks);
+  const deletedTasks = useTaskStore((state) => state.deletedTasks);
   const setTasksOverlayOpen = useTaskStore((state) => state.setTasksOverlayOpen);
+  const setBinOpen = useTaskStore((state) => state.setBinOpen);
 
   const activeDate = new Date(currentDateStr);
   const [isMiniCalendarOpen, setIsMiniCalendarOpen] = useState(false);
@@ -60,16 +62,132 @@ export const Header: React.FC<HeaderProps> = ({
 
   const calendarDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Filter tasks across all dates for the search results list
-  const matchedTasks = useMemo(() => {
+  // Filter tasks and subtasks across all dates and bin for the search results list
+  const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const query = searchQuery.toLowerCase().trim();
-    return tasks.filter((task) => {
-      const matchTitle = task.title.toLowerCase().includes(query);
-      const matchSubtasks = task.subtasks && task.subtasks.some((sub) => sub.title.toLowerCase().includes(query));
-      return matchTitle || matchSubtasks;
+    const allTasksCombined = [...tasks, ...deletedTasks];
+    const results: Array<{
+      key: string;
+      type: 'task' | 'subtask';
+      title: string;
+      parentTitle?: string;
+      category: string;
+      location: 'bin' | 'pending' | 'completed' | 'timeline';
+      date?: string;
+      time?: string;
+      task: any;
+      subtask?: any;
+    }> = [];
+
+    allTasksCombined.forEach((task) => {
+      const isDeleted = 'deletedAt' in task && Boolean(task.deletedAt);
+      const isTaskPending = !task.completed && !isDeleted && (task.isPending === true || Boolean(task.date && task.date < todayStr));
+      const isTaskCompleted = Boolean(task.completed);
+
+      const taskLocation: 'bin' | 'pending' | 'completed' | 'timeline' = 
+        isDeleted ? 'bin' : isTaskPending ? 'pending' : isTaskCompleted ? 'completed' : 'timeline';
+
+      // 1. Check task title match
+      if (task.title.toLowerCase().includes(query)) {
+        results.push({
+          key: `task-${task.id}`,
+          type: 'task',
+          title: task.title,
+          category: task.category,
+          location: taskLocation,
+          date: task.date,
+          time: task.time,
+          task,
+        });
+      }
+
+      // 2. Check subtasks matches
+      if (task.subtasks) {
+        task.subtasks.forEach((sub: any) => {
+          if (sub.title.toLowerCase().includes(query)) {
+            const isSubCompleted = Boolean(sub.completed) || isTaskCompleted;
+            const subLocation: 'bin' | 'pending' | 'completed' | 'timeline' = 
+              isDeleted ? 'bin' : isSubCompleted ? 'completed' : isTaskPending ? 'pending' : 'timeline';
+
+            results.push({
+              key: `subtask-${task.id}-${sub.id}`,
+              type: 'subtask',
+              title: sub.title,
+              parentTitle: task.title,
+              category: task.category,
+              location: subLocation,
+              date: task.date,
+              time: task.time,
+              task,
+              subtask: sub,
+            });
+          }
+        });
+      }
     });
-  }, [tasks, searchQuery]);
+
+    return results;
+  }, [tasks, deletedTasks, searchQuery, todayStr]);
+
+  const handleSearchResultClick = useCallback((item: any) => {
+    setSearchQuery('');
+    const task = item.task;
+
+    const scrollToElement = (elementId: string) => {
+      let attempts = 0;
+      const maxAttempts = 30;
+      const interval = setInterval(() => {
+        attempts++;
+        const el = document.getElementById(elementId);
+        if (el) {
+          clearInterval(interval);
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('ring-2', 'ring-blue-500');
+          setTimeout(() => el.classList.remove('ring-2', 'ring-blue-500'), 2000);
+        } else if (attempts >= maxAttempts) {
+          clearInterval(interval);
+        }
+      }, 50);
+    };
+
+    // Priority 1: Deleted task in Bin
+    if (item.location === 'bin') {
+      setBinOpen(true);
+      scrollToElement(`bin-task-${task.id}`);
+      return;
+    }
+
+    // Priority 2: Pending task
+    if (item.location === 'pending') {
+      (window as any).__pendingScrollTargetId = { taskId: task.id, isCompleted: false };
+      setTasksOverlayOpen(true);
+      window.dispatchEvent(new CustomEvent('expand-and-scroll-task', { detail: { taskId: task.id } }));
+      return;
+    }
+
+    // Priority 3: Completed task
+    if (item.location === 'completed') {
+      (window as any).__pendingScrollTargetId = { taskId: task.id, isCompleted: true };
+      setTasksOverlayOpen(true);
+      window.dispatchEvent(new CustomEvent('reveal-completed-task', { detail: { taskId: task.id } }));
+      return;
+    }
+
+    // Priority 4: Normal timeline task
+    if (task.date) {
+      const [yr, mo, dy] = task.date.split('-').map(Number);
+      const dateObj = new Date(yr, mo - 1, dy);
+      setCurrentDate(dateObj);
+      setSelectedView('day');
+      scrollToElement(`timeline-task-${task.id}`);
+      if (task.time) {
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('scroll-to-task', { detail: { time: task.time } }));
+        }, 150);
+      }
+    }
+  }, [setSearchQuery, setBinOpen, setTasksOverlayOpen, setCurrentDate, setSelectedView]);
 
   // Close dropdowns on day change
   useEffect(() => {
@@ -204,40 +322,56 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Search dropdown results */}
           {searchQuery.trim() !== '' && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-xl z-[1000] overflow-hidden max-h-72 overflow-y-auto">
-              {matchedTasks.length === 0 ? (
+              {searchResults.length === 0 ? (
                 <div className="px-4 py-4 text-center text-xs text-gray-400 font-medium">
                   No matching tasks found
                 </div>
               ) : (
                 <div className="py-1">
-                  {matchedTasks.map((task) => (
+                  {searchResults.map((item) => (
                     <button
-                      key={task.id}
-                      onClick={() => {
-                        const [yr, mo, dy] = task.date.split('-').map(Number);
-                        const dateObj = new Date(yr, mo - 1, dy);
-                        setCurrentDate(dateObj);
-                        setSelectedView('day');
-                        if (task.time) {
-                          setTimeout(() => {
-                            window.dispatchEvent(new CustomEvent('scroll-to-task', { detail: { time: task.time } }));
-                          }, 150);
-                        }
-                        setSearchQuery('');
-                      }}
+                      key={item.key}
+                      onClick={() => handleSearchResultClick(item)}
                       className="w-full text-left px-4 py-2.5 hover:bg-blue-50 border-b border-gray-100 last:border-none flex flex-col transition-colors cursor-pointer"
                     >
-                      <span className="text-xs font-semibold text-gray-800 truncate">
-                        {task.title}
-                      </span>
-                      <div className="flex items-center space-x-2 text-[10px] text-gray-400 mt-0.5">
-                        <span className="capitalize px-1.5 py-0.5 bg-gray-100 rounded-full text-[9px] font-bold text-gray-500">{task.category}</span>
+                      {item.type === 'subtask' ? (
+                        <>
+                          <div className="flex items-center space-x-1.5 min-w-0">
+                            <span className="text-[9px] font-extrabold uppercase tracking-wider text-blue-600 bg-blue-50 border border-blue-200/60 px-1.5 py-0.5 rounded-md flex-shrink-0">
+                              Subtask
+                            </span>
+                            <span className="text-xs font-semibold text-gray-800 truncate">
+                              {item.title}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-gray-500 truncate mt-0.5">
+                            in <span className="font-medium text-gray-700">{item.parentTitle}</span>
+                          </p>
+                        </>
+                      ) : (
+                        <span className="text-xs font-semibold text-gray-800 truncate">
+                          {item.title}
+                        </span>
+                      )}
+
+                      <div className="flex items-center space-x-2 text-[10px] text-gray-400 mt-1">
+                        <span className="capitalize px-1.5 py-0.5 bg-gray-100 rounded-full text-[9px] font-bold text-gray-500">
+                          {item.category}
+                        </span>
                         <span>•</span>
-                        <span>{task.date}</span>
-                        {task.time && (
+                        {item.location === 'bin' ? (
+                          <span className="text-rose-500 font-bold">Bin</span>
+                        ) : item.location === 'pending' ? (
+                          <span className="text-amber-600 font-bold">Pending</span>
+                        ) : item.location === 'completed' ? (
+                          <span className="text-emerald-600 font-bold">Completed</span>
+                        ) : (
+                          <span>{item.date}</span>
+                        )}
+                        {item.time && item.location === 'timeline' && (
                           <>
                             <span>•</span>
-                            <span>{task.time}</span>
+                            <span>{item.time}</span>
                           </>
                         )}
                       </div>

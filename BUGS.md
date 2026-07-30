@@ -6,6 +6,36 @@
 
 ## Resolved Bugs
 
+- **BUG 58: Search results routing past-dated pending tasks to timeline, missing completed items, and displaying parent title for subtasks**
+  - *Description:* Past-dated pending tasks routed to their creation date on timeline instead of pending list; completed tasks and completed subtasks were omitted or improperly handled; subtask matches rendered parent title instead of subtask title.
+  - *Root Cause:*
+    1. Pending check in search click handler checked `task.isPending === true` alone, omitting tasks pending due to past dates (`task.date < todayStr`).
+    2. Subtask search matches returned parent task objects directly, rendering `task.title` in dropdown.
+    3. Location priority was evaluated on coarse parent properties rather than combined task/subtask status.
+  - *Resolution:*
+    1. Built `searchResults` array generating granular search result items for tasks and subtasks with title, parent title reference, category, and precise location.
+    2. Strictly applied flag priority order: `Bin` -> `Pending` -> `Completed` -> `Timeline`.
+    3. Ensured subtask taps route to parent's location and trigger parent expand/reveal.
+
+- **BUG 57: Pending/Completed/Timeline search routing failing to scroll and reveal task**
+  - *Description:* While Bin search results scrolled and highlighted properly, pending, completed, and timeline search results failed to scroll to or reveal the target task.
+  - *Root Cause:*
+    1. Custom window events (`expand-and-scroll-task` / `reveal-completed-task`) were dispatched before `TasksOverlay` mounted and attached its event listeners.
+    2. Single-shot `setTimeout` DOM lookups failed if the element was not painted at that exact instant.
+    3. Day View task cards in `CalendarViews.tsx` lacked a DOM ID (`timeline-task-${task.id}`).
+  - *Resolution:*
+    1. Added `__pendingScrollTargetId` on window to handle on-mount scrolling when `TasksOverlay` opens.
+    2. Implemented a 50ms polling `scrollToElement` helper that waits for the target DOM element to exist before scrolling and applying ring highlight.
+    3. Added `id={`timeline-task-${task.id}`}` to Day View task cards.
+
+- **BUG 56: Search result tap always jumped to creation date and opened edit sheet**
+  - *Description:* Tapping a search result always navigated to the creation date on timeline and opened the task edit sheet, even if the task was currently in Pending list, Completed list, or Bin.
+  - *Root Cause:* `onClick` handler in `Header.tsx` unconditionally invoked `setCurrentDate(task.date)` and opened the edit sheet instead of checking the task's current location flags (`deletedAt`, `isPending`, `completed`).
+  - *Resolution:*
+    1. Replaced unconditional navigation in `Header.tsx` with deterministic flag check priority: `deletedAt` -> `isPending` -> `completed` -> timeline date.
+    2. Removed `setEditingTask` call from search-result tap.
+    3. Added `expand-and-scroll-task` and `reveal-completed-task` custom event listeners in `TasksOverlay.tsx` and DOM IDs in `BinOverlay.tsx` and `TasksOverlay.tsx` for smooth scrolling and revealing.
+
 - **BUG 55: Hardware/OS Back button exiting app when task edit sheet is open**
   - *Description:* Pressing the physical or OS back button while editing a task on the edit sheet exited the app instead of closing the sheet.
   - *Root Cause:*

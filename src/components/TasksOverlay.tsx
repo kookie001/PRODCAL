@@ -266,6 +266,7 @@ const TaskItemRow = React.memo(({
 
   return (
     <div 
+      id={`task-row-${task.id}`}
       className={`mx-3 my-1 rounded-[12px] cursor-pointer select-none transition-all duration-150 ${
         isDraggingThis ? 'opacity-35 border-dashed border-gray-400 bg-gray-100 scale-95' : ''
       }`}
@@ -465,6 +466,64 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
   const [isCompletedExpanded, setIsCompletedExpanded] = useState(true);
   const [gcalExpandedTaskIds, setGcalExpandedTaskIds] = useState<string[]>([]);
   const [isFullScreen, setIsFullScreen] = useState(false);
+
+  useEffect(() => {
+    const scrollToTarget = (elementId: string) => {
+      let attempts = 0;
+      const maxAttempts = 30; // 30 * 50ms = 1500ms
+      const interval = setInterval(() => {
+        attempts++;
+        const el = document.getElementById(elementId);
+        if (el) {
+          clearInterval(interval);
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('ring-2', 'ring-blue-500');
+          setTimeout(() => el.classList.remove('ring-2', 'ring-blue-500'), 2000);
+        } else if (attempts >= maxAttempts) {
+          clearInterval(interval);
+        }
+      }, 50);
+    };
+
+    const handleExpandAndScroll = (e: Event) => {
+      const customEv = e as CustomEvent<{ taskId: string }>;
+      const taskId = customEv.detail?.taskId;
+      if (!taskId) return;
+
+      setGcalExpandedTaskIds((prev) => (prev.includes(taskId) ? prev : [...prev, taskId]));
+      scrollToTarget(`task-row-${taskId}`);
+    };
+
+    const handleRevealCompleted = (e: Event) => {
+      const customEv = e as CustomEvent<{ taskId: string }>;
+      const taskId = customEv.detail?.taskId;
+      if (!taskId) return;
+
+      setIsCompletedExpanded(true);
+      scrollToTarget(`comp-task-${taskId}`);
+    };
+
+    window.addEventListener('expand-and-scroll-task', handleExpandAndScroll);
+    window.addEventListener('reveal-completed-task', handleRevealCompleted);
+
+    // Check if target was set before overlay mounted
+    if ((window as any).__pendingScrollTargetId) {
+      const target = (window as any).__pendingScrollTargetId;
+      delete (window as any).__pendingScrollTargetId;
+      if (target.isCompleted) {
+        setIsCompletedExpanded(true);
+        scrollToTarget(`comp-task-${target.taskId}`);
+      } else {
+        setGcalExpandedTaskIds((prev) => (prev.includes(target.taskId) ? prev : [...prev, target.taskId]));
+        scrollToTarget(`task-row-${target.taskId}`);
+      }
+    }
+
+    return () => {
+      window.removeEventListener('expand-and-scroll-task', handleExpandAndScroll);
+      window.removeEventListener('reveal-completed-task', handleRevealCompleted);
+    };
+  }, []);
 
   const [todayStr, setTodayStr] = useState(() => format(new Date(), 'yyyy-MM-dd'));
 
@@ -1088,7 +1147,7 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
                       const cat = CATEGORIES.find((c) => c.id === item.category) || CATEGORIES[0];
                       if (item.kind === 'task') {
                         return (
-                          <div key={`comp-task-${item.id}`} className="flex items-center justify-between py-2.5 px-2">
+                          <div key={`comp-task-${item.id}`} id={`comp-task-${item.id}`} className="flex items-center justify-between py-2.5 px-2">
                             <div className="flex items-center space-x-3 min-w-0 flex-1">
                               <button
                                 type="button"
@@ -1113,7 +1172,7 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
                         );
                       } else {
                         return (
-                          <div key={`comp-sub-${item.id}`} className="flex items-center justify-between py-2.5 px-2">
+                          <div key={`comp-sub-${item.id}`} id={`comp-task-${item.parentTaskId}`} className="flex items-center justify-between py-2.5 px-2">
                             <div className="flex items-center space-x-3 min-w-0 flex-1">
                               <button
                                 type="button"

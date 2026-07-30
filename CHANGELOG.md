@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-07-30]
+- Fix search: pending priority routing, include completed, show matched subtask with location:
+  - Fixed pending tasks routing to creation date instead of pending list by evaluating full pending criteria (`!task.completed && !isDeleted && (task.isPending === true || (task.date && task.date < todayStr))`) in `Header.tsx`.
+  - Added completed tasks and completed subtasks into search matching and display, routing them directly to the completed overlay section with smooth scrolling and blue ring highlight.
+  - Updated subtask search results to display subtask title, parent task reference ("in Parent Task Title"), and subtask location indicator (`Bin`, `Pending`, `Completed`, or timeline date).
+  - Ensured subtask result taps route to the parent task's location with strict flag priority (`Bin` -> `Pending` -> `Completed` -> `Timeline`) and auto-expand/reveal the parent so the subtask is visible.
+
+- Fix pending/completed/timeline search routing to match working Bin reveal+scroll:
+  - Fixed timing/mount issue where custom events dispatched before `TasksOverlay` mounted and registered event listeners.
+  - Implemented on-mount target check (`__pendingScrollTargetId`) and a 50ms polling `scrollToElement` helper that waits until the target DOM element is rendered before executing smooth scroll and applying a blue highlight ring.
+  - Added missing DOM ID `timeline-task-${task.id}` to Day View task cards in `CalendarViews.tsx`.
+  - Standardized scroll and reveal behavior across all four locations (Bin, Pending, Completed, Timeline).
+
 ## [2026-07-28]
 - Remove back-button debug, default new task to active category, unify tile colors to Work theme:
   - Removed on-screen debug readout banner from `TaskSheet.tsx` while keeping back-button history interception logic fully intact.

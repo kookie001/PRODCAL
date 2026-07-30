@@ -64,6 +64,7 @@ export const BinOverlay: React.FC = () => {
             return (
               <div
                 key={task.id}
+                id={`bin-task-${task.id}`}
                 className="bg-gray-50 border border-gray-100 rounded-xl p-3 flex items-start justify-between space-x-3 shadow-xs hover:border-gray-200 transition-all"
               >
                 <div className="min-w-0 flex-1">
