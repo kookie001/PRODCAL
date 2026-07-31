@@ -44,6 +44,12 @@ export const Header: React.FC<HeaderProps> = ({
   const deletedTasks = useTaskStore((state) => state.deletedTasks);
   const setTasksOverlayOpen = useTaskStore((state) => state.setTasksOverlayOpen);
   const setBinOpen = useTaskStore((state) => state.setBinOpen);
+  const setSelectedCategory = useTaskStore((state) => state.setSelectedCategory);
+
+  const handleHeaderDateClick = useCallback(() => {
+    setCurrentDate(new Date());
+    setSelectedCategory('All');
+  }, [setCurrentDate, setSelectedCategory]);
 
   const activeDate = new Date(currentDateStr);
   const [isMiniCalendarOpen, setIsMiniCalendarOpen] = useState(false);
@@ -282,17 +288,17 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Today's date text with highlight for today, and plain tile style for other days */}
           {isTodayActive ? (
             <span 
-              onClick={() => setCurrentDate(new Date())}
+              onClick={handleHeaderDateClick}
               className="text-xs sm:text-sm font-semibold bg-[#1A73E8] text-white select-none px-3 py-1.5 rounded-full flex-shrink-0 cursor-pointer shadow-xs hover:bg-blue-700 active:scale-95 transition-all duration-150 flex items-center"
-              title="Today"
+              title="Today & Show All Tasks"
             >
               {format(activeDate, 'EEE, MMMM d')}
             </span>
           ) : (
             <span 
-              onClick={() => setCurrentDate(new Date())}
+              onClick={handleHeaderDateClick}
               className="text-xs sm:text-sm font-semibold bg-gray-50 border border-gray-200 text-gray-800 select-none px-3 py-1.5 rounded-full flex-shrink-0 cursor-pointer shadow-xs hover:bg-gray-100 hover:text-blue-600 active:scale-95 transition-all duration-150 flex items-center"
-              title="Go to Today"
+              title="Go to Today & Show All Tasks"
             >
               {format(activeDate, 'EEE, MMMM d')}
             </span>

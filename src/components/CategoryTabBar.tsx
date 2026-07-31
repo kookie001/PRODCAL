@@ -84,34 +84,6 @@ const SortableCategoryTab: React.FC<SortableCategoryTabProps> = ({
     touchAction: 'pan-x',
   };
 
-  if (id === 'All') {
-    const isActive = selectedCategory === 'All';
-    return (
-      <button
-        ref={setNodeRef}
-        style={style}
-        onClick={() => setSelectedCategory('All')}
-        data-category-tab="All"
-        className={`shrink-0 border transition-colors duration-200 select-none flex items-center space-x-1.5
-          ${isActive
-            ? 'active-tab bg-[#1A73E8] border-[#1A73E8] text-white'
-            : 'bg-blue-50/50 border-blue-100 text-gray-700 hover:bg-blue-100/50 hover:text-gray-900'
-          }
-        `}
-      >
-        <span
-          {...attributes}
-          {...listeners}
-          className="p-0.5 -ml-1 rounded hover:bg-black/5 active:bg-black/10 transition-colors shrink-0 cursor-grab active:cursor-grabbing"
-          style={{ touchAction: 'none' }}
-        >
-          <GripVertical size={11} className={isActive ? 'text-white/70' : 'text-gray-400'} />
-        </span>
-        <span>All</span>
-      </button>
-    );
-  }
-
   if (id === 'Pending') {
     const isActive = selectedCategory === 'Pending';
     return (
@@ -215,24 +187,6 @@ const StaticCategoryTab: React.FC<StaticCategoryTabProps> = ({
     } : {}),
   };
 
-  if (id === 'All') {
-    const isActive = selectedCategory === 'All';
-    return (
-      <div
-        style={style}
-        className={`shrink-0 border select-none touch-none flex items-center space-x-1.5
-          ${isActive
-            ? 'bg-[#1A73E8] border-[#1A73E8] text-white font-semibold'
-            : 'bg-blue-50/50 border-blue-100 text-gray-700'
-          }
-        `}
-      >
-        <GripVertical size={11} className={isActive ? 'text-white/70' : 'text-gray-400'} />
-        <span>All</span>
-      </div>
-    );
-  }
-
   if (id === 'Pending') {
     const isActive = selectedCategory === 'Pending';
     return (
@@ -298,7 +252,7 @@ export const CategoryTabBar: React.FC = () => {
   const [, setIndicatorStyle] = useState({ left: 0, width: 0 });
 
   const displayOrder = useMemo(() => {
-    const allIds = ['All', 'Pending', ...categories.map((c) => c.id)];
+    const allIds = ['Pending', ...categories.map((c) => c.id)];
     return [...allIds].sort((a, b) => {
       const indexA = categoryOrder.indexOf(a);
       const indexB = categoryOrder.indexOf(b);

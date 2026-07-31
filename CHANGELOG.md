@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-07-31]
+- Remove "All" category tile; header date tile becomes "show all tasks" toggle:
+  - Removed "All" tile from `CategoryTabBar.tsx` completely while keeping category order sorting, tab scrolling, and drag-to-category fully intact.
+  - Set default active category to "Work" so the timeline displays only tasks of the active category by default.
+  - Updated header date tile ("Fri, 31 July") in `Header.tsx` so tapping it jumps to today AND sets `selectedCategory` to `'All'`, serving as the single toggle to view all tasks across every category.
+- Simplify timeline task cards and align all titles:
+  - Removed the left date/time text block and the thin separator (`|`) from timeline task cards in `CalendarViews.tsx`.
+  - Maintained a fixed 24px reserved slot for the subtask expand chevron: if incomplete subtasks exist, the chevron renders in that slot; if not, the 24px slot remains reserved so all task titles start at the exact same horizontal alignment across every card.
+  - Preserved pencil edit button, completion circle, tap-to-expand subtasks, and drag-to-reorder/drag-to-category features.
+
 ## [2026-07-30]
 - Fix search: pending priority routing, include completed, show matched subtask with location:
   - Fixed pending tasks routing to creation date instead of pending list by evaluating full pending criteria (`!task.completed && !isDeleted && (task.isPending === true || (task.date && task.date < todayStr))`) in `Header.tsx`.

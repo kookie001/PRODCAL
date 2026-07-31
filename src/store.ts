@@ -252,11 +252,11 @@ export const useTaskStore = create<TaskState & TaskActions>()(
       theme: 'light',
       selectedView: 'month',
       categories: CATEGORIES,
-      categoryOrder: ['All', 'Pending', 'Work', 'Personal', 'Health', 'Holidays', 'Other'],
+      categoryOrder: ['Pending', 'Work', 'Personal', 'Health', 'Holidays', 'Other'],
       
       currentDate: new Date().toISOString(),
       direction: 'next',
-      selectedCategory: 'All',
+      selectedCategory: 'Work',
       isFABOpen: false,
       editingTask: null,
       selectedTaskForDetails: null,

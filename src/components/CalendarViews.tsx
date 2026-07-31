@@ -2128,42 +2128,6 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
         boxSizing: 'border-box',
       }}>
 
-        {/* WRAPPER FOR TIME/DATE + SEPARATOR */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          flexShrink: 0,
-        }}>
-          {/* TIME BLOCK */}
-          <div style={{
-            paddingLeft: '4px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'flex-start',
-            marginRight: '8px',
-            flexShrink: 0,
-          }}>
-            <span style={{
-              fontSize: '11px',
-              fontWeight: 800,
-              color: completed ? '#9CA3AF' : '#1E40AF',
-              whiteSpace: 'nowrap',
-            }}>
-              {format12hTime(task.time)}
-            </span>
-          </div>
-
-          {/* THIN SEPARATOR */}
-          <div style={{
-            width: '1px',
-            height: '24px',
-            backgroundColor: completed ? '#E5E7EB' : '#BFDBFE',
-            marginRight: '8px',
-            flexShrink: 0,
-          }} />
-        </div>
-
         {/* LEFT: expand toggle (chevron) — only if incomplete subtasks exist */}
         <div style={{
           width: '24px',
