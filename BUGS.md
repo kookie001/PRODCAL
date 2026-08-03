@@ -6,6 +6,10 @@
 
 ## Resolved Bugs
 
+- **BUG 59: Category system enhancements (Amit category & long-press tile menu)**
+  - *Description:* Requirement to add "Amit" as a standard reorderable category tile and add a long-press menu on category tiles for Rename and Delete.
+  - *Resolution:* Added "Amit" category config and migration state in store. Integrated 500ms long-press gesture handling on tile body with pointer distance checks (>8px movement cancels for scrolling) and grip handle isolation (`.grip-handle` bypasses long press for dnd-kit reordering). Added Rename modal and Delete confirmation dialog with fallback task re-assignment to `Other`.
+
 - **BUG 58: Search results routing past-dated pending tasks to timeline, missing completed items, and displaying parent title for subtasks**
   - *Description:* Past-dated pending tasks routed to their creation date on timeline instead of pending list; completed tasks and completed subtasks were omitted or improperly handled; subtask matches rendered parent title instead of subtask title.
   - *Root Cause:*

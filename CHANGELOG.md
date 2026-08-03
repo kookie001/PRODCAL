@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-08-03]
+- Add "Amit" category tile and long-press tile menu (rename/delete):
+  - Added "Amit" as a standard category tile in `types.ts` and `store.ts`, included in default category order (`categoryOrder`), and auto-migrated into persisted state via `onRehydrateStorage`.
+  - Added long-press gesture (~500ms hold) on category tile body in `CategoryTabBar.tsx` with haptic feedback to open a context menu for Rename and Delete.
+  - Ensured long-press gesture coexists without conflict alongside tap-to-filter, horizontal scrolling (cancels if moved >8px), and grip handle drag-and-drop reordering (`.grip-handle` check).
+  - Implemented `renameCategory` in store: renames category everywhere, updating tile label, category config, and keeping all associated tasks connected.
+  - Implemented `deleteCategory` in store: shows confirmation dialog before deleting, removes category from bar, and converts associated tasks to uncategorized (`Other`) without losing tasks.
+- Fix PWA caching so deploys reach the live app (service worker update strategy, hashed assets):
+  - Updated `public/sw.js` to versioned cache key `gcal-tasks-v2` and added Network-First fetching strategy for HTML/navigation requests (`{ cache: 'no-cache' }`).
+  - Added message listener in `sw.js` for `SKIP_WAITING` and ensured `activate` cleans up all old cache versions while calling `clients.claim()`.
+  - Added service worker lifecycle update triggers in `index.html`: automatically checks for SW updates on load & foreground visibility, posts `SKIP_WAITING` upon new SW installation, and auto-reloads page when new SW takes control (`controllerchange`).
+
 ## [2026-07-31]
 - Remove "All" category tile; header date tile becomes "show all tasks" toggle:
   - Removed "All" tile from `CategoryTabBar.tsx` completely while keeping category order sorting, tab scrolling, and drag-to-category fully intact.

@@ -89,4 +89,14 @@ export const CATEGORIES: CategoryConfig[] = [
       solid: '#f0b429',
     },
   },
+  {
+    id: 'Amit',
+    name: 'Amit',
+    color: {
+      light: 'text-blue-700',
+      bgLight: 'bg-blue-50',
+      borderLight: 'border-blue-200',
+      solid: '#1a73e8',
+    },
+  },
 ];

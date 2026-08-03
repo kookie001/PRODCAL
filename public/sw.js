@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gcal-tasks-v1';
+const CACHE_NAME = 'gcal-tasks-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -8,6 +8,13 @@ const ASSETS_TO_CACHE = [
   '/icon-512.png',
   '/apple-touch-icon.png'
 ];
+
+// Listen for skipWaiting message from client
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
 // Install Service Worker and precache basic shells
 self.addEventListener('install', (event) => {
@@ -21,7 +28,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate event - clean up old caches
+// Activate event - clean up old caches & claim clients immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -39,17 +46,34 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch event handler: network first, fallback to cache for speed and reliability
+// Fetch event handler: network first for navigation/HTML, fallback to cache
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests and local assets
   if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) {
     return;
   }
 
+  // Network-First for HTML navigation to ensure latest JS/CSS hashes are loaded
+  if (event.request.mode === 'navigate' || event.request.headers.get('accept')?.includes('text/html')) {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-cache' })
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match(event.request).then((cached) => cached || caches.match('/'));
+        })
+    );
+    return;
+  }
+
+  // General Network-First with Cache Fallback for assets
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
-        // If valid response, clone and cache it
         if (networkResponse && networkResponse.status === 200) {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -59,14 +83,9 @@ self.addEventListener('fetch', (event) => {
         return networkResponse;
       })
       .catch(() => {
-        // Offline: attempt to retrieve from cache
         return caches.match(event.request).then((cachedResponse) => {
           if (cachedResponse) {
             return cachedResponse;
-          }
-          // If indexing route, return the cached index root
-          if (event.request.mode === 'navigate') {
-            return caches.match('/');
           }
           return new Response('Offline: Resource not available', {
             status: 503,

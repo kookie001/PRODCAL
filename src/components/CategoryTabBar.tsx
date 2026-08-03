@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Plus, Check, X, GripVertical } from 'lucide-react';
+import { Plus, Check, X, GripVertical, Pencil, Trash2, AlertTriangle } from 'lucide-react';
 import { useTaskStore } from '../store';
 import { CategoryConfig } from '../types';
 import { 
@@ -46,6 +46,7 @@ interface SortableCategoryTabProps {
   selectedCategory: string;
   setSelectedCategory: (cat: string) => void;
   categories: CategoryConfig[];
+  onLongPress?: (cat: CategoryConfig, rect: DOMRect) => void;
 }
 
 const SortableCategoryTab: React.FC<SortableCategoryTabProps> = ({
@@ -53,6 +54,7 @@ const SortableCategoryTab: React.FC<SortableCategoryTabProps> = ({
   selectedCategory,
   setSelectedCategory,
   categories,
+  onLongPress,
 }) => {
   const {
     attributes,
@@ -62,6 +64,68 @@ const SortableCategoryTab: React.FC<SortableCategoryTabProps> = ({
     transition,
     isDragging,
   } = useSortable({ id });
+
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const isLongPressTriggeredRef = useRef<boolean>(false);
+  const buttonElemRef = useRef<HTMLButtonElement | null>(null);
+
+  const clearTimer = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if ((e.target as HTMLElement).closest('.grip-handle')) return;
+    isLongPressTriggeredRef.current = false;
+    touchStartPosRef.current = { x: e.clientX, y: e.clientY };
+    clearTimer();
+
+    const catObj = categories.find((c) => c.id === id);
+    if (!catObj) return;
+
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressTriggeredRef.current = true;
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        try { navigator.vibrate(20); } catch (_) {}
+      }
+      if (onLongPress && buttonElemRef.current) {
+        onLongPress(catObj, buttonElemRef.current.getBoundingClientRect());
+      }
+    }, 500);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!touchStartPosRef.current || !longPressTimerRef.current) return;
+    const dx = Math.abs(e.clientX - touchStartPosRef.current.x);
+    const dy = Math.abs(e.clientY - touchStartPosRef.current.y);
+    if (dx > 8 || dy > 8) {
+      clearTimer();
+      touchStartPosRef.current = null;
+    }
+  };
+
+  const handlePointerUp = () => {
+    clearTimer();
+    touchStartPosRef.current = null;
+  };
+
+  const handlePointerCancel = () => {
+    clearTimer();
+    touchStartPosRef.current = null;
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (isLongPressTriggeredRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      isLongPressTriggeredRef.current = false;
+      return;
+    }
+    setSelectedCategory(id);
+  };
 
   const style: React.CSSProperties = {
     transform: transform ? CSS.Transform.toString(transform) : undefined,
@@ -102,7 +166,7 @@ const SortableCategoryTab: React.FC<SortableCategoryTabProps> = ({
         <span
           {...attributes}
           {...listeners}
-          className="p-0.5 -ml-1 rounded hover:bg-black/5 active:bg-black/10 transition-colors shrink-0 cursor-grab active:cursor-grabbing"
+          className="grip-handle p-0.5 -ml-1 rounded hover:bg-black/5 active:bg-black/10 transition-colors shrink-0 cursor-grab active:cursor-grabbing"
           style={{ touchAction: 'none' }}
         >
           <GripVertical size={11} className={isActive ? 'text-white/70' : 'text-gray-400'} />
@@ -124,9 +188,16 @@ const SortableCategoryTab: React.FC<SortableCategoryTabProps> = ({
 
   return (
     <button
-      ref={setNodeRef}
+      ref={(node) => {
+        setNodeRef(node);
+        buttonElemRef.current = node;
+      }}
       style={customStyle}
-      onClick={() => setSelectedCategory(cat.id)}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      onClick={handleClick}
       data-category-tab={cat.id}
       className={`shrink-0 flex items-center space-x-1.5 border transition-colors duration-200 select-none
         ${isActive
@@ -138,7 +209,7 @@ const SortableCategoryTab: React.FC<SortableCategoryTabProps> = ({
       <span
         {...attributes}
         {...listeners}
-        className="p-0.5 -ml-1 rounded hover:bg-black/5 active:bg-black/10 transition-colors shrink-0 cursor-grab active:cursor-grabbing"
+        className="grip-handle p-0.5 -ml-1 rounded hover:bg-black/5 active:bg-black/10 transition-colors shrink-0 cursor-grab active:cursor-grabbing"
         style={{ touchAction: 'none' }}
       >
         <GripVertical size={11} className={isActive ? 'text-white/70' : 'text-gray-400'} />
@@ -240,6 +311,8 @@ export const CategoryTabBar: React.FC = () => {
   const setSelectedCategory = useTaskStore((state) => state.setSelectedCategory);
   const categories = useTaskStore((state) => state.categories);
   const addCategory = useTaskStore((state) => state.addCategory);
+  const renameCategory = useTaskStore((state) => state.renameCategory);
+  const deleteCategory = useTaskStore((state) => state.deleteCategory);
   const categoryOrder = useTaskStore((state) => state.categoryOrder);
   const setCategoryOrder = useTaskStore((state) => state.setCategoryOrder);
 
@@ -248,6 +321,11 @@ export const CategoryTabBar: React.FC = () => {
   const [activeId, setActiveId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   
+  const [menuCategory, setMenuCategory] = useState<{ cat: CategoryConfig; rect: DOMRect } | null>(null);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameInput, setRenameInput] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const [, setIndicatorStyle] = useState({ left: 0, width: 0 });
 
@@ -341,10 +419,38 @@ export const CategoryTabBar: React.FC = () => {
     setIsAdding(false);
   };
 
+  const handleLongPressTile = (cat: CategoryConfig, rect: DOMRect) => {
+    setMenuCategory({ cat, rect });
+    setIsRenaming(false);
+    setShowDeleteConfirm(false);
+  };
+
+  const closeMenu = () => {
+    setMenuCategory(null);
+    setIsRenaming(false);
+    setShowDeleteConfirm(false);
+  };
+
+  const handleRenameSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!menuCategory) return;
+    const trimmed = renameInput.trim();
+    if (trimmed && trimmed !== menuCategory.cat.name) {
+      renameCategory(menuCategory.cat.id, trimmed);
+    }
+    closeMenu();
+  };
+
+  const handleDeleteConfirm = () => {
+    if (!menuCategory) return;
+    deleteCategory(menuCategory.cat.id);
+    closeMenu();
+  };
+
   return (
     <div 
       ref={containerRef}
-      className="w-full bg-white border-b border-gray-150 px-4 flex items-center overflow-x-auto scrollbar-none flex-shrink-0 h-12"
+      className="w-full bg-white border-b border-gray-150 px-4 flex items-center overflow-x-auto scrollbar-none flex-shrink-0 h-12 relative"
       style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' }}
     >
       <div className="flex items-center space-x-2 whitespace-nowrap pr-8 relative h-full">
@@ -367,6 +473,7 @@ export const CategoryTabBar: React.FC = () => {
                 selectedCategory={selectedCategory}
                 setSelectedCategory={setSelectedCategory}
                 categories={categories}
+                onLongPress={handleLongPressTile}
               />
             ))}
           </SortableContext>
@@ -423,6 +530,116 @@ export const CategoryTabBar: React.FC = () => {
           </button>
         )}
       </div>
+
+      {/* Long-Press Category Options Modal / Menu */}
+      {menuCategory && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-2xs animate-fade-in"
+          onClick={closeMenu}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-xl border border-gray-100 w-full max-w-xs p-4 flex flex-col space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {!isRenaming && !showDeleteConfirm && (
+              <>
+                <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                  <span className="text-sm font-semibold text-gray-800 flex items-center space-x-2">
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: menuCategory.cat.color.solid }} />
+                    <span>{menuCategory.cat.name}</span>
+                  </span>
+                  <button onClick={closeMenu} className="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="flex flex-col space-y-1">
+                  <button
+                    onClick={() => {
+                      setIsRenaming(true);
+                      setRenameInput(menuCategory.cat.name);
+                    }}
+                    className="w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-[#1A73E8] transition-colors text-left cursor-pointer"
+                  >
+                    <Pencil size={15} />
+                    <span>Rename category</span>
+                  </button>
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors text-left cursor-pointer"
+                  >
+                    <Trash2 size={15} />
+                    <span>Delete category</span>
+                  </button>
+                </div>
+              </>
+            )}
+
+            {isRenaming && (
+              <form onSubmit={handleRenameSubmit} className="flex flex-col space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-gray-700">Rename Category</span>
+                  <button type="button" onClick={closeMenu} className="p-1 text-gray-400 hover:text-gray-600 cursor-pointer">
+                    <X size={16} />
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  autoFocus
+                  maxLength={20}
+                  value={renameInput}
+                  onChange={(e) => setRenameInput(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-800 focus:outline-none focus:border-[#1A73E8] focus:ring-1 focus:ring-[#1A73E8]"
+                />
+                <div className="flex items-center justify-end space-x-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsRenaming(false)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!renameInput.trim() || renameInput.trim() === menuCategory.cat.name}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1A73E8] text-white disabled:opacity-40 hover:bg-blue-700 transition-colors cursor-pointer"
+                  >
+                    Save
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {showDeleteConfirm && (
+              <div className="flex flex-col space-y-3">
+                <div className="flex items-center space-x-2 text-red-600">
+                  <AlertTriangle size={18} />
+                  <span className="text-xs font-semibold">Delete Category?</span>
+                </div>
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  Are you sure you want to delete <span className="font-semibold text-gray-800">"{menuCategory.cat.name}"</span>? Associated tasks will become uncategorized.
+                </p>
+                <div className="flex items-center justify-end space-x-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(false)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteConfirm}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition-colors shadow-xs cursor-pointer"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+

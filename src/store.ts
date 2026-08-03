@@ -44,6 +44,8 @@ interface TaskActions {
   deleteTask: (id: string) => void;
   reorderTasks: (tasks: Task[]) => void;
   addCategory: (name: string) => void;
+  renameCategory: (oldId: string, newName: string) => void;
+  deleteCategory: (id: string) => void;
   setCategoryOrder: (order: string[]) => void;
   
   setCurrentDate: (date: Date) => void;
@@ -252,7 +254,7 @@ export const useTaskStore = create<TaskState & TaskActions>()(
       theme: 'light',
       selectedView: 'month',
       categories: CATEGORIES,
-      categoryOrder: ['Pending', 'Work', 'Personal', 'Health', 'Holidays', 'Other'],
+      categoryOrder: ['Pending', 'Work', 'Personal', 'Health', 'Holidays', 'Other', 'Amit'],
       
       currentDate: new Date().toISOString(),
       direction: 'next',
@@ -582,11 +584,74 @@ export const useTaskStore = create<TaskState & TaskActions>()(
           color,
         };
 
-        const nextOrder = state.categoryOrder ? [...state.categoryOrder, trimmedName] : ['All', 'Pending', 'Work', 'Personal', 'Health', 'Holidays', 'Other', trimmedName];
+        const nextOrder = state.categoryOrder ? [...state.categoryOrder, trimmedName] : ['Pending', 'Work', 'Personal', 'Health', 'Holidays', 'Other', 'Amit', trimmedName];
 
         return {
           categories: [...state.categories, newCategory],
           categoryOrder: nextOrder,
+        };
+      }),
+
+      renameCategory: (oldId, newName) => set((state) => {
+        const trimmed = newName.trim();
+        if (!trimmed || trimmed === oldId) return {};
+
+        const exists = state.categories.some(
+          (c) => c.id.toLowerCase() === trimmed.toLowerCase() && c.id !== oldId
+        );
+        if (exists) return {};
+
+        const updatedCategories = state.categories.map((c) =>
+          c.id === oldId ? { ...c, id: trimmed, name: trimmed } : c
+        );
+
+        const updatedCategoryOrder = state.categoryOrder.map((catId) =>
+          catId === oldId ? trimmed : catId
+        );
+
+        const updatedTasks = state.tasks.map((task) =>
+          task.category === oldId ? { ...task, category: trimmed } : task
+        );
+
+        const updatedDeletedTasks = state.deletedTasks.map((task) =>
+          task.category === oldId ? { ...task, category: trimmed } : task
+        );
+
+        const nextSelectedCategory = state.selectedCategory === oldId ? trimmed : state.selectedCategory;
+
+        return {
+          categories: updatedCategories,
+          categoryOrder: updatedCategoryOrder,
+          tasks: updatedTasks,
+          deletedTasks: updatedDeletedTasks,
+          selectedCategory: nextSelectedCategory,
+        };
+      }),
+
+      deleteCategory: (id) => set((state) => {
+        const updatedCategories = state.categories.filter((c) => c.id !== id);
+        const updatedCategoryOrder = state.categoryOrder.filter((catId) => catId !== id);
+
+        const fallbackCat = 'Other';
+        const updatedTasks = state.tasks.map((task) =>
+          task.category === id ? { ...task, category: fallbackCat } : task
+        );
+
+        const updatedDeletedTasks = state.deletedTasks.map((task) =>
+          task.category === id ? { ...task, category: fallbackCat } : task
+        );
+
+        const nextSelectedCategory =
+          state.selectedCategory === id
+            ? (updatedCategories[0]?.id || 'Work')
+            : state.selectedCategory;
+
+        return {
+          categories: updatedCategories,
+          categoryOrder: updatedCategoryOrder,
+          tasks: updatedTasks,
+          deletedTasks: updatedDeletedTasks,
+          selectedCategory: nextSelectedCategory,
         };
       }),
 
@@ -603,6 +668,27 @@ export const useTaskStore = create<TaskState & TaskActions>()(
         categoryOrder: state.categoryOrder,
         deletedTasks: state.deletedTasks,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          const hasAmit = state.categories?.some((c) => c.id === 'Amit');
+          if (!hasAmit && state.categories) {
+            const amitConfig: CategoryConfig = {
+              id: 'Amit',
+              name: 'Amit',
+              color: {
+                light: 'text-blue-700',
+                bgLight: 'bg-blue-50',
+                borderLight: 'border-blue-200',
+                solid: '#1a73e8',
+              },
+            };
+            state.categories = [...state.categories, amitConfig];
+            if (state.categoryOrder && !state.categoryOrder.includes('Amit')) {
+              state.categoryOrder = [...state.categoryOrder, 'Amit'];
+            }
+          }
+        }
+      },
     }
   )
 );
