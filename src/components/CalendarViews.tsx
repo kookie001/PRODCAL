@@ -148,17 +148,19 @@ export const CalendarViews: React.FC<CalendarViewsProps> = ({ searchQuery }) => 
     setTempTimeStr(null);
   }, [draggedTaskId, tempTimeStr, updateTask]);
 
+  const specialCategoryId = useTaskStore((state) => state.specialCategoryId);
+
   // Filter tasks by category and exclude completed tasks from timeline (do NOT filter by search query anymore!)
   const filteredTasks = useMemo(() => {
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     return tasks.filter((task) => {
       if (task.completed) return false;
       if (selectedCategory === 'Pending') {
-        return task.category === 'Amit' && (task.date < todayStr || task.isPending === true);
+        return task.category === specialCategoryId && (task.date < todayStr || task.isPending === true);
       }
       return task.category === selectedCategory;
     });
-  }, [tasks, selectedCategory]);
+  }, [tasks, selectedCategory, specialCategoryId]);
 
   const openPopover = useCallback((date: Date, hour: number) => {
     setPopoverDate(date);
@@ -2570,7 +2572,7 @@ const DayView = React.memo<DayViewProps>(({
   
   const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
   const pendingCount = useTaskStore(
-    useCallback((state) => state.tasks.filter((task) => !task.completed && task.category === 'Amit' && task.date && (task.date < todayStr || task.isPending === true)).length, [todayStr])
+    useCallback((state) => state.tasks.filter((task) => !task.completed && task.category === state.specialCategoryId && task.date && (task.date < todayStr || task.isPending === true)).length, [todayStr])
   );
 
   const reorderSubtasks = useTaskStore((state) => state.reorderSubtasks);

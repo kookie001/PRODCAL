@@ -315,6 +315,8 @@ export const CategoryTabBar: React.FC = () => {
   const deleteCategory = useTaskStore((state) => state.deleteCategory);
   const categoryOrder = useTaskStore((state) => state.categoryOrder);
   const setCategoryOrder = useTaskStore((state) => state.setCategoryOrder);
+  const specialCategoryId = useTaskStore((state) => state.specialCategoryId);
+  const setSpecialCategoryId = useTaskStore((state) => state.setSpecialCategoryId);
 
   const [isAdding, setIsAdding] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -553,6 +555,28 @@ export const CategoryTabBar: React.FC = () => {
                   </button>
                 </div>
                 <div className="flex flex-col space-y-1">
+                  <label className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-[#1A73E8] transition-colors cursor-pointer select-none">
+                    <div className="flex items-center space-x-2.5">
+                      <input
+                        type="checkbox"
+                        checked={menuCategory.cat.id === specialCategoryId}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSpecialCategoryId(menuCategory.cat.id);
+                          }
+                          // Turning OFF directly is blocked as at least one tile must always be special
+                        }}
+                        className="w-4 h-4 text-[#1A73E8] rounded border-gray-300 focus:ring-[#1A73E8] cursor-pointer"
+                      />
+                      <span>Special tile</span>
+                    </div>
+                    {menuCategory.cat.id === specialCategoryId && (
+                      <span className="text-[10px] font-bold bg-blue-100 text-[#1A73E8] px-2 py-0.5 rounded-full">
+                        Active
+                      </span>
+                    )}
+                  </label>
+
                   <button
                     onClick={() => {
                       setIsRenaming(true);

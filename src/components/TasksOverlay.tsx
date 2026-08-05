@@ -704,7 +704,7 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
         updateTask(draggedTaskRef.current.id, {
           date: formattedDate,
           time: '',
-          category: 'Amit',
+          category: useTaskStore.getState().specialCategoryId,
           isPending: false,
           manualOrder: newOrder
         });
@@ -738,9 +738,11 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
     }, 280);
   }, [setIsOpen, setTasksOverlayOpen]);
 
+  const specialCategoryId = useTaskStore((state) => state.specialCategoryId);
+
   const allPendingTasks = useMemo(() => {
-    return tasks.filter((task) => !task.completed && task.category === 'Amit' && task.date && (task.date < todayStr || task.isPending === true));
-  }, [tasks, todayStr]);
+    return tasks.filter((task) => !task.completed && task.category === specialCategoryId && task.date && (task.date < todayStr || task.isPending === true));
+  }, [tasks, todayStr, specialCategoryId]);
 
   const completedTasks = useMemo(() => {
     return tasks.filter((task) => task.completed);

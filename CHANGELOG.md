@@ -1,6 +1,12 @@
 # Changelog
 
 ## [2026-08-05]
+- Decouple special category from name via flag + Special tile checkbox in long-press menu:
+  - Introduced `specialCategoryId` in store state, persisted to `localStorage`, defaulting to `'Amit'` on migration/first load.
+  - Replaced all hardcoded `category === 'Amit'` checks with `specialCategoryId` across pending list filter (`CalendarViews.tsx`), pending count badges (`Header.tsx`, `CalendarViews.tsx`), pending-to-timeline drop category assignment (`TasksOverlay.tsx`), `setTaskPending` (`store.ts`), search result location classification (`Header.tsx`), and default sheet category (`TaskSheet.tsx`).
+  - Added "Special tile" checkbox in category long-press menu in `CategoryTabBar.tsx` with single-active enforcement (enabling turns on for selected category and turns off previous; unchecking active special tile is blocked so at least one tile remains special).
+  - Ensured renaming the special category updates `specialCategoryId` in `renameCategory` (`store.ts`), keeping all pending functionality fully operational regardless of category name.
+
 - Amit becomes the pending-source category; remove all-tasks header function:
   - Restricted pending list criteria and pending count badge across `CalendarViews.tsx`, `Header.tsx`, `TasksOverlay.tsx`, `TaskSheet.tsx`, and `store.ts` so ONLY incomplete tasks with category `Amit` (past-dated or flagged pending) qualify for the pending list.
   - Past-dated incomplete tasks of other categories (Work, Personal, Health, etc.) remain on their original date timeline and do not enter pending.

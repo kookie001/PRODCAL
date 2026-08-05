@@ -62,8 +62,9 @@ export const Header: React.FC<HeaderProps> = ({
     );
   }, [activeDate]);
 
+  const specialCategoryId = useTaskStore((state) => state.specialCategoryId);
   const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
-  const pendingCount = useMemo(() => tasks.filter((task) => !task.completed && task.category === 'Amit' && task.date && (task.date < todayStr || task.isPending === true)).length, [tasks, todayStr]);
+  const pendingCount = useMemo(() => tasks.filter((task) => !task.completed && task.category === specialCategoryId && task.date && (task.date < todayStr || task.isPending === true)).length, [tasks, todayStr, specialCategoryId]);
 
   const calendarDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -87,7 +88,7 @@ export const Header: React.FC<HeaderProps> = ({
 
     allTasksCombined.forEach((task) => {
       const isDeleted = 'deletedAt' in task && Boolean(task.deletedAt);
-      const isTaskPending = !task.completed && !isDeleted && task.category === 'Amit' && (task.isPending === true || Boolean(task.date && task.date < todayStr));
+      const isTaskPending = !task.completed && !isDeleted && task.category === specialCategoryId && (task.isPending === true || Boolean(task.date && task.date < todayStr));
       const isTaskCompleted = Boolean(task.completed);
 
       const taskLocation: 'bin' | 'pending' | 'completed' | 'timeline' = 

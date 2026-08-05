@@ -6,6 +6,10 @@
 
 ## Resolved Bugs
 
+- **BUG 61: Special category behavior hardcoded to name "Amit" breaking on rename**
+  - *Description:* Pending list source category and dropped task category assignment were hardcoded to the string name "Amit", breaking whenever the category was renamed.
+  - *Resolution:* Decoupled special-category behavior from the name "Amit" by introducing a persisted `specialCategoryId` store value. Replaced all name checks with ID checks. Added a "Special tile" checkbox/toggle in the category long-press menu, maintaining single-active enforcement and fallback default (`Amit`). Updated `renameCategory` to preserve `specialCategoryId` on rename.
+
 - **BUG 60: Pending source restriction to "Amit" category & removal of all-tasks view**
   - *Description:* Pending list previously accumulated past-dated tasks from any category, and header date tile toggled an "All" tasks view.
   - *Resolution:* Restricted pending qualification and count badge strictly to incomplete tasks in the `Amit` category (`category === 'Amit' && (date < todayStr || isPending)`). Updated pending-to-timeline drops and `setTaskPending` to assign category `Amit`. Removed all-tasks view and sidebar "All Calendars" button so timeline strictly shows selected category tasks, and header date tile returns to today.

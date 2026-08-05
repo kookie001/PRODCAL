@@ -323,6 +323,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
   const setPrefilledTitle = useTaskStore((state) => state.setPrefilledTitle);
   const currentDateStr = useTaskStore((state) => state.currentDate);
   const selectedCategory = useTaskStore((state) => state.selectedCategory);
+  const specialCategoryId = useTaskStore((state) => state.specialCategoryId);
   const categories = useTaskStore((state) => state.categories);
   const setTaskSheetOpen = useTaskStore((state) => state.setTaskSheetOpen);
 
@@ -494,7 +495,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
       const isPending = Boolean(
         activeMode === 'edit' &&
         activeEditTask &&
-        activeEditTask.category === 'Amit' &&
+        activeEditTask.category === specialCategoryId &&
         (activeEditTask.isPending === true || (activeEditTask.date && activeEditTask.date < todayStr))
       );
       openedFromPendingRef.current = isPending;
@@ -516,7 +517,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
         // Create mode
         setTitle(prefilledTitle || '');
         const isRealCategory = selectedCategory !== 'Pending' && Boolean(selectedCategory);
-        const defaultCategory = isRealCategory ? selectedCategory : 'Amit';
+        const defaultCategory = isRealCategory ? selectedCategory : specialCategoryId;
         setCategory(defaultCategory);
         
         // Match currently selected date from store
@@ -549,7 +550,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
     } else {
       hasInitializedRef.current = false;
     }
-  }, [activeIsOpen, activeMode, activeEditTask, currentDateStr, prefilledTime, prefilledTitle, selectedCategory, categories]);
+  }, [activeIsOpen, activeMode, activeEditTask, currentDateStr, prefilledTime, prefilledTitle, selectedCategory, specialCategoryId, categories]);
 
   const handleSubtaskChange = useCallback((id: string, val: string) => {
     setSubtasks((prev) => prev.map((s) => (s.id === id ? { ...s, title: val } : s)));

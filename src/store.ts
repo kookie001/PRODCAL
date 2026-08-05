@@ -18,6 +18,7 @@ interface TaskState {
   selectedView: ViewType;
   categories: CategoryConfig[];
   categoryOrder: string[];
+  specialCategoryId: string;
   
   // Non-persisted transient state
   currentDate: string; // ISO String of the current active date for calendar view
@@ -47,6 +48,7 @@ interface TaskActions {
   renameCategory: (oldId: string, newName: string) => void;
   deleteCategory: (id: string) => void;
   setCategoryOrder: (order: string[]) => void;
+  setSpecialCategoryId: (id: string) => void;
   
   setCurrentDate: (date: Date) => void;
   setDirection: (direction: 'next' | 'prev') => void;
@@ -255,6 +257,7 @@ export const useTaskStore = create<TaskState & TaskActions>()(
       selectedView: 'month',
       categories: CATEGORIES,
       categoryOrder: ['Pending', 'Work', 'Personal', 'Health', 'Holidays', 'Other', 'Amit'],
+      specialCategoryId: 'Amit',
       
       currentDate: new Date().toISOString(),
       direction: 'next',
@@ -344,7 +347,7 @@ export const useTaskStore = create<TaskState & TaskActions>()(
 
       setTaskPending: (id) => set((state) => ({
         tasks: state.tasks.map((t) =>
-          t.id === id ? { ...t, isPending: true, category: 'Amit' } : t
+          t.id === id ? { ...t, isPending: true, category: state.specialCategoryId } : t
         )
       })),
 
@@ -618,6 +621,7 @@ export const useTaskStore = create<TaskState & TaskActions>()(
         );
 
         const nextSelectedCategory = state.selectedCategory === oldId ? trimmed : state.selectedCategory;
+        const updatedSpecialCategoryId = state.specialCategoryId === oldId ? trimmed : state.specialCategoryId;
 
         return {
           categories: updatedCategories,
@@ -625,6 +629,7 @@ export const useTaskStore = create<TaskState & TaskActions>()(
           tasks: updatedTasks,
           deletedTasks: updatedDeletedTasks,
           selectedCategory: nextSelectedCategory,
+          specialCategoryId: updatedSpecialCategoryId,
         };
       }),
 
@@ -646,20 +651,27 @@ export const useTaskStore = create<TaskState & TaskActions>()(
             ? (updatedCategories[0]?.id || 'Work')
             : state.selectedCategory;
 
+        const updatedSpecialCategoryId =
+          state.specialCategoryId === id
+            ? (updatedCategories[0]?.id || 'Work')
+            : state.specialCategoryId;
+
         return {
           categories: updatedCategories,
           categoryOrder: updatedCategoryOrder,
           tasks: updatedTasks,
           deletedTasks: updatedDeletedTasks,
           selectedCategory: nextSelectedCategory,
+          specialCategoryId: updatedSpecialCategoryId,
         };
       }),
 
-      setCategoryOrder: (order) => set({ categoryOrder: order })
+      setCategoryOrder: (order) => set({ categoryOrder: order }),
+      setSpecialCategoryId: (id) => set({ specialCategoryId: id }),
     }),
     {
       name: 'google-calendar-tasks-store',
-      // Only persist tasks, theme, view, categories, and deletedTasks
+      // Only persist tasks, theme, view, categories, categoryOrder, deletedTasks, specialCategoryId
       partialize: (state) => ({
         tasks: state.tasks,
         theme: state.theme,
@@ -667,6 +679,7 @@ export const useTaskStore = create<TaskState & TaskActions>()(
         categories: state.categories,
         categoryOrder: state.categoryOrder,
         deletedTasks: state.deletedTasks,
+        specialCategoryId: state.specialCategoryId,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
@@ -689,6 +702,9 @@ export const useTaskStore = create<TaskState & TaskActions>()(
             if (state.categoryOrder && !state.categoryOrder.includes('Amit')) {
               state.categoryOrder = [...state.categoryOrder, 'Amit'];
             }
+          }
+          if (!state.specialCategoryId) {
+            state.specialCategoryId = state.categories?.some((c) => c.id === 'Amit') ? 'Amit' : (state.categories?.[0]?.id || 'Work');
           }
         }
       },
