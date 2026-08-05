@@ -6,6 +6,10 @@
 
 ## Resolved Bugs
 
+- **BUG 60: Pending source restriction to "Amit" category & removal of all-tasks view**
+  - *Description:* Pending list previously accumulated past-dated tasks from any category, and header date tile toggled an "All" tasks view.
+  - *Resolution:* Restricted pending qualification and count badge strictly to incomplete tasks in the `Amit` category (`category === 'Amit' && (date < todayStr || isPending)`). Updated pending-to-timeline drops and `setTaskPending` to assign category `Amit`. Removed all-tasks view and sidebar "All Calendars" button so timeline strictly shows selected category tasks, and header date tile returns to today.
+
 - **BUG 59: Category system enhancements (Amit category & long-press tile menu)**
   - *Description:* Requirement to add "Amit" as a standard reorderable category tile and add a long-press menu on category tiles for Rename and Delete.
   - *Resolution:* Added "Amit" category config and migration state in store. Integrated 500ms long-press gesture handling on tile body with pointer distance checks (>8px movement cancels for scrolling) and grip handle isolation (`.grip-handle` bypasses long press for dnd-kit reordering). Added Rename modal and Delete confirmation dialog with fallback task re-assignment to `Other`.

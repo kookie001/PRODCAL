@@ -154,10 +154,9 @@ export const CalendarViews: React.FC<CalendarViewsProps> = ({ searchQuery }) => 
     return tasks.filter((task) => {
       if (task.completed) return false;
       if (selectedCategory === 'Pending') {
-        return task.date < todayStr || task.isPending === true;
+        return task.category === 'Amit' && (task.date < todayStr || task.isPending === true);
       }
-      const matchesCategory = selectedCategory === 'All' || task.category === selectedCategory;
-      return matchesCategory;
+      return task.category === selectedCategory;
     });
   }, [tasks, selectedCategory]);
 
@@ -2571,7 +2570,7 @@ const DayView = React.memo<DayViewProps>(({
   
   const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
   const pendingCount = useTaskStore(
-    useCallback((state) => state.tasks.filter((task) => !task.completed && task.date && (task.date < todayStr || task.isPending === true)).length, [todayStr])
+    useCallback((state) => state.tasks.filter((task) => !task.completed && task.category === 'Amit' && task.date && (task.date < todayStr || task.isPending === true)).length, [todayStr])
   );
 
   const reorderSubtasks = useTaskStore((state) => state.reorderSubtasks);

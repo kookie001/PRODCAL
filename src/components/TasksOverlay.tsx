@@ -704,6 +704,7 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
         updateTask(draggedTaskRef.current.id, {
           date: formattedDate,
           time: '',
+          category: 'Amit',
           isPending: false,
           manualOrder: newOrder
         });
@@ -738,7 +739,7 @@ export const TasksOverlay: React.FC<TasksOverlayProps> = ({ searchQuery, setSear
   }, [setIsOpen, setTasksOverlayOpen]);
 
   const allPendingTasks = useMemo(() => {
-    return tasks.filter((task) => !task.completed && task.date && (task.date < todayStr || task.isPending === true));
+    return tasks.filter((task) => !task.completed && task.category === 'Amit' && task.date && (task.date < todayStr || task.isPending === true));
   }, [tasks, todayStr]);
 
   const completedTasks = useMemo(() => {

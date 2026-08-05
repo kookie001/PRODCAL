@@ -145,25 +145,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               <span>My Calendars</span>
             </div>
             <div className="space-y-1">
-              {/* All row */}
-              <button
-                onClick={() => handleCategorySelect('All')}
-                className={`w-full flex items-center justify-between text-xs px-3 py-2 rounded-xl transition-all cursor-pointer
-                  ${selectedCategory === 'All'
-                    ? 'bg-[#E8F0FE] text-[#1A73E8] font-bold border-l-4 border-[#1A73E8] pl-2'
-                    : 'text-gray-600 hover:bg-gray-50 border-l-4 border-transparent'
-                  }
-                `}
-              >
-                <div className="flex items-center">
-                  <span className="w-2.5 h-2.5 rounded-full mr-3 border border-gray-300 bg-gray-100" />
-                  <span>All Calendars</span>
-                </div>
-                <span className="text-[10px] text-gray-400 font-bold bg-gray-100/50 px-1.5 py-0.5 rounded-md">
-                  {tasks.length}
-                </span>
-              </button>
-
               {CATEGORIES.map((cat) => {
                 const isSelected = selectedCategory === cat.id;
                 const categoryCount = tasks.filter((t) => t.category === cat.id).length;

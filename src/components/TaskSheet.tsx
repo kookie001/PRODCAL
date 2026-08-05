@@ -494,6 +494,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
       const isPending = Boolean(
         activeMode === 'edit' &&
         activeEditTask &&
+        activeEditTask.category === 'Amit' &&
         (activeEditTask.isPending === true || (activeEditTask.date && activeEditTask.date < todayStr))
       );
       openedFromPendingRef.current = isPending;
@@ -514,8 +515,8 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
       } else {
         // Create mode
         setTitle(prefilledTitle || '');
-        const isRealCategory = selectedCategory !== 'All' && selectedCategory !== 'Pending' && Boolean(selectedCategory);
-        const defaultCategory = isRealCategory ? selectedCategory : (categories[0]?.id || 'Work');
+        const isRealCategory = selectedCategory !== 'Pending' && Boolean(selectedCategory);
+        const defaultCategory = isRealCategory ? selectedCategory : 'Amit';
         setCategory(defaultCategory);
         
         // Match currently selected date from store

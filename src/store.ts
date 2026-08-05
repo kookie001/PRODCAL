@@ -22,7 +22,7 @@ interface TaskState {
   // Non-persisted transient state
   currentDate: string; // ISO String of the current active date for calendar view
   direction: 'next' | 'prev'; // For slide transitions
-  selectedCategory: CategoryType | 'All';
+  selectedCategory: CategoryType;
   isFABOpen: boolean;
   editingTask: Task | null; // For editing existing tasks in the task sheet
   selectedTaskForDetails: Task | null; // For showing task detail modal
@@ -50,7 +50,7 @@ interface TaskActions {
   
   setCurrentDate: (date: Date) => void;
   setDirection: (direction: 'next' | 'prev') => void;
-  setSelectedCategory: (category: CategoryType | 'All') => void;
+  setSelectedCategory: (category: CategoryType) => void;
   setSelectedView: (view: ViewType) => void;
   toggleTheme: () => void;
   setFABOpen: (isOpen: boolean) => void;
@@ -344,7 +344,7 @@ export const useTaskStore = create<TaskState & TaskActions>()(
 
       setTaskPending: (id) => set((state) => ({
         tasks: state.tasks.map((t) =>
-          t.id === id ? { ...t, isPending: true } : t
+          t.id === id ? { ...t, isPending: true, category: 'Amit' } : t
         )
       })),
 
@@ -670,6 +670,9 @@ export const useTaskStore = create<TaskState & TaskActions>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
+          if ((state.selectedCategory as string) === 'All') {
+            state.selectedCategory = 'Work';
+          }
           const hasAmit = state.categories?.some((c) => c.id === 'Amit');
           if (!hasAmit && state.categories) {
             const amitConfig: CategoryConfig = {

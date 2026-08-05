@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-08-05]
+- Amit becomes the pending-source category; remove all-tasks header function:
+  - Restricted pending list criteria and pending count badge across `CalendarViews.tsx`, `Header.tsx`, `TasksOverlay.tsx`, `TaskSheet.tsx`, and `store.ts` so ONLY incomplete tasks with category `Amit` (past-dated or flagged pending) qualify for the pending list.
+  - Past-dated incomplete tasks of other categories (Work, Personal, Health, etc.) remain on their original date timeline and do not enter pending.
+  - Updated pending-to-timeline drop in `TasksOverlay.tsx` to assign category `Amit` (preserving all-day and top-of-list behavior).
+  - Updated `setTaskPending` in `store.ts` to assign category `Amit`.
+  - Removed "show all tasks" function from the header date tile so it strictly performs its "return to today" jump.
+  - Removed "All Calendars" option from `Sidebar.tsx` and all `'All'` view fallbacks, ensuring a real category is always selected and the timeline strictly filters by that category.
+
 ## [2026-08-03]
 - Add "Amit" category tile and long-press tile menu (rename/delete):
   - Added "Amit" as a standard category tile in `types.ts` and `store.ts`, included in default category order (`categoryOrder`), and auto-migrated into persisted state via `onRehydrateStorage`.

@@ -48,8 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   const handleHeaderDateClick = useCallback(() => {
     setCurrentDate(new Date());
-    setSelectedCategory('All');
-  }, [setCurrentDate, setSelectedCategory]);
+  }, [setCurrentDate]);
 
   const activeDate = new Date(currentDateStr);
   const [isMiniCalendarOpen, setIsMiniCalendarOpen] = useState(false);
@@ -64,7 +63,7 @@ export const Header: React.FC<HeaderProps> = ({
   }, [activeDate]);
 
   const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
-  const pendingCount = useMemo(() => tasks.filter((task) => !task.completed && task.date && (task.date < todayStr || task.isPending === true)).length, [tasks, todayStr]);
+  const pendingCount = useMemo(() => tasks.filter((task) => !task.completed && task.category === 'Amit' && task.date && (task.date < todayStr || task.isPending === true)).length, [tasks, todayStr]);
 
   const calendarDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -88,7 +87,7 @@ export const Header: React.FC<HeaderProps> = ({
 
     allTasksCombined.forEach((task) => {
       const isDeleted = 'deletedAt' in task && Boolean(task.deletedAt);
-      const isTaskPending = !task.completed && !isDeleted && (task.isPending === true || Boolean(task.date && task.date < todayStr));
+      const isTaskPending = !task.completed && !isDeleted && task.category === 'Amit' && (task.isPending === true || Boolean(task.date && task.date < todayStr));
       const isTaskCompleted = Boolean(task.completed);
 
       const taskLocation: 'bin' | 'pending' | 'completed' | 'timeline' = 
