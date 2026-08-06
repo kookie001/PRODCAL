@@ -610,6 +610,9 @@ const WeekView = React.memo<WeekViewProps>(({
 
   const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
 
+  const specialCategoryId = useTaskStore((state) => state.specialCategoryId);
+  const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+
   const tasksByDate = useMemo(() => {
     const map = new Map<string, Task[]>();
     tasks.forEach((task) => {
@@ -618,9 +621,23 @@ const WeekView = React.memo<WeekViewProps>(({
         map.set(dateStr, []);
       }
       map.get(dateStr)!.push(task);
+
+      if (
+        !task.completed &&
+        !task.isPending &&
+        task.category !== specialCategoryId &&
+        task.date < todayStr
+      ) {
+        if (dateStr !== todayStr) {
+          if (!map.has(todayStr)) {
+            map.set(todayStr, []);
+          }
+          map.get(todayStr)!.push(task);
+        }
+      }
     });
     return map;
-  }, [tasks]);
+  }, [tasks, todayStr, specialCategoryId]);
 
   const reorderSubtasks = useTaskStore((state) => state.reorderSubtasks);
   const toggleSubtask = useTaskStore((state) => state.toggleSubtask);
@@ -2566,6 +2583,7 @@ const DayView = React.memo<DayViewProps>(({
 
   const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
   const isTodayDay = isToday(activeDate);
+  const specialCategoryId = useTaskStore((state) => state.specialCategoryId);
   const setTasksOverlayOpen = useTaskStore((state) => state.setTasksOverlayOpen);
   const isTasksOverlayOpen = useTaskStore((state) => state.isTasksOverlayOpen);
   const setCurrentDate = useTaskStore((state) => state.setCurrentDate);
@@ -2923,12 +2941,28 @@ const DayView = React.memo<DayViewProps>(({
   });
 
   const dayTasks = useMemo(() => {
+    const activeDateStr = format(activeDate, 'yyyy-MM-dd');
+    const isViewingToday = activeDateStr === todayStr;
+
     return tasks.filter((task) => {
       if (task.isPending) return false;
-      const taskDate = new Date(task.date + 'T00:00:00');
-      return isSameDay(taskDate, activeDate);
+      if (task.completed) return false;
+
+      // 1. Tasks directly on the active view date
+      if (task.date === activeDateStr) return true;
+
+      // 2. When viewing today, carry forward past incomplete non-special category tasks
+      if (
+        isViewingToday &&
+        task.date < todayStr &&
+        task.category !== specialCategoryId
+      ) {
+        return true;
+      }
+
+      return false;
     });
-  }, [tasks, activeDate]);
+  }, [tasks, activeDate, todayStr, specialCategoryId]);
 
   const sortedDayTasks = useMemo(() => {
     return [...dayTasks].sort((a, b) => {
@@ -3179,6 +3213,9 @@ const ScheduleView = React.memo<ScheduleViewProps>(({
     lastScrollY.current = currentScrollY;
   };
 
+  const specialCategoryId = useTaskStore((state) => state.specialCategoryId);
+  const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+
   // Build full list of days from Jan 1st 2025 to Dec 31st 2027
   const scheduleItems = React.useMemo(() => {
     const tasksByDateMap = new Map<string, Task[]>();
@@ -3188,6 +3225,20 @@ const ScheduleView = React.memo<ScheduleViewProps>(({
         tasksByDateMap.set(dStr, []);
       }
       tasksByDateMap.get(dStr)!.push(t);
+
+      if (
+        !t.completed &&
+        !t.isPending &&
+        t.category !== specialCategoryId &&
+        t.date < todayStr
+      ) {
+        if (dStr !== todayStr) {
+          if (!tasksByDateMap.has(todayStr)) {
+            tasksByDateMap.set(todayStr, []);
+          }
+          tasksByDateMap.get(todayStr)!.push(t);
+        }
+      }
     });
 
     const items: any[] = [];

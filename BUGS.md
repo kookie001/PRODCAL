@@ -6,6 +6,10 @@
 
 ## Resolved Bugs
 
+- **BUG 62: Past incomplete non-special category tasks vanishing from timeline on day change**
+  - *Description:* When the day changed, incomplete tasks belonging to non-special categories (Work, Personal, Health, etc.) from past days disappeared from today's timeline unless manually navigated back to past dates.
+  - *Resolution:* Implemented display-only carry forward logic in `DayView`, `WeekView`, and `ScheduleView`. Incomplete non-special tasks with `date < todayStr` now appear on today's view while preserving their original stored `date` in data without mutation. Excluded special-category tasks (which go to Pending list) and completed tasks. Viewing past/future dates continues to display only tasks actually assigned to those dates.
+
 - **BUG 61: Special category behavior hardcoded to name "Amit" breaking on rename**
   - *Description:* Pending list source category and dropped task category assignment were hardcoded to the string name "Amit", breaking whenever the category was renamed.
   - *Resolution:* Decoupled special-category behavior from the name "Amit" by introducing a persisted `specialCategoryId` store value. Replaced all name checks with ID checks. Added a "Special tile" checkbox/toggle in the category long-press menu, maintaining single-active enforcement and fallback default (`Amit`). Updated `renameCategory` to preserve `specialCategoryId` on rename.

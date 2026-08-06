@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-08-06]
+- Carry forward incomplete non-special tasks to today's timeline (display-only, no date mutation):
+  - Updated `DayView` task selection so when viewing today (`isViewingToday`), incomplete tasks from past dates (`task.date < todayStr`) in non-special categories (`task.category !== specialCategoryId`) carry forward to today's timeline.
+  - Ensured actual stored `task.date` is never mutated (pure display computation).
+  - Special category tasks continue to go strictly to the Pending list and are excluded from timeline carry-forward.
+  - Carried-forward tasks stop appearing as soon as they are completed.
+  - Viewing past or future days strictly displays tasks actually assigned to those dates.
+  - Updated `WeekView` and `ScheduleView` task grouping maps to reflect carried-forward tasks in today's column/section.
+
 ## [2026-08-05]
 - Decouple special category from name via flag + Special tile checkbox in long-press menu:
   - Introduced `specialCategoryId` in store state, persisted to `localStorage`, defaulting to `'Amit'` on migration/first load.

@@ -21,44 +21,57 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        let refreshing = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (!refreshing) {
-            refreshing = true;
-            window.location.reload();
-          }
-        });
+        const isDev = window.location.hostname.includes('ais-dev') || 
+                      window.location.hostname === 'localhost' || 
+                      window.location.hostname === '127.0.0.1';
 
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-              console.log('ServiceWorker registered:', registration.scope);
-              
-              // Force update check on load
-              registration.update();
+        if (isDev) {
+          // Unregister any active service worker in dev environment to prevent MIME type & stale dev asset issues
+          navigator.serviceWorker.getRegistrations().then((registrations) => {
+            for (const registration of registrations) {
+              registration.unregister();
+            }
+          }).catch(() => {});
+        } else {
+          let refreshing = false;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!refreshing) {
+              refreshing = true;
+              window.location.reload();
+            }
+          });
 
-              registration.addEventListener('updatefound', () => {
-                const newWorker = registration.installing;
-                if (newWorker) {
-                  newWorker.addEventListener('statechange', () => {
-                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                      newWorker.postMessage({ type: 'SKIP_WAITING' });
-                    }
-                  });
-                }
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+              .then((registration) => {
+                console.log('ServiceWorker registered:', registration.scope);
+                
+                // Force update check on load
+                registration.update().catch(() => {});
+
+                registration.addEventListener('updatefound', () => {
+                  const newWorker = registration.installing;
+                  if (newWorker) {
+                    newWorker.addEventListener('statechange', () => {
+                      if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        newWorker.postMessage({ type: 'SKIP_WAITING' });
+                      }
+                    });
+                  }
+                });
+              })
+              .catch((err) => {
+                console.log('ServiceWorker registration skipped or failed: ', err);
               });
-            })
-            .catch((err) => {
-              console.log('ServiceWorker registration failed: ', err);
-            });
-        });
+          });
 
-        // Check for updates when app returns to foreground
-        document.addEventListener('visibilitychange', () => {
-          if (document.visibilityState === 'visible') {
-            navigator.serviceWorker.ready.then((reg) => reg.update());
-          }
-        });
+          // Check for updates when app returns to foreground
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+              navigator.serviceWorker.ready.then((reg) => reg.update()).catch(() => {});
+            }
+          });
+        }
       }
     </script>
   </body>
