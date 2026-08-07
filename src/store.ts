@@ -261,7 +261,7 @@ export const useTaskStore = create<TaskState & TaskActions>()(
       
       currentDate: new Date().toISOString(),
       direction: 'next',
-      selectedCategory: 'Work',
+      selectedCategory: 'Amit',
       isFABOpen: false,
       editingTask: null,
       selectedTaskForDetails: null,
@@ -705,6 +705,9 @@ export const useTaskStore = create<TaskState & TaskActions>()(
           }
           if (!state.specialCategoryId) {
             state.specialCategoryId = state.categories?.some((c) => c.id === 'Amit') ? 'Amit' : (state.categories?.[0]?.id || 'Work');
+          }
+          if (state.specialCategoryId) {
+            state.selectedCategory = state.specialCategoryId;
           }
         }
       },

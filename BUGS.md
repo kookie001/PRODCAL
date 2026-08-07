@@ -6,6 +6,14 @@
 
 ## Resolved Bugs
 
+- **BUG 64: Search bar routing issues with carried-forward tasks, DOM IDs, category tabs, and subtask expansion**
+  - *Description:* Search results routed to a task's stored creation date instead of its displayed location on today's timeline when carried forward, failed to switch the active category tab, missing `timeline-task-${id}` DOM ID on cards, and didn't auto-expand parent timeline cards when a subtask was clicked.
+  - *Resolution:* Fixed in `Header.tsx` and `CalendarViews.tsx`: (1) Used effective display date (`todayStr` for carried-forward tasks) when navigating timeline results. (2) Re-added `id={`timeline-task-${task.id}`}` on `DraggableTaskBlock`'s outer `motion.div`. (3) Called `setSelectedCategory(task.category)` on search navigation so the timeline tab matches the task. (4) Dispatched `expand-timeline-task` event on subtask clicks to expand parent timeline task card.
+
+- **BUG 63: Unreliable single-tap-to-expand on task card title**
+  - *Description:* Single-tap on subtask card title required hard press or multiple taps to expand/collapse.
+  - *Resolution:* Fixed two primary root causes in `CalendarViews.tsx`: (1) Title `<p>` element was un-stretched (~17px height in a 48px row), so 65% of vertical space fell through to non-title container where `isTitle` was false. Wrapped title in a full-height (`100%`) flex container. (2) Loosened touch movement distance tolerance from 8px to 14px so natural finger squish during soft taps is not misidentified as drag/scroll. Reduced tap timer window to 220ms with `touchAction: 'manipulation'`.
+
 - **BUG 62: Past incomplete non-special category tasks vanishing from timeline on day change**
   - *Description:* When the day changed, incomplete tasks belonging to non-special categories (Work, Personal, Health, etc.) from past days disappeared from today's timeline unless manually navigated back to past dates.
   - *Resolution:* Implemented display-only carry forward logic in `DayView`, `WeekView`, and `ScheduleView`. Incomplete non-special tasks with `date < todayStr` now appear on today's view while preserving their original stored `date` in data without mutation. Excluded special-category tasks (which go to Pending list) and completed tasks. Viewing past/future dates continues to display only tasks actually assigned to those dates.

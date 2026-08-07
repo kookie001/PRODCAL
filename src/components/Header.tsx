@@ -181,19 +181,31 @@ export const Header: React.FC<HeaderProps> = ({
     }
 
     // Priority 4: Normal timeline task
-    if (task.date) {
-      const [yr, mo, dy] = task.date.split('-').map(Number);
+    if (task.category) {
+      setSelectedCategory(task.category);
+    }
+
+    const isCarriedForward = !task.completed && !task.isPending && task.category !== specialCategoryId && task.date && task.date < todayStr;
+    const targetDateStr = isCarriedForward ? todayStr : task.date;
+
+    if (targetDateStr) {
+      const [yr, mo, dy] = targetDateStr.split('-').map(Number);
       const dateObj = new Date(yr, mo - 1, dy);
       setCurrentDate(dateObj);
       setSelectedView('day');
       scrollToElement(`timeline-task-${task.id}`);
+
+      if (item.type === 'subtask') {
+        window.dispatchEvent(new CustomEvent('expand-timeline-task', { detail: { taskId: task.id } }));
+      }
+
       if (task.time) {
         setTimeout(() => {
           window.dispatchEvent(new CustomEvent('scroll-to-task', { detail: { time: task.time } }));
         }, 150);
       }
     }
-  }, [setSearchQuery, setBinOpen, setTasksOverlayOpen, setCurrentDate, setSelectedView]);
+  }, [setSearchQuery, setBinOpen, setTasksOverlayOpen, setCurrentDate, setSelectedView, setSelectedCategory, specialCategoryId, todayStr]);
 
   // Close dropdowns on day change
   useEffect(() => {

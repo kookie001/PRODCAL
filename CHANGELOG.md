@@ -1,6 +1,23 @@
 # Changelog
 
+## [2026-08-07]
+- Fix search routing: carried-forward date, timeline id, category switch, subtask auto-expand:
+  - Computed effective display date for search results: carried-forward non-special tasks now navigate to `todayStr` (where they appear on the timeline) rather than their stored past date.
+  - Restored missing `id={`timeline-task-${task.id}`}` on `DraggableTaskBlock`'s outer `motion.div` in `CalendarViews.tsx` so search scroll & ring highlight targets the timeline element directly.
+  - Updated `handleSearchResultClick` in `Header.tsx` to automatically call `setSelectedCategory(task.category)` on search result navigation so the matching category tab is activated and the task is visible.
+  - Enabled auto-expansion of parent timeline task cards when a subtask search result is clicked via `expand-timeline-task` event dispatch.
+
 ## [2026-08-06]
+- Fix unreliable single-tap-to-expand: loosen tolerance, remove tap delay, generous hit area:
+  - Loosened touch movement distance threshold from 8px to 14px in `CalendarViews.tsx` so natural finger squish during soft taps is not misidentified as drag/scroll.
+  - Wrapped title in a full-height (`100%`) flex container spanning the 48px row, eliminating 31px of vertical dead space where taps fell through to non-title handlers.
+  - Reduced tap-count window to 220ms with `touchAction: 'manipulation'` for instant, reliable expand/collapse response on first soft tap.
+  - Removed chevron button; aligned titles left-aligned with underline indicator for tasks with incomplete subtasks.
+
+- Default to special category on app launch:
+  - Updated store initial state and rehydration logic (`onRehydrateStorage`) so `selectedCategory` defaults to `specialCategoryId` (by flag/ID, not hardcoded name) when the app launches or reloads.
+  - Preserved normal category switching during the session without forcing back to special on subsequent user interactions.
+
 - Carry forward incomplete non-special tasks to today's timeline (display-only, no date mutation):
   - Updated `DayView` task selection so when viewing today (`isViewingToday`), incomplete tasks from past dates (`task.date < todayStr`) in non-special categories (`task.category !== specialCategoryId`) carry forward to today's timeline.
   - Ensured actual stored `task.date` is never mutated (pure display computation).

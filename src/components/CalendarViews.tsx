@@ -1672,6 +1672,18 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
     setEditTitle(task.title)
   }, [task.title])
 
+  useEffect(() => {
+    const handleExpand = (e: CustomEvent<{ taskId: string }>) => {
+      if (e.detail?.taskId === task.id) {
+        setExpanded(true);
+      }
+    };
+    window.addEventListener('expand-timeline-task' as any, handleExpand);
+    return () => {
+      window.removeEventListener('expand-timeline-task' as any, handleExpand);
+    };
+  }, [task.id]);
+
   const incompleteSubtasks = useMemo(() => {
     return (task.subtasks || []).filter(s => !s.completed);
   }, [task.subtasks]);
@@ -1693,11 +1705,14 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
     updateTask(id, { completed: !task.completed })
   }
 
+  const hasIncompleteSubtasks = incompleteSubtasks.length > 0;
+
   const handleUnifiedTap = (isTitle: boolean) => {
     if (moved.current) return;
     tapCount.current += 1;
     clearTimeout(tapTimer.current);
     addDebug(`tap=${tapCount.current} title=${isTitle}`);
+    
     if (tapCount.current >= 3) {
       tapCount.current = 0;
       addDebug(`DELETE ${task.title}`);
@@ -1707,13 +1722,19 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       deleteTask(task.id);
       return;
     }
+    
     tapTimer.current = setTimeout(() => {
-      if (tapCount.current === 1 && isTitle) {
+      if (tapCount.current === 1) {
+        if (isTitle && hasIncompleteSubtasks) {
+          addDebug(`TOGGLE EXPAND ${task.title}`);
+          setExpanded((prev) => !prev);
+        }
+      } else if (tapCount.current === 2) {
         addDebug(`EDIT ${task.title}`);
         onEditOpen(task);
       }
       tapCount.current = 0;
-    }, 350);
+    }, 220);
   };
 
   const sensors = useSensors(
@@ -2006,7 +2027,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       if (!dragging.current) return
       const dy = e.touches[0].clientY - touchStart.current.y
       const dx = e.touches[0].clientX - touchStart.current.x
-      if (Math.abs(dy) > 8 || Math.abs(dx) > 8) {
+      if (Math.abs(dy) > 14 || Math.abs(dx) > 14) {
         if (!moved.current) {
           moved.current = true
         }
@@ -2066,6 +2087,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
   return (
     <motion.div
       ref={combinedRef}
+      id={`timeline-task-${task.id}`}
       {...attributes}
       {...listeners}
       onTouchStart={(e) => {
@@ -2087,7 +2109,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
             dist = Math.hypot(dx, dy)
           }
           const duration = Date.now() - (touchStart.current?.time || 0)
-          if (!moved.current && dist <= 8 && duration <= 400) {
+          if (!moved.current && dist <= 14 && duration <= 500) {
             handleUnifiedTap(false)
           }
         }
@@ -2140,71 +2162,13 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        padding: '0 8px',
+        padding: '0 12px',
         height: '48px',
         width: '100%',
         boxSizing: 'border-box',
       }}>
 
-        {/* LEFT: expand toggle (chevron) — only if incomplete subtasks exist */}
-        <div style={{
-          width: '24px',
-          marginRight: '6px',
-          flexShrink: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-          {incompleteSubtasks.length > 0 && (
-            <button
-              className="chevron-button"
-              onTouchStart={(e) => {
-                e.stopPropagation()
-                e.preventDefault()
-              }}
-              onMouseDown={(e) => {
-                e.stopPropagation()
-                e.preventDefault()
-              }}
-              onTouchEnd={(e) => {
-                e.stopPropagation()
-                e.preventDefault()
-                setExpanded(prev => !prev)
-              }}
-              onMouseUp={(e) => {
-                e.stopPropagation()
-                e.preventDefault()
-                setExpanded(prev => !prev)
-              }}
-              style={{
-                width: '24px',
-                height: '24px',
-                background: 'transparent',
-                border: 'none',
-                padding: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-              }}
-            >
-              <svg 
-                width="10" 
-                height="10" 
-                viewBox="0 0 8 8" 
-                fill="none"
-                style={{
-                  transition: 'transform 150ms ease',
-                  transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                }}
-              >
-                <path d="M2 1.5L5.5 4L2 6.5" stroke={fg} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          )}
-        </div>
-
-        {/* CENTER: task title — takes all remaining space, priority */}
+        {/* CENTER: task title — starts from left, takes all remaining space */}
         {isEditing ? (
           <input
             type="text"
@@ -2244,7 +2208,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
             }}
           />
         ) : (
-          <p
+          <div
             onTouchEnd={(e) => {
               lastTouchTime.current = Date.now()
               const touch = e.changedTouches ? e.changedTouches[0] : null
@@ -2255,7 +2219,7 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
                 dist = Math.hypot(dx, dy)
               }
               const duration = Date.now() - (touchStart.current?.time || 0)
-              if (moved.current || dist > 8 || duration > 400) return
+              if (moved.current || dist > 14 || duration > 500) return
               e.stopPropagation()
               e.preventDefault()  // CRITICAL — prevents the synthetic onClick from also firing
               handleUnifiedTap(true)
@@ -2268,21 +2232,37 @@ const DraggableTaskBlock = React.memo<DraggableTaskBlockProps>(({ task, style, o
             }}
             style={{
               flex: 1,
-              fontSize: '14px',
-              fontWeight: 600,
-              color: fg,
-              textDecoration: completed ? 'line-through' : 'none',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              margin: 0,
-              padding: 0,
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
               cursor: 'pointer',
-              lineHeight: '1.2',
+              touchAction: 'manipulation',
+              minWidth: 0,
             }}
           >
-            {task.title}
-          </p>
+            <p
+              style={{
+                fontSize: '14px',
+                fontWeight: 600,
+                color: fg,
+                textDecoration: completed
+                  ? 'line-through'
+                  : (hasIncompleteSubtasks ? 'underline' : 'none'),
+                textDecorationColor: hasIncompleteSubtasks ? `${fg}88` : undefined,
+                textDecorationThickness: hasIncompleteSubtasks ? '1.5px' : undefined,
+                textUnderlineOffset: hasIncompleteSubtasks ? '3px' : undefined,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                margin: 0,
+                padding: 0,
+                lineHeight: '1.2',
+                width: '100%',
+              }}
+            >
+              {task.title}
+            </p>
+          </div>
         )}
 
         {/* SMALL PENCIL (EDIT) ICON BUTTON */}
